@@ -25,7 +25,7 @@ Perform a code-only Covel gameplay-flow audit from the first start-game click th
 
 Confirm these inputs from the user request or infer conservatively:
 
-- Target repo, normally `REPO_ROOT`.
+- Target repo, normally the current Covel repository root.
 - Whether the audit is static-only.
 - Starting user action, usually first `Start Game` in the prep screen.
 - Required simulation depth, usually Turn0 plus at least Turn1/Turn2/Turn3.
