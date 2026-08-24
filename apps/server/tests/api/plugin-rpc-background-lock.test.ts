@@ -148,7 +148,7 @@ describe("detached runtime cross-process lock boundary", () => {
     expect(backgroundKeys[0]).not.toBe(SESSION_ID);
   });
 
-  it("allows different runtime or activation jobs to execute concurrently", async () => {
+  it("serializes different activations of one runtime while allowing other runtimes", async () => {
     const gate = deferred();
     const started = new Set<string>();
     let active = 0;
@@ -181,10 +181,15 @@ describe("detached runtime cross-process lock boundary", () => {
       runtimeId: RUNTIME_B,
       triggerEvent,
     });
-    await vi.waitFor(() => expect(started.size).toBe(3));
+    await vi.waitFor(() => expect(started.size).toBe(2));
 
-    expect(maxActive).toBe(3);
+    expect(started).toEqual(
+      new Set([`${RUNTIME_A}:same image`, `${RUNTIME_B}:same image`]),
+    );
+    expect(maxActive).toBe(2);
     gate.resolve();
     await Promise.all([first, second, third]);
+    expect(started).toContain(`${RUNTIME_A}:different image`);
+    expect(maxActive).toBe(2);
   });
 });

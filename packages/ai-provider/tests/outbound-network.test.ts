@@ -160,6 +160,30 @@ describe("outbound network transport", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back after a SOCKS5 destination connection failure", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    const socksFailure = new TypeError("fetch failed", {
+      cause: Object.assign(
+        new Error("SOCKS5 connection failed: Connection refused"),
+        { code: "UND_ERR_SOCKS5_REPLY_5" },
+      ),
+    });
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(socksFailure)
+      .mockResolvedValueOnce(new Response("direct", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    configureOutboundProxy({
+      mode: "system",
+      resolveSystemProxy: async () => "SOCKS5 dead-proxy.example:1080; DIRECT",
+    });
+
+    await expect(
+      outboundFetch("https://provider.example/v1/models"),
+    ).resolves.toMatchObject({ status: 200 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("routes core provider requests through an HTTP proxy", async () => {
     vi.stubEnv("NODE_ENV", "production");
     let proxyConnections = 0;

@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   createWorld: vi.fn(),
   getSession: vi.fn(),
   createSession: vi.fn(),
+  deleteSession: vi.fn(),
   syncMessages: vi.fn(),
 }));
 
@@ -45,6 +46,7 @@ beforeEach(() => {
   api.getWorld.mockResolvedValue({ id: "world-1" });
   api.getSession.mockRejectedValue(new Error("404"));
   api.createSession.mockResolvedValue({ id: "sess-1" });
+  api.deleteSession.mockResolvedValue(undefined);
   api.syncMessages.mockResolvedValue(undefined);
 });
 
@@ -139,5 +141,27 @@ describe("LocalDataService session sync", () => {
       [],
       "en-US",
     );
+  });
+
+  it("deletes both the local session and its server mirror", async () => {
+    const store = createMemoryStore();
+    const now = new Date().toISOString();
+    await store.createSession({
+      id: "sess-1",
+      worldId: "world-1",
+      status: "active",
+      turnCount: 0,
+      preGameCompleted: [],
+      activePlugins: [],
+      locale: "en-US",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const service = withStore(store);
+
+    await service.deleteSession("sess-1");
+
+    await expect(store.getSession("sess-1")).resolves.toBeNull();
+    expect(api.deleteSession).toHaveBeenCalledWith("sess-1");
   });
 });

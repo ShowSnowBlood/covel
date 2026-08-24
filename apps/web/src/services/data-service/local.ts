@@ -258,7 +258,18 @@ export class LocalDataService implements DataService {
     // partway through.
     this.statePatches.delete(sessionId);
     const store = await this.getStore();
-    await store.deleteSession(sessionId);
+    await Promise.all([
+      store.deleteSession(sessionId),
+      // A local session may already have an authoritative server mirror from
+      // syncToServer. Its cleanup is best-effort so offline users can still
+      // delete their browser data, but always attempt it to avoid orphaned
+      // sessions when startup rolls back after a partial or completed sync.
+      api.deleteSession(sessionId).catch((error) => {
+        if (!isNotFound(error)) {
+          ignoreError("delete server session mirror")(error);
+        }
+      }),
+    ]);
     appKv
       .removeStateSnapshot(sessionId)
       .catch(ignoreError("remove state snapshot on delete"));

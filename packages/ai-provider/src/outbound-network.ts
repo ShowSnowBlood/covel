@@ -285,6 +285,13 @@ function canFallbackAfter(
     "ENETUNREACH",
     "UND_ERR_CONNECT_TIMEOUT",
     "UND_ERR_PRX_CONN",
+    // Undici reports destination-side SOCKS5 connectivity failures with
+    // protocol reply codes instead of the corresponding Node network codes.
+    // These are safe to advance past when Chromium supplied another route.
+    "UND_ERR_SOCKS5_REPLY_3", // network unreachable
+    "UND_ERR_SOCKS5_REPLY_4", // host unreachable
+    "UND_ERR_SOCKS5_REPLY_5", // connection refused
+    "UND_ERR_SOCKS5_REPLY_6", // TTL expired
   ]);
   let cause = error;
   for (let depth = 0; cause instanceof Error && depth < 8; depth++) {

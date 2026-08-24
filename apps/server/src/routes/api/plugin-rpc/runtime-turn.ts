@@ -9,7 +9,6 @@ import {
 import type { DataStore, SessionRecord } from "@covel/store";
 import type { EventBus } from "@covel/events";
 import type { RuntimeManifest, RuntimeResult, TurnInput } from "@covel/shared";
-import { createHash } from "node:crypto";
 
 import type { SessionLock } from "../../../lib/session-lock.js";
 import type {
@@ -63,33 +62,16 @@ export interface RunDeferredFollowerArgs {
 }
 
 /**
- * Stable identity for a detached provider job. Duplicate work (same runtime,
- * activation and settings) must share a cross-process lock; unrelated scene or
- * media jobs keep distinct keys and can execute concurrently.
+ * Stable cross-process identity for detached work owned by one runtime.
+ *
+ * Runtime handlers commonly perform read-check-generate-write sequences over
+ * plugin data. Until those domain writes expose their own atomic idempotency
+ * keys, every activation of the same runtime must stay serialised; otherwise
+ * different payloads can still target the same record and overwrite each
+ * other after both have paid for provider work.
  */
-function backgroundJobLockId(
-  sessionId: string,
-  runtimeId: string,
-  input: TurnInput,
-): string {
-  const work = {
-    activation:
-      input.manualTrigger?.triggerEvent ?? input.manualTrigger?.payload ?? null,
-    userSettings: input.userSettings ?? null,
-  };
-  const canonical = JSON.stringify(work, (_key, value) =>
-    value && typeof value === "object" && !Array.isArray(value)
-      ? Object.fromEntries(
-          Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),
-        )
-      : value,
-  );
-  const fingerprint = createHash("sha256").update(canonical).digest("hex");
-  return `background-runtime:${JSON.stringify([
-    sessionId,
-    runtimeId,
-    fingerprint,
-  ])}`;
+function backgroundRuntimeLockId(sessionId: string, runtimeId: string): string {
+  return `background-runtime:${JSON.stringify([sessionId, runtimeId])}`;
 }
 
 export function createPluginRpcRuntimeTurnRunner(
@@ -225,7 +207,7 @@ export function createPluginRpcRuntimeTurnRunner(
     readonly turnResult: Awaited<ReturnType<typeof executeTurn>>;
     readonly commit: TurnCommitOutcome;
   }> {
-    const jobLockId = backgroundJobLockId(ctx.sessionId, runtimeId, turnInput);
+    const jobLockId = backgroundRuntimeLockId(ctx.sessionId, runtimeId);
     return ctx.sessionLock.withLock(jobLockId, async () => {
       const result = await executeTurn(turnInput, ctx.activeRuntimes, {
         ...ctx.deps,
