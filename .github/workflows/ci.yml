@@ -9,6 +9,7 @@ name: CI
 # two runs of the same commit otherwise — the PR ref and the branch ref hash
 # to different concurrency groups, so neither cancels the other. The PR run
 # covers dev branches; this push trigger is the post-merge guard on main.
+# Manual dispatch runs the same gate, including the production build step.
 on:
   pull_request:
   push:
