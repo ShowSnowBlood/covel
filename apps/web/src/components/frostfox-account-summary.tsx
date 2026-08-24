@@ -66,9 +66,8 @@ export function FrostFoxAccountSummary() {
       </div>
       <div className="flex h-9 items-center gap-1 rounded-[var(--radius-control)] px-2 text-xs tabular-nums">
         <WalletCards className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{balance}</span>
+      </div>
+    </div>
   );
-}
-
-export function FrostFoxAccountLoading() {
-  return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />;
 }
