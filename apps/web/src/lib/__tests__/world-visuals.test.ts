@@ -19,10 +19,10 @@ function makeWorld(overrides: Partial<WorldRecord>): WorldRecord {
 describe("world visuals", () => {
   it("matches bundled worlds by id", () => {
     expect(worldVisualForId("emberback")?.image).toBe(
-      "/visuals/worlds/emberback-4k.webp",
+      "/visuals/worlds/emberback-4k.webp?v=2",
     );
     expect(worldVisualForId("mistport")?.image).toBe(
-      "/visuals/worlds/mistport-4k.webp",
+      "/visuals/worlds/mistport-4k.webp?v=2",
     );
     expect(worldVisual(makeWorld({ id: "neonridge" })).image).toBe(
       "/visuals/worlds/neonridge.webp",
@@ -31,7 +31,7 @@ describe("world visuals", () => {
 
   it("falls back to the first matching tag", () => {
     expect(worldVisualForTags(["romance"])?.image).toBe(
-      "/visuals/worlds/haruka-academy-4k.webp",
+      "/visuals/worlds/haruka-academy-4k.webp?v=2",
     );
     expect(worldVisual(makeWorld({ tags: ["custom", "xianxia"] })).image).toBe(
       "/visuals/worlds/cloudmere.webp",
