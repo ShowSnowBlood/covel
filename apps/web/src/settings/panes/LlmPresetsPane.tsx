@@ -129,6 +129,8 @@ export function LlmPresetsPane() {
       currentSlots,
       profiles,
       firstModelRef,
+      state.presets,
+      Object.keys(state.llmConfig?.slots ?? {}),
     );
     if (nextSlots !== currentSlots) setSlotConfig(nextSlots);
     setSelectedProviderId(providerId);

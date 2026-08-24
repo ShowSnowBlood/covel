@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, Loader2, XCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
@@ -46,6 +46,23 @@ interface PingButtonProps {
 // model row + settings pane), so caching at this level avoids hitting the
 // provider once per component.
 const resultCache = new Map<string, { result: PingResult; at: number }>();
+const cacheSubscribers = new Set<() => void>();
+let cacheNotificationRevision = 0;
+let cacheInvalidationGeneration = 0;
+
+function publishCacheChange(): void {
+  cacheNotificationRevision += 1;
+  for (const subscriber of cacheSubscribers) subscriber();
+}
+
+function subscribeToCache(subscriber: () => void): () => void {
+  cacheSubscribers.add(subscriber);
+  return () => cacheSubscribers.delete(subscriber);
+}
+
+function getCacheRevision(): number {
+  return cacheNotificationRevision;
+}
 
 function requestIdFor(target: PingTarget): string {
   return target.kind === "preset" ? target.presetId : `slot-${target.slotId}`;
@@ -72,6 +89,11 @@ export function PingButton({
   const requestId = requestIdFor(target);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<PingResult | null>(null);
+  const cacheRevision = useSyncExternalStore(
+    subscribeToCache,
+    getCacheRevision,
+    getCacheRevision,
+  );
 
   // Hydrate from cache when the target changes (component reused for a
   // different preset/slot, or remounted within the TTL window).
@@ -82,7 +104,7 @@ export function PingButton({
     } else {
       setResult(null);
     }
-  }, [requestId, cacheTtlMs]);
+  }, [requestId, cacheTtlMs, cacheRevision]);
 
   const handleClick = useCallback(async () => {
     const cached = resultCache.get(requestId);
@@ -91,6 +113,7 @@ export function PingButton({
       return;
     }
     setTesting(true);
+    let requestGeneration: number | undefined;
     try {
       // Run pre-ping side effects (e.g. persist keys in onboarding). A
       // thrown error or explicit `false` short-circuits and surfaces via
@@ -103,8 +126,11 @@ export function PingButton({
           return;
         }
       }
+      requestGeneration = cacheInvalidationGeneration;
       const res = await pingPreset(requestId);
+      if (requestGeneration !== cacheInvalidationGeneration) return;
       resultCache.set(requestId, { result: res, at: Date.now() });
+      publishCacheChange();
       setResult(res);
       onResult?.(res);
     } catch (err) {
@@ -113,7 +139,18 @@ export function PingButton({
         latencyMs: 0,
         error: err instanceof Error ? err.message : t("toast.networkError"),
       };
-      resultCache.set(requestId, { result: fallback, at: Date.now() });
+      if (
+        requestGeneration !== undefined &&
+        requestGeneration !== cacheInvalidationGeneration
+      ) {
+        return;
+      }
+      // Setup errors that happen before the request are shown locally and are
+      // intentionally not cached. Provider responses remain shareable.
+      if (requestGeneration !== undefined) {
+        resultCache.set(requestId, { result: fallback, at: Date.now() });
+        publishCacheChange();
+      }
       setResult(fallback);
       onResult?.(fallback);
     } finally {
@@ -236,9 +273,13 @@ export function PingButton({
 /** Invalidate the cached ping result for one target (e.g. after key edit). */
 export function invalidatePingResult(target: PingTarget): void {
   resultCache.delete(requestIdFor(target));
+  cacheInvalidationGeneration += 1;
+  publishCacheChange();
 }
 
 /** API-key edits can affect every preset/slot using that provider. */
 export function invalidateAllPingResults(): void {
   resultCache.clear();
+  cacheInvalidationGeneration += 1;
+  publishCacheChange();
 }
