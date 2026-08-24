@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { createConfigApiRoutes } from "../../src/routes/config-api.js";
 
@@ -41,6 +41,7 @@ describe("config API env and file contracts", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     for (const key of ENV_KEYS) {
       if (savedEnv[key] === undefined) {
         delete process.env[key];
@@ -278,6 +279,52 @@ describe("config API env and file contracts", () => {
 
     expect(res.status).toBe(400);
     expect(fs.existsSync(path.join(tmpHome, "config.toml"))).toBe(false);
+  });
+
+  it("validates the proxy dispatcher before changing config.toml", async () => {
+    process.env.COVEL_HOME = tmpHome;
+    const configPath = path.join(tmpHome, "config.toml");
+    const original = '[paths]\ndata_root = "/existing/data"\n';
+    fs.writeFileSync(configPath, original, "utf-8");
+    const app = buildApp(apiKeys);
+
+    const res = await app.request("/api/config/proxy", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "http",
+        url: "http://user%ZZ:pass@127.0.0.1:7890",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(fs.readFileSync(configPath, "utf-8")).toBe(original);
+  });
+
+  it("falls back to direct when a stored proxy cannot initialize", async () => {
+    process.env.COVEL_HOME = tmpHome;
+    const configPath = path.join(tmpHome, "config.toml");
+    fs.writeFileSync(
+      configPath,
+      '[network]\nproxy_mode = "http"\n' +
+        'proxy_url = "http://user%ZZ:pass@127.0.0.1:7890"\n',
+      "utf-8",
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const app = buildApp(apiKeys);
+    const res = await app.request("/api/config/proxy");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      mode: "direct",
+      effective: "direct",
+    });
+    expect(fs.readFileSync(configPath, "utf-8")).toContain("user%ZZ");
+    expect(warn).toHaveBeenCalledWith(
+      "[proxy-config] Ignoring invalid stored proxy settings:",
+      expect.anything(),
+    );
   });
 
   // ── Desktop REST bearer token guard ────────────────────────────

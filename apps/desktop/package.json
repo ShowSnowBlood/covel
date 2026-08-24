@@ -21,6 +21,7 @@
     "clean": "node ../../scripts/remove-paths.mjs dist staging ../../release/electron"
   },
   "dependencies": {
+    "@covel/shared": "workspace:*",
     "smol-toml": "^1.7.0",
     "tsx": "4.22.4"
   },
