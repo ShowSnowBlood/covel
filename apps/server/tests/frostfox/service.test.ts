@@ -157,6 +157,11 @@ describe("FrostFox first-party SaaS", () => {
     const managedPresetId =
       context?.managedSlotDefaults?.slotPresetOverrides?.story;
     expect(managedPresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(context?.managedSlotDefaults?.slotPresetOverrides).toEqual({
+      story: managedPresetId,
+      plugin: managedPresetId,
+      default: managedPresetId,
+    });
     expect(context?.managedSlotDefaults?.customPresets).toEqual([
       expect.objectContaining({
         id: managedPresetId,

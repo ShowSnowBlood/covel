@@ -191,19 +191,37 @@ function mergeManagedSlotDefaults(
   if (!defaults) return overrides;
   if (!overrides) return defaults;
 
+  const configuredDefaults = defaults.slotPresetOverrides ?? {};
   const explicitSlots = overrides.slotPresetOverrides ?? {};
+  const replacementByDefault = new Map<string, string>();
+  for (const [slotId, presetId] of Object.entries(explicitSlots)) {
+    const defaultPresetId = configuredDefaults[slotId];
+    if (defaultPresetId && !replacementByDefault.has(defaultPresetId)) {
+      replacementByDefault.set(defaultPresetId, presetId);
+    }
+  }
   const defaultSlots = Object.fromEntries(
-    Object.entries(defaults.slotPresetOverrides ?? {}).filter(
-      ([slotId]) => !Object.hasOwn(explicitSlots, slotId),
+    Object.entries(configuredDefaults)
+      .filter(([slotId]) => !Object.hasOwn(explicitSlots, slotId))
+      .map(([slotId, presetId]) => [
+        slotId,
+        replacementByDefault.get(presetId) ?? presetId,
+      ]),
+  );
+  const managedPresetIds = new Set(
+    (defaults.customPresets ?? []).map((preset) => preset.id),
+  );
+  const activeManagedPresetIds = new Set(
+    Object.values(defaultSlots).filter((presetId) =>
+      managedPresetIds.has(presetId),
     ),
   );
-  const activeDefaultPresetIds = new Set(Object.values(defaultSlots));
   const customPresets = [
     ...(defaults.customPresets ?? []).filter((preset) =>
-      activeDefaultPresetIds.has(preset.id),
+      activeManagedPresetIds.has(preset.id),
     ),
     ...(overrides.customPresets ?? []).filter(
-      (preset) => !activeDefaultPresetIds.has(preset.id),
+      (preset) => !activeManagedPresetIds.has(preset.id),
     ),
   ];
 

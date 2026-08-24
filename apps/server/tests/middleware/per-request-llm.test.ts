@@ -312,7 +312,11 @@ describe("per-request LLM middleware", () => {
               principal,
               apiKeys: { [managedPreset.provider]: "sk-ff-derived" },
               managedSlotDefaults: {
-                slotPresetOverrides: { story: managedPreset.id },
+                slotPresetOverrides: {
+                  story: managedPreset.id,
+                  plugin: managedPreset.id,
+                  default: managedPreset.id,
+                },
                 customPresets: [managedPreset],
               },
             }
@@ -345,7 +349,11 @@ describe("per-request LLM middleware", () => {
       [managedPreset.provider]: "sk-ff-derived",
     });
     expect(calls[0].slotOverrides).toEqual({
-      slotPresetOverrides: { story: managedPreset.id },
+      slotPresetOverrides: {
+        story: managedPreset.id,
+        plugin: managedPreset.id,
+        default: managedPreset.id,
+      },
       customPresets: [managedPreset],
     });
 
@@ -370,7 +378,11 @@ describe("per-request LLM middleware", () => {
     });
     expect(overrideResponse.status).toBe(200);
     expect(calls[1].slotOverrides).toEqual({
-      slotPresetOverrides: { story: browserPreset.id },
+      slotPresetOverrides: {
+        story: browserPreset.id,
+        plugin: browserPreset.id,
+        default: browserPreset.id,
+      },
       customPresets: [browserPreset],
     });
   });

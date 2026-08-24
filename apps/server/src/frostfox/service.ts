@@ -723,6 +723,7 @@ function buildManagedSlotDefaults(
     string,
     NonNullable<SlotOverridesInput["customPresets"]>[number]
   >();
+  let textFallbackPresetId: string | undefined;
 
   for (const preset of ai.config.presets) {
     if (!preset.enabled || !preset.defaultSlot) continue;
@@ -733,6 +734,9 @@ function buildManagedSlotDefaults(
       .digest("hex")
       .slice(0, 24)}`;
     slotPresetOverrides[preset.defaultSlot] = id;
+    if (!textFallbackPresetId && (preset.tag ?? "text") === "text") {
+      textFallbackPresetId = id;
+    }
     customPresets.set(id, {
       id,
       name: `${provider.displayName} · ${preset.model}`,
@@ -741,6 +745,11 @@ function buildManagedSlotDefaults(
       model: preset.model,
       protocol: provider.protocol,
     });
+  }
+
+  if (textFallbackPresetId) {
+    slotPresetOverrides.plugin ??= textFallbackPresetId;
+    slotPresetOverrides.default ??= textFallbackPresetId;
   }
 
   return Object.keys(slotPresetOverrides).length === 0
