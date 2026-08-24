@@ -73,6 +73,7 @@ pnpm auto:push
 ```
 
 The watcher waits 2 seconds after edits settle, commits all non-ignored workspace changes with a Chinese Conventional Commit message, and pushes the current branch to `origin`. Press `Ctrl+C` to stop. It never force-pushes; detached HEADs, conflicts, and rejected pushes leave the local commit intact and are retried later.
+The script refuses `.env` files, key or certificate files, and unresolved merge conflicts; it never force-pushes.
 
 Use `pnpm auto:push -- --once` for a one-shot installation or verification run.
 
