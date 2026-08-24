@@ -106,6 +106,8 @@
     "studio": "工作室",
     "debug": "调试",
     "primary": "主导航",
+    "frostfoxConnect": "连接账号",
+    "frostfoxAccountSummary": "账号与余额",
     "getStarted": "开始使用"
   },
   "session": {

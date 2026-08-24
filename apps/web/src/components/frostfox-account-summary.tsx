@@ -63,9 +63,9 @@ export function FrostFoxAccountSummary() {
       className="flex items-center gap-1.5 text-muted-foreground"
       aria-label={t("nav.frostfoxAccountSummary", "Account and balance")}
     >
-      <div className="flex h-9 max-w-36 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-xs">
+      <div className="hidden h-9 max-w-36 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-xs sm:flex">
         <CircleUserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="hidden truncate sm:inline">{status.account.name}</span>
+        <span className="truncate">{status.account.name}</span>
       </div>
       <div className="flex h-9 items-center gap-1 rounded-[var(--radius-control)] px-2 text-xs tabular-nums">
         <WalletCards className="h-4 w-4 shrink-0" aria-hidden="true" />

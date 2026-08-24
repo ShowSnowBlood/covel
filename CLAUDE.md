@@ -61,6 +61,11 @@ pnpm validate:plugin  # validate PLUGIN.md manifests; pass file or plugin dir, -
                       # a plugin DIR also gets cross-runtime checks (userSettings key collisions)
 pnpm build:electron   # production desktop installer → release/
 pnpm release:preflight  # static pre-tag gate: lockfile sync, import resolution, plugin/world/prompt structure
+pnpm commit:push -- "feat: 中文摘要"  # once, only after the whole requested change is verified
+
+# Publication invariant: one completed user-requested change set produces one
+# Chinese Conventional Commit and one push. Never commit per file save or
+# intermediate edit; main pushes trigger production deployment.
 ```
 
 ## Config Files

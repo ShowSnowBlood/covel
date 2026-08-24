@@ -64,18 +64,15 @@ pnpm e2e                                   # Playwright 端到端
 
 常用 type：`feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`。
 
-### 自动提交与推送
+### 整体提交与推送
 
-如需让当前工作区持续自动提交并推送修改，运行：
+完成一个完整修改并通过对应验证后，只执行一次：
 
 ```bash
-pnpm auto:push
+pnpm commit:push -- "feat: 完成账号余额展示"
 ```
 
-该任务会等待修改停止 2 秒，将当前工作区的全部非忽略变更作为一次提交，并使用中文 Conventional Commit 消息推送到当前分支的 `origin`。按 `Ctrl+C` 停止。自动任务不会强制推送；遇到 detached HEAD、冲突或远端拒绝时保留本地提交并稍后重试。
-脚本会拒绝提交 `.env`、密钥证书文件和未解决的合并冲突；它不会强制推送。
-
-首次安装或验证脚本时可使用 `pnpm auto:push -- --once`。
+该命令把当前工作区的全部非忽略变更合并为一个中文 Conventional Commit，再推送当前分支。禁止按文件保存或中间编辑步骤自动提交，避免将不可构建的半成品触发到部署流水线。脚本会拒绝 `.env`、密钥证书文件、未解决冲突和强制推送。
 
 ### Pull Request
 

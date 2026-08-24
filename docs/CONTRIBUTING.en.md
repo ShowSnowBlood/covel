@@ -64,18 +64,15 @@ Follow Conventional Commits:
 
 Common types: `feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`.
 
-### Automatic commit and push
+### Whole-change commit and push
 
-To continuously commit and push workspace changes, run:
+After one complete change has passed its relevant verification, run exactly once:
 
 ```bash
-pnpm auto:push
+pnpm commit:push -- "feat: 完成账号余额展示"
 ```
 
-The watcher waits 2 seconds after edits settle, commits all non-ignored workspace changes with a Chinese Conventional Commit message, and pushes the current branch to `origin`. Press `Ctrl+C` to stop. It never force-pushes; detached HEADs, conflicts, and rejected pushes leave the local commit intact and are retried later.
-The script refuses `.env` files, key or certificate files, and unresolved merge conflicts; it never force-pushes.
-
-Use `pnpm auto:push -- --once` for a one-shot installation or verification run.
+The command groups every non-ignored workspace change into one Chinese Conventional Commit and pushes the current branch. Never commit on each file save or intermediate edit because an incomplete commit can trigger the deployment pipeline. The script refuses `.env` files, key or certificate files, unresolved conflicts, and force-pushes.
 
 ### Pull requests
 
