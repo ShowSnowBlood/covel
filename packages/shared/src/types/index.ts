@@ -28,6 +28,7 @@ export type {
   LLMToolDefinition,
   LLMResponseFormat,
   LLMStreamEvent,
+  LLMTargetIdentity,
   LLMAdapter,
   SimpleCompletionAdapter,
 } from "./llm-adapter.js";

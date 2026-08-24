@@ -126,7 +126,19 @@ export interface SimpleCompletionAdapter<
   }): Promise<{ content: string }>;
 }
 
+/** Provider/model identity resolved from an LLM slot for observability. */
+export interface LLMTargetIdentity {
+  readonly provider: string;
+  readonly model: string;
+}
+
 export interface LLMAdapter {
+  /**
+   * Resolve a requested slot to the provider/model that will receive the call.
+   * Optional for lightweight mocks and adapters without a slot registry.
+   */
+  resolveTarget?(slot?: string): LLMTargetIdentity | undefined;
+
   /**
    * Call the LLM with messages and optional tools.
    * The `model` parameter maps to a slot name (e.g., 'default', 'fast', 'balance').

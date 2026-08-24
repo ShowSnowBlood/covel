@@ -123,6 +123,8 @@ export interface CallLLMWithRetryParams {
   /** Identity for trace payload enrichment. */
   readonly runtimeId?: string;
   readonly pluginId?: string;
+  /** Provider model resolved from `model`, which remains the requested slot. */
+  readonly resolvedModel?: string;
   /** Provider label for trace payload (e.g. 'deepseek', 'openai'). Optional. */
   readonly provider?: string;
   /**
@@ -169,7 +171,7 @@ export async function callLLMWithRetry(
         runtimeId: params.runtimeId,
         pluginId: params.pluginId,
         slot: params.model,
-        model: params.model,
+        model: params.resolvedModel ?? params.model,
         provider: params.provider,
         messages: attemptMessages,
         tools: params.tools,
@@ -322,7 +324,7 @@ export async function streamLLMWithRetry(
       runtimeId: params.runtimeId,
       pluginId: params.pluginId,
       slot: params.model,
-      model: params.model,
+      model: params.resolvedModel ?? params.model,
       provider: params.provider,
       messages: attemptMessages,
       tools: params.tools,

@@ -26,6 +26,7 @@ const customPresetSchema = z.object({
 const providerModelProfileSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
+  provider: z.string().optional(),
   baseUrl: z.string(),
   protocol: z.string().optional(),
   models: z.array(

@@ -321,4 +321,132 @@ describe("custom preset secret channel", () => {
     const keys = readKeysBlob();
     expect(keys["preset:custom_legacy"]).toBe("sk-legacy-leak");
   });
+
+  it("copies legacy preset keys into connection-specific profile namespaces", async () => {
+    vi.resetModules();
+    localStorageMock.setItem(
+      LOCAL_STORAGE_SETTINGS_KEY,
+      JSON.stringify({
+        schemaVersion: 1,
+        savedAt: "2026-08-24T00:00:00.000Z",
+        entries: {
+          "llm.customPresets": [
+            {
+              id: "official_model",
+              name: "Official",
+              provider: "openai",
+              baseUrl: "https://api.openai.com/v1",
+              model: "gpt-5",
+              protocol: "openai-responses-v1",
+            },
+            {
+              id: "official_mini_model",
+              name: "Official Mini",
+              provider: "openai",
+              baseUrl: "https://api.openai.com/v1",
+              model: "gpt-5-mini",
+              protocol: "openai-responses-v1",
+            },
+            {
+              id: "proxy_model",
+              name: "Proxy",
+              provider: "openai",
+              baseUrl: "https://proxy.example/v1",
+              model: "gpt-4.1",
+              protocol: "openai-chat-v1",
+            },
+          ],
+        },
+      }),
+    );
+    localStorageMock.setItem(
+      LOCAL_STORAGE_KEYS_KEY,
+      JSON.stringify({
+        "preset:official_model": "sk-official",
+        "preset:official_mini_model": "sk-official-latest",
+        "preset:proxy_model": "sk-proxy",
+      }),
+    );
+
+    const { initSettings: init2 } = await import("@/settings/store");
+    const freshApi = await import("../api.js");
+    await init2();
+
+    const profiles = freshApi.getProviderProfiles();
+    const profileByModelRef = new Map(
+      profiles.flatMap((profile) =>
+        profile.models.map((model) => [model.ref, profile.id] as const),
+      ),
+    );
+    expect(profileByModelRef.get("official_mini_model")).toBe(
+      profileByModelRef.get("official_model"),
+    );
+    await vi.waitFor(() => {
+      const keys = readKeysBlob();
+      expect(keys[profileByModelRef.get("official_model")!]).toBe(
+        "sk-official-latest",
+      );
+      expect(keys[profileByModelRef.get("proxy_model")!]).toBe("sk-proxy");
+    });
+  });
+
+  it("backfills keys for profiles migrated by an earlier version", async () => {
+    vi.resetModules();
+    localStorageMock.setItem(
+      LOCAL_STORAGE_SETTINGS_KEY,
+      JSON.stringify({
+        schemaVersion: 1,
+        savedAt: "2026-08-24T00:00:00.000Z",
+        entries: {
+          "llm.providers": [
+            {
+              id: "openai-official-model",
+              provider: "openai",
+              name: "Official",
+              baseUrl: "https://api.openai.com/v1",
+              protocol: "openai-responses-v1",
+              models: [{ ref: "official_model", modelId: "gpt-5" }],
+            },
+            {
+              id: "openai-proxy-model",
+              provider: "openai",
+              name: "Proxy Chat",
+              baseUrl: "https://proxy.example/v1",
+              protocol: "openai-chat-v1",
+              models: [{ ref: "proxy_model", modelId: "gpt-4.1" }],
+            },
+            {
+              id: "openai-proxy-responses-model",
+              provider: "openai",
+              name: "Proxy Responses",
+              baseUrl: "https://proxy.example/v1",
+              protocol: "openai-responses-v1",
+              models: [{ ref: "proxy_responses_model", modelId: "gpt-5-mini" }],
+            },
+          ],
+        },
+      }),
+    );
+    localStorageMock.setItem(
+      LOCAL_STORAGE_KEYS_KEY,
+      JSON.stringify({
+        openai: "sk-provider-fallback",
+        "preset:official_model": "sk-official",
+        "preset:proxy_model": "sk-stale-proxy",
+        "openai-proxy-model": "sk-current-proxy",
+      }),
+    );
+
+    const { initSettings: init2 } = await import("@/settings/store");
+    const freshApi = await import("../api.js");
+    await init2();
+
+    freshApi.getProviderProfiles();
+    await vi.waitFor(() => {
+      const keys = readKeysBlob();
+      expect(keys["openai-official-model"]).toBe("sk-official");
+      expect(keys["openai-proxy-model"]).toBe("sk-current-proxy");
+      expect(keys["openai-proxy-responses-model"]).toBe("sk-provider-fallback");
+    });
+  });
 });

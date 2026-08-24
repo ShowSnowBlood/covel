@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { FolderOpen, Info } from "lucide-react";
 import {
@@ -50,6 +50,27 @@ export function LlmKeysPane({
   const { t } = useTranslation();
   const store = useSettingsStore();
   const { state } = useSession();
+  const subscribeToSecrets = useCallback(
+    (notify: () => void) =>
+      store.subscribeAll((_value, key) => {
+        if (key.startsWith("keys.")) notify();
+      }),
+    [store],
+  );
+  const getSecretsSnapshot = useCallback(
+    () =>
+      JSON.stringify(
+        Object.entries(store.snapshotSecrets())
+          .map(([provider, key]) => [provider, key.trim().length > 0] as const)
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    [store],
+  );
+  useSyncExternalStore(
+    subscribeToSecrets,
+    getSecretsSnapshot,
+    getSecretsSnapshot,
+  );
 
   const isConfigured = state.llmConfig?.configured ?? false;
   const [priceMultipliers, setPriceMultipliersLocal] = useState<

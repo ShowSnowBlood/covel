@@ -66,6 +66,7 @@ export type {
 // ── LLM Adapter ─────────────────────────────────────────────────
 export type {
   LLMAdapter,
+  LLMTargetIdentity,
   LLMMessage as LLMAdapterMessage,
   LLMResponse,
   LLMStreamEvent,

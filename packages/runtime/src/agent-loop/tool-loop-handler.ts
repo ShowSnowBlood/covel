@@ -71,6 +71,14 @@ export async function requestLLMResponse(
     onStreamDelta,
     onQueueWait,
   } = opts;
+  // Target resolution enriches telemetry only. A custom resolver failure must
+  // not bypass the normal retry/error path of the actual LLM request.
+  let resolvedTarget: ReturnType<NonNullable<typeof deps.llm.resolveTarget>>;
+  try {
+    resolvedTarget = deps.llm.resolveTarget?.(effectiveModel);
+  } catch {
+    resolvedTarget = undefined;
+  }
 
   const callParams = {
     llm: deps.llm,
@@ -85,6 +93,12 @@ export async function requestLLMResponse(
     emitter: deps.emitter,
     runtimeId: manifest.name,
     pluginId: manifest.pluginId,
+    ...(resolvedTarget
+      ? {
+          resolvedModel: resolvedTarget.model,
+          provider: resolvedTarget.provider,
+        }
+      : {}),
     // Player abort cuts the in-flight call/stream and bypasses salvage.
     abortSignal: deps.turnControl?.signal,
   } as const;
@@ -173,6 +187,8 @@ async function requestNonStreaming(
       responseFormat,
       retryPolicy,
       deadline,
+      resolvedModel: callParams.resolvedModel,
+      provider: callParams.provider,
     });
   }
 }
@@ -186,6 +202,8 @@ async function malformedToolArgsFallback(args: {
   responseFormat: LLMResponseFormat | undefined;
   retryPolicy: RetryPolicy;
   deadline: number;
+  resolvedModel: string | undefined;
+  provider: string | undefined;
 }): Promise<LLMResponse> {
   const {
     manifest,
@@ -196,18 +214,18 @@ async function malformedToolArgsFallback(args: {
     responseFormat,
     retryPolicy,
     deadline,
+    resolvedModel,
+    provider,
   } = args;
   const fallbackCallStart = Date.now();
-  // Malformed-tool-arguments fallback bypasses the retry helper, so provider
-  // identity is not available here. Explicit `null` signals "provider unknown
-  // at this call site" and survives JSON serialisation (unlike `undefined`,
-  // which is dropped), keeping the payload schema uniform across emit sites.
+  // This fallback bypasses the retry helper, so carry forward the target that
+  // requestLLMResponse resolved for the normal attempt.
   await emitLlmCalling(deps.emitter, {
     runtimeId: manifest.name,
     pluginId: manifest.pluginId,
     slot: effectiveModel,
-    model: effectiveModel,
-    provider: null,
+    model: resolvedModel ?? effectiveModel,
+    provider,
     messages,
     tools: toolDefs,
     attempt: 0,

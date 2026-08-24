@@ -310,6 +310,58 @@ function rawLegacyPresets(): CustomPreset[] {
   return getSettings().get<CustomPreset[]>("llm.customPresets") ?? [];
 }
 
+let providerProfileKeyMigration = Promise.resolve();
+
+/**
+ * Copy secrets from the legacy model/provider namespaces into the connection
+ * namespace consumed by the provider-first settings UI. Keep the old entries
+ * for downgrade compatibility, and never replace a key already saved for the
+ * connection itself.
+ *
+ * The queue serializes full-snapshot secret writes used by desktop backends.
+ * Re-reading the snapshot before each write also makes repeated lazy migration
+ * safe when several settings panes render at the same time.
+ */
+function migrateProviderProfileKeys(
+  profiles: readonly ProviderModelProfile[],
+  store: ReturnType<typeof getSettings>,
+): void {
+  providerProfileKeyMigration = providerProfileKeyMigration
+    .then(async () => {
+      for (const profile of profiles) {
+        const profileId = profile.id.trim();
+        if (!profileId) continue;
+
+        const secrets = (
+          store as unknown as {
+            snapshotSecrets(): Record<string, string>;
+          }
+        ).snapshotSecrets();
+        if (secrets[profileId]?.trim()) continue;
+
+        // Legacy requests assigned keys in preset order, so the last model key
+        // won when several presets shared one connection. Preserve that choice.
+        const presetSecret = profile.models.reduce<string | undefined>(
+          (selected, model) =>
+            secrets[`preset:${model.ref}`]?.trim() || selected,
+          undefined,
+        );
+        const providerId =
+          typeof profile.provider === "string"
+            ? (providerKeyToId(profile.provider) ?? profile.provider.trim())
+            : undefined;
+        const providerSecret = providerId
+          ? secrets[providerId]?.trim()
+          : undefined;
+        const key = presetSecret ?? providerSecret;
+        if (key) await store.set(`keys.${profileId}`, key);
+      }
+    })
+    .catch((err: unknown) => {
+      console.warn("[api] provider profile key migration failed:", err);
+    });
+}
+
 export function getProviderProfiles(): ProviderModelProfile[] {
   const store = getSettings();
   const stored =
@@ -325,6 +377,7 @@ export function getProviderProfiles(): ProviderModelProfile[] {
         profile.provider?.trim() || profile.id,
       ]),
     );
+    migrateProviderProfileKeys(stored, store);
     return stored;
   }
 
@@ -342,6 +395,7 @@ export function getProviderProfiles(): ProviderModelProfile[] {
         profile.provider?.trim() || profile.id,
       ]),
     );
+    migrateProviderProfileKeys(migrated, store);
     void store.set("llm.providers", migrated);
     // Remove any legacy inline secrets while keeping downgrade compatibility.
     void store.set("llm.customPresets", flattenProviderProfiles(migrated));

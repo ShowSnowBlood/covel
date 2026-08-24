@@ -46,6 +46,16 @@ export interface SlotOverridesInput {
  * of the LLM-call contract — merging the two would re-couple the packages.
  */
 export interface GatewayLike {
+  resolveSlot(
+    presetId: string | undefined,
+    options?: {
+      apiKeys?: Record<string, string>;
+      envApiKeys?: Record<string, string>;
+      slotOverrides?: SlotOverridesInput;
+      fallbackTag?: string;
+    },
+  ): { provider: string; model: string } | null;
+
   generateText(
     input: {
       presetId?: string;
@@ -151,6 +161,26 @@ export function createGatewayAdapter(
   config?: GatewayAdapterConfig,
 ): LLMAdapter {
   return {
+    resolveTarget(slot) {
+      try {
+        const target = gateway.resolveSlot(slot, {
+          apiKeys: config?.apiKeys,
+          ...(config?.envApiKeys ? { envApiKeys: config.envApiKeys } : {}),
+          ...(config?.slotOverrides
+            ? { slotOverrides: config.slotOverrides }
+            : {}),
+          fallbackTag: "text",
+        });
+        return target
+          ? { provider: target.provider, model: target.model }
+          : undefined;
+      } catch {
+        // Target identity only enriches telemetry. The actual generate/stream
+        // call must retain its existing retry and paired error-trace path.
+        return undefined;
+      }
+    },
+
     async generate(params): Promise<LLMResponse> {
       // Convert LLMToolDefinition[] → gateway ToolDefinition[]
       const tools = params.tools?.map(toGatewayTool);
