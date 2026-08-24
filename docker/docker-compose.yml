@@ -47,6 +47,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    image: ${COVEL_APP_IMAGE:-covel-game:local}
     container_name: covel-app
     restart: unless-stopped
     ports:
