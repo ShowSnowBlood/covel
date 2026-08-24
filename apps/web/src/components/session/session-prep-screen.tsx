@@ -6,7 +6,7 @@ import {
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Play, ArrowLeft, Loader2 } from "lucide-react";
+import { AlertCircle, Play, ArrowLeft, Loader2 } from "lucide-react";
 import * as api from "@/services/api.js";
 import { Button } from "@/components/ui/button.js";
 import { ScrollArea } from "@/components/ui/scroll-area.js";
@@ -55,6 +55,7 @@ export function SessionPrepScreen({
   packages,
   presets,
   llmConfig,
+  startError,
   onBack,
   onStart,
   onResume,
@@ -210,6 +211,9 @@ export function SessionPrepScreen({
     setIsStarting(true);
     try {
       await onStart(startPluginsPayload(selectedPluginIds));
+    } catch {
+      // startGameSession stores the actionable message in session state; keep
+      // this handler settled while the prep screen renders that message.
     } finally {
       setIsStarting(false);
     }
@@ -312,6 +316,23 @@ export function SessionPrepScreen({
               </div>
             </div>
           </header>
+
+          {startError && (
+            <div
+              className="mb-5 flex items-start gap-2 rounded-[var(--radius-card)] border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm"
+              role="alert"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div className="min-w-0">
+                <p className="font-medium text-destructive">
+                  {t("session.startFailed", "Could not create session")}
+                </p>
+                <p className="mt-1 break-words text-xs text-muted-foreground">
+                  {startError}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-start">
             <section className="min-w-0 space-y-4">

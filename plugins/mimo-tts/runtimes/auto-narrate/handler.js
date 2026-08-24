@@ -19,6 +19,7 @@
  */
 
 import {
+  abortSignalWithTimeout,
   pickNarratorText,
   persistTrack,
   recordFailure,
@@ -127,7 +128,7 @@ export default async function autoNarrateHandler(ctx) {
         format,
         triggeredBy: "auto",
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: abortSignalWithTimeout(ctx.signal, timeoutMs),
     });
     const ref = refs[0];
     if (!ref) throw new Error("speech provider returned no usable media");

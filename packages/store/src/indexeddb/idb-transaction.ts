@@ -2,6 +2,7 @@ import type { BrowserIdbDatabase, IdbStoreName } from "./idb-db.js";
 
 export interface IdbMutationTracker {
   ensureStoreSnapshot(name: IdbStoreName): Promise<void>;
+  addAndTrack(name: IdbStoreName, value: unknown): Promise<void>;
   putAndTrack(name: IdbStoreName, value: unknown): Promise<void>;
   deleteAndTrack(name: IdbStoreName, key: unknown): Promise<void>;
   beginTx(): Promise<void>;
@@ -29,6 +30,14 @@ export function createIdbMutationTracker(
   ): Promise<void> {
     await ensureStoreSnapshot(name);
     await db.put(name, value as Record<string, unknown>);
+  }
+
+  async function addAndTrack(
+    name: IdbStoreName,
+    value: unknown,
+  ): Promise<void> {
+    await ensureStoreSnapshot(name);
+    await db.add(name, value as Record<string, unknown>);
   }
 
   async function deleteAndTrack(
@@ -60,6 +69,7 @@ export function createIdbMutationTracker(
 
   return {
     ensureStoreSnapshot,
+    addAndTrack,
     putAndTrack,
     deleteAndTrack,
 

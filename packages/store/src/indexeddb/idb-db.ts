@@ -46,7 +46,7 @@ export async function openBrowserIdb(
 ): Promise<BrowserIdbDatabase> {
   const db = await openDB(dbName, BROWSER_IDB_SCHEMA_VERSION, {
     async upgrade(db, oldVersion, _newVersion, transaction) {
-      upgradeBrowserIdbSchema(db, oldVersion, transaction);
+      await upgradeBrowserIdbSchema(db, oldVersion, transaction);
       if (oldVersion > 0 && oldVersion < 12) {
         await backfillSnapshotMetadata(transaction);
       }

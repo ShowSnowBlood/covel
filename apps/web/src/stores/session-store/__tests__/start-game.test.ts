@@ -47,6 +47,9 @@ function makeDataService(order: string[]): DataService {
     syncToServer: vi.fn(async () => {
       order.push("sync");
     }),
+    deleteSession: vi.fn(async () => {
+      order.push("delete");
+    }),
   } as unknown as DataService;
 }
 
@@ -109,5 +112,91 @@ describe("startGameSession bootstrap order", () => {
 
     expect(api.clearPrepRuntimeBindings).not.toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledWith({ type: "SET_SESSION", session });
+  });
+
+  it("rejects visibly and removes a local session when server sync fails", async () => {
+    const order: string[] = [];
+    const ds = makeDataService(order);
+    vi.mocked(ds.syncToServer).mockRejectedValueOnce(new Error("offline"));
+    const dispatch = vi.fn();
+
+    await expect(
+      startGameSession({
+        ds,
+        dispatch,
+        sessionIdRef: { current: null },
+        world,
+        presets: [],
+        llmConfig: null,
+      }),
+    ).rejects.toThrow("offline");
+
+    expect(ds.deleteSession).toHaveBeenCalledWith(session.id);
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "SET_EXECUTION_ERROR",
+      error: "offline",
+    });
+    expect(dispatch).not.toHaveBeenCalledWith({ type: "SET_SESSION", session });
+  });
+
+  it("clears a published session when initial snapshot hydration fails", async () => {
+    api.getSessionSnapshot.mockRejectedValueOnce(new Error("snapshot failed"));
+    const ds = makeDataService([]);
+    vi.mocked(ds.deleteSession).mockRejectedValueOnce(
+      new Error("cleanup failed"),
+    );
+    const dispatch = vi.fn();
+    const sessionIdRef = { current: null as string | null };
+
+    await expect(
+      startGameSession({
+        ds,
+        dispatch,
+        sessionIdRef,
+        world,
+        presets: [],
+        llmConfig: null,
+      }),
+    ).rejects.toThrow("snapshot failed");
+
+    expect(dispatch).toHaveBeenCalledWith({ type: "SET_SESSION", session });
+    expect(dispatch).toHaveBeenCalledWith({ type: "RESET_SESSION" });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "SET_EXECUTION_ERROR",
+      error: "snapshot failed",
+    });
+    expect(sessionIdRef.current).toBeNull();
+    expect(ds.deleteSession).toHaveBeenCalledWith(session.id);
+  });
+
+  it("drops an initial snapshot that resolves after a session switch", async () => {
+    let resolveSnapshot!: (snapshot: Record<string, unknown>) => void;
+    api.getSessionSnapshot.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSnapshot = resolve;
+      }),
+    );
+    const ds = makeDataService([]);
+    const dispatch = vi.fn();
+    const sessionIdRef = { current: null as string | null };
+
+    const starting = startGameSession({
+      ds,
+      dispatch,
+      sessionIdRef,
+      world,
+      presets: [],
+      llmConfig: null,
+    });
+    await vi.waitFor(() => expect(sessionIdRef.current).toBe(session.id));
+    sessionIdRef.current = "sess-b";
+    resolveSnapshot({ scene: "session A" });
+    await starting;
+
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "SET_GAME_STATE" }),
+    );
+    expect(dispatch).not.toHaveBeenCalledWith({ type: "RESET_SESSION" });
+    expect(ds.deleteSession).not.toHaveBeenCalled();
   });
 });

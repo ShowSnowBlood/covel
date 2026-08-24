@@ -18,6 +18,7 @@ export {
   createSqliteMediaStore,
 } from "./media-store.js";
 export { supportsVector } from "./vector-store.js";
+export { SessionAlreadyExistsError } from "./errors.js";
 export type {
   MediaAssetLookup,
   MediaAssetRecord,

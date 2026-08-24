@@ -222,18 +222,32 @@ describe("concurrent writes", () => {
 
     expect(results[0]?.status).toBe("rejected");
     expect(results[1]?.status).toBe("fulfilled");
-    // The point of the per-key undo: the rejected write must not erase the
-    // concurrent one that landed. A whole-map snapshot rollback did exactly
-    // that.
+    // The second full snapshot persisted both optimistic mutations, so memory
+    // must converge to that successful snapshot as well.
     expect(store.get("a.two")).toBe(2);
-    expect(store.has("a.one")).toBe(false);
-    // KNOWN, PRE-EXISTING: `save` writes a full snapshot, so the successful
-    // write persisted `a.one` too (it was still in the map when B serialised).
-    // Memory is authoritative and self-corrects on the next write. Fixing the
-    // disk divergence needs a write queue, which would defer the in-memory
-    // mutation and break synchronous read-after-write (`applyThemeSelection`
-    // does `void set(...)` then `get(...)` in the same tick).
+    expect(store.get("a.one")).toBe(1);
     expect(adapter.readEntries()).toEqual({ "a.one": 1, "a.two": 2 });
+  });
+
+  it("does not let an older failure roll back a newer write to the same key", async () => {
+    const adapter = createMemoryAdapter({ "ui.locale": "zh-CN" });
+    const store = new SettingsStore(adapter);
+    store.register(localeEntry);
+    await store.init();
+
+    vi.spyOn(adapter, "save").mockRejectedValueOnce(new Error("transient"));
+
+    const results = await Promise.allSettled([
+      store.set("ui.locale", "en-US"),
+      store.set("ui.locale", "zh-CN"),
+    ]);
+
+    expect(results.map((result) => result.status)).toEqual([
+      "rejected",
+      "fulfilled",
+    ]);
+    expect(store.get("ui.locale")).toBe("zh-CN");
+    expect(adapter.readEntries()).toEqual({ "ui.locale": "zh-CN" });
   });
 
   it("keeps read-after-write synchronous", async () => {

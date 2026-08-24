@@ -86,6 +86,12 @@ localStorage keys. The reset does not touch desktop SQLite files, media
 directories, `settings.json`, `keys.env`, or other files outside the
 browser/WebView origin.
 
+IndexedDB schema v15 rebuilds `characters` and `lorebook_entries` with the
+composite key `("sessionId", "id")`. Every opener of the shared database must
+pass its active `versionchange` transaction to `upgradeBrowserIdbSchema()` so
+the existing rows can be copied into the rebuilt stores before the upgrade
+commits.
+
 Desktop uses the same web bundle, so its WebView can still create
 `covel-browser` for frontend-only UI state and media render cache. Desktop
 business records and durable media continue to use `remote` mode by default:
@@ -117,3 +123,10 @@ by the store layer so server and web records expose the same shape.
 `SessionRecord.presetId` is stored through `SessionRecord.metadata.presetId`.
 This keeps SQL schemas forward-compatible while allowing local browser mode,
 memory, SQLite, PostgreSQL, and IndexedDB to share one typed contract.
+
+Character and lorebook IDs are session-local. Their durable identity is
+`(sessionId, id)` in all four DataStore backends, so separate sessions may use
+the same logical ID without moving or overwriting each other's rows. SQLite
+rebuilds legacy global-ID tables atomically on boot, PostgreSQL replaces the
+legacy primary key in place, and IndexedDB performs the v15 versionchange
+migration described above.

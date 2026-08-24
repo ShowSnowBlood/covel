@@ -102,8 +102,74 @@ function applySessionColumnMigrations(sqlite: Database.Database): void {
   }
 }
 
+const SESSION_SCOPED_IDENTITY_TABLES = [
+  {
+    name: "characters",
+    ddl: buildCreateTablesSql([schema.characters], "sqlite"),
+  },
+  {
+    name: "lorebook_entries",
+    ddl: buildCreateTablesSql([schema.lorebookEntries], "sqlite"),
+  },
+] as const;
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Migrate legacy global-id primary keys to `(session_id, id)` without dropping
+ * data. SQLite cannot alter a primary key in place, so both tables are rebuilt
+ * inside one transaction; any failure restores the original tables intact.
+ */
+function applySessionScopedIdentityMigrations(sqlite: Database.Database): void {
+  const pending = SESSION_SCOPED_IDENTITY_TABLES.filter(({ name }) => {
+    const columns = sqlite
+      .prepare(`PRAGMA table_info(${quoteIdentifier(name)})`)
+      .all() as Array<{ name: string; pk: number }>;
+    const primaryKey = columns
+      .filter((column) => column.pk > 0)
+      .sort((a, b) => a.pk - b.pk)
+      .map((column) => column.name);
+    return primaryKey.join("\0") !== "session_id\0id";
+  });
+  if (pending.length === 0) return;
+
+  sqlite.transaction(() => {
+    for (const { name, ddl } of pending) {
+      const legacyName = `__covel_${name}_global_id`;
+      sqlite.exec(
+        `ALTER TABLE ${quoteIdentifier(name)} RENAME TO ${quoteIdentifier(legacyName)}`,
+      );
+
+      const legacyIndexes = sqlite
+        .prepare(`PRAGMA index_list(${quoteIdentifier(legacyName)})`)
+        .all() as Array<{ name: string; origin: string }>;
+      for (const index of legacyIndexes) {
+        if (index.origin === "c") {
+          sqlite.exec(`DROP INDEX ${quoteIdentifier(index.name)}`);
+        }
+      }
+
+      sqlite.exec(ddl);
+      const columns = (
+        sqlite
+          .prepare(`PRAGMA table_info(${quoteIdentifier(legacyName)})`)
+          .all() as Array<{ name: string }>
+      ).map((column) => quoteIdentifier(column.name));
+      const columnList = columns.join(", ");
+      sqlite.exec(
+        `INSERT INTO ${quoteIdentifier(name)} (${columnList}) ` +
+          `SELECT ${columnList} FROM ${quoteIdentifier(legacyName)}`,
+      );
+      sqlite.exec(`DROP TABLE ${quoteIdentifier(legacyName)}`);
+    }
+  })();
+}
+
 export function createTables(sqlite: Database.Database): void {
   sqlite.exec(CREATE_TABLES_SQL);
   sqlite.exec(VECTOR_MODELS_TRIGGER_SQL);
   applySessionColumnMigrations(sqlite);
+  applySessionScopedIdentityMigrations(sqlite);
 }

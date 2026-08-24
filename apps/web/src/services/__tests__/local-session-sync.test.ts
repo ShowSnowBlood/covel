@@ -104,4 +104,40 @@ describe("LocalDataService session sync", () => {
       "en-US",
     );
   });
+
+  it("preserves legacy underscore IDs when creating the server mirror", async () => {
+    const store = createMemoryStore();
+    const now = new Date().toISOString();
+    await store.upsertWorld({
+      id: "world_legacy",
+      name: "World",
+      description: "",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await store.createSession({
+      id: "session_legacy",
+      worldId: "world_legacy",
+      status: "active",
+      turnCount: 0,
+      preGameCompleted: [],
+      activePlugins: [],
+      locale: "en-US",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const service = withStore(store);
+
+    await service.syncToServer("session_legacy");
+
+    expect(api.getWorld).toHaveBeenCalledWith("world_legacy");
+    expect(api.getSession).toHaveBeenCalledWith("session_legacy");
+    expect(api.createSession).toHaveBeenCalledWith(
+      "world_legacy",
+      undefined,
+      "session_legacy",
+      [],
+      "en-US",
+    );
+  });
 });

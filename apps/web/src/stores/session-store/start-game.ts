@@ -49,18 +49,13 @@ async function hydrateInitialSnapshot(
   sessionIdRef: MutableRef<string | null>,
   dispatch: SessionDispatch,
 ): Promise<void> {
-  try {
-    const snapshot = await api.getSessionSnapshot(sessionId);
-    const activeSessionId = sessionIdRef.current ?? sessionId;
-    if (activeSessionId !== sessionId) return;
+  const snapshot = await api.getSessionSnapshot(sessionId);
+  if (sessionIdRef.current !== sessionId) return;
 
-    dispatch({
-      type: "SET_GAME_STATE",
-      state: enrichGameStateFromSnapshot(snapshot),
-    });
-  } catch {
-    // Snapshot hydration is best-effort; reconnect and SSE keep state fresh.
-  }
+  dispatch({
+    type: "SET_GAME_STATE",
+    state: enrichGameStateFromSnapshot(snapshot),
+  });
 }
 
 async function persistPrepRuntimeBindings(
@@ -96,6 +91,9 @@ export async function startGameSession({
   llmConfig,
   plugins,
 }: StartGameOptions): Promise<void> {
+  let createdSessionId: string | null = null;
+  let published = false;
+  dispatch({ type: "SET_EXECUTION_ERROR", error: null });
   try {
     const session = await ds.createSession(
       world.id,
@@ -104,6 +102,7 @@ export async function startGameSession({
       plugins,
       i18n.language,
     );
+    createdSessionId = session.id;
 
     // Local mode creates the browser record first. Establish the authoritative
     // server mirror before publishing an executable session or issuing any
@@ -114,19 +113,39 @@ export async function startGameSession({
     await persistPrepRuntimeBindings(world.id, session.id);
 
     setActivePluginDataSession(session.id);
+    sessionIdRef.current = session.id;
+    published = true;
     dispatch({ type: "SET_SESSION", session });
 
     await hydrateInitialSnapshot(session.id, sessionIdRef, dispatch);
 
     try {
-      await hydratePluginDataForUiSpecs(session.id, dispatch);
+      await hydratePluginDataForUiSpecs(
+        session.id,
+        dispatch,
+        () => sessionIdRef.current === session.id,
+      );
     } catch {
       // Right-panel hydration will retry when its own ui-spec loader runs.
     }
   } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    if (published) {
+      try {
+        sessionIdRef.current = null;
+        setActivePluginDataSession(null);
+        dispatch({ type: "RESET_SESSION" });
+      } catch {
+        // Recovery must not replace the bootstrap error reported to the caller.
+      }
+    }
+    if (createdSessionId) {
+      await ds.deleteSession(createdSessionId).catch(() => undefined);
+    }
     dispatch({
       type: "SET_EXECUTION_ERROR",
-      error: (err as Error).message,
+      error: error.message,
     });
+    throw error;
   }
 }

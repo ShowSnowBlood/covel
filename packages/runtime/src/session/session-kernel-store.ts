@@ -59,6 +59,19 @@ export interface KernelStore {
     createdAt: string;
     updatedAt: string;
   }): Promise<void>;
+  listCharacters?(sessionId: string): Promise<
+    readonly {
+      id: string;
+      sessionId: string;
+      name: string;
+      type: string;
+      description?: string;
+      fields?: unknown;
+      version: number;
+      createdAt: string;
+      updatedAt: string;
+    }[]
+  >;
   setPluginData?(record: {
     id: string;
     sessionId: string;

@@ -10,6 +10,17 @@ function getIpc(): CovelIpcApiShape | null {
   return w.covelIpc ?? null;
 }
 
+function assertIpcWriteSucceeded(channel: string, result: unknown): void {
+  if (
+    result &&
+    typeof result === "object" &&
+    "ok" in result &&
+    (result as { ok?: unknown }).ok === false
+  ) {
+    throw new Error(`[settings] IPC ${channel} failed`);
+  }
+}
+
 interface JsonFileBackendOptions {
   /** Defaults to `/api/config/settings`. */
   readonly restEndpoint?: string;
@@ -72,7 +83,8 @@ export function createJsonFileBackend(
     async save(entries): Promise<void> {
       const ipc = getIpc();
       if (ipc) {
-        await ipc.invoke("covel:settings:save", entries);
+        const result = await ipc.invoke("covel:settings:save", entries);
+        assertIpcWriteSucceeded("covel:settings:save", result);
         return;
       }
       const res = await fetchImpl(endpoint, {
@@ -108,7 +120,8 @@ export function createJsonFileBackend(
     async saveSecrets(keys): Promise<void> {
       const ipc = getIpc();
       if (ipc) {
-        await ipc.invoke("covel:keys:save", keys);
+        const result = await ipc.invoke("covel:keys:save", keys);
+        assertIpcWriteSucceeded("covel:keys:save", result);
         return;
       }
       const res = await fetchImpl(secretsEndpoint, {

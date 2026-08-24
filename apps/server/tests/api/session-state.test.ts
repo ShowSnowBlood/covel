@@ -16,6 +16,7 @@ import { createMemoryStore, type DataStore } from "@covel/store";
 import { sessionRoutes } from "../../src/routes/api/session.js";
 import { stateRoutes } from "../../src/routes/api/state.js";
 import { createHealthRoutes } from "../../src/routes/api/health.js";
+import { createInProcessSessionLock } from "../../src/lib/session-lock.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -25,11 +26,13 @@ function createTestApp(deps: {
   pluginRegistry: PluginRegistry;
 }) {
   const app = new Hono();
+  const sessionLock = createInProcessSessionLock();
 
   app.use("*", async (c, next) => {
     c.set("store", deps.store);
     c.set("stateManager", deps.stateManager);
     c.set("pluginRegistry", deps.pluginRegistry);
+    c.set("sessionLock", sessionLock);
     await next();
   });
 

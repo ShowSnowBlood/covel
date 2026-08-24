@@ -936,16 +936,19 @@ commit trace 会记录 `ui.rendered`，并为每个 part 记录 `ui.part.update`
 
 **Payload (`CharacterUpsertPayload`):**
 
-| 字段           | 类型    | 必需 | 描述                                                                            |
-| -------------- | ------- | ---- | ------------------------------------------------------------------------------- |
-| id             | string  | ✓    | 角色 ID                                                                         |
-| name           | string  | ✓    | 角色名称                                                                        |
-| type           | string  |      | 角色类型，默认 `npc`                                                            |
-| description    | string  |      | 角色描述                                                                        |
-| fields         | unknown |      | 角色属性                                                                        |
-| version        | number  |      | 版本号，默认 `1`                                                                |
-| createdAt      | string  |      | 创建时间，缺省为提交时间                                                        |
-| mirrorPluginId | string  |      | 可选：同时镜像到该插件的 `plugin_data/<plugin>/characters/<id>`，供插件 UI 订阅 |
+| 字段            | 类型    | 必需 | 描述                                                                                                  |
+| --------------- | ------- | ---- | ----------------------------------------------------------------------------------------------------- |
+| id              | string  | ✓    | 角色 ID                                                                                               |
+| name            | string  | ✓    | 角色名称                                                                                              |
+| type            | string  |      | 角色类型，默认 `npc`                                                                                  |
+| description     | string  |      | 角色描述                                                                                              |
+| fields          | unknown |      | 角色属性                                                                                              |
+| version         | number  |      | 版本号，默认 `1`                                                                                      |
+| expectedVersion | number  |      | 更新 proposal 读取到的版本；提交时把 `fields` 作为 shallow patch 合并到最新角色并从 live version 递增 |
+| createdAt       | string  |      | 创建时间，缺省为提交时间                                                                              |
+| mirrorPluginId  | string  |      | 可选：同时镜像到该插件的 `plugin_data/<plugin>/characters/<id>`，供插件 UI 订阅                       |
+
+`update-character` 自动填写 `expectedVersion`。同一 stage 的并行 runtime 即使都从 v1 开始，提交时也会按顺序重读 live 角色并合并互不冲突的 fields patch，避免后提交者丢失先提交者的新字段；同一字段发生冲突时仍由后提交的 patch 覆盖。
 
 ### `working_memory.set`
 

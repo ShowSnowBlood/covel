@@ -7,6 +7,7 @@ import {
 } from "../types.js";
 import type { IdbStoreName } from "./idb-db.js";
 import type { IdbStoreContext, IdbStoreSlice } from "./idb-context.js";
+import { SessionAlreadyExistsError } from "../errors.js";
 
 export function createIdbSessionStore(ctx: IdbStoreContext): IdbStoreSlice {
   const { db, mutations } = ctx;
@@ -52,10 +53,17 @@ export function createIdbSessionStore(ctx: IdbStoreContext): IdbStoreSlice {
 
   return {
     async createSession(session: SessionRecord): Promise<void> {
-      await mutations.putAndTrack(
-        "sessions",
-        structuredClone(normalizeSessionRecord(session)),
-      );
+      try {
+        await mutations.addAndTrack(
+          "sessions",
+          structuredClone(normalizeSessionRecord(session)),
+        );
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "ConstraintError") {
+          throw new SessionAlreadyExistsError(session.id);
+        }
+        throw error;
+      }
     },
 
     async getSession(id: string): Promise<SessionRecord | null> {
@@ -99,11 +107,7 @@ export function createIdbSessionStore(ctx: IdbStoreContext): IdbStoreSlice {
     },
 
     async deleteCharacter(sessionId: string, id: string): Promise<void> {
-      const existing = (await db.get("characters", id)) as
-        CharacterRecord | undefined;
-      if (existing?.sessionId === sessionId) {
-        await mutations.deleteAndTrack("characters", id);
-      }
+      await mutations.deleteAndTrack("characters", [sessionId, id]);
     },
   };
 }

@@ -19,6 +19,10 @@ export default async function handler(ctx) {
   );
 
   return {
+    // Same-execution source for recorder's declared `inputs.dicePool`
+    // binding. pluginData below commits only at turn finalization, after the
+    // in-turn check.resolved follower has already run.
+    dice,
     checkContext: buildCheckContext(dice, ctx.locale),
     // Audit trail: the raw pool survives even when the narrative never uses it.
     pluginData: [

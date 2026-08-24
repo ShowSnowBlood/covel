@@ -365,7 +365,6 @@ export function makeInsertValues(json: JsonWriter): InsertValueBuilders {
     },
     lorebookEntryUpdate(record) {
       return {
-        sessionId: record.sessionId,
         pluginId: record.pluginId,
         keys: json.writeJson(record.keys),
         content: record.content,

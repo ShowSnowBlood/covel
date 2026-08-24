@@ -7,6 +7,10 @@ import {
   BROWSER_IDB_SCHEMA_VERSION,
   upgradeBrowserIdbSchema,
 } from "../src/indexeddb/idb-schema.js";
+import {
+  makeCharacter,
+  makeLorebookEntry,
+} from "../src/contract/test-fixtures.js";
 
 let dbCounter = 0;
 
@@ -73,7 +77,11 @@ describe("IdbStore snapshot cursor implementation", () => {
     const lightweight = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(dbName, BROWSER_IDB_SCHEMA_VERSION);
       request.onupgradeneeded = (event) => {
-        upgradeBrowserIdbSchema(request.result, event.oldVersion);
+        void upgradeBrowserIdbSchema(
+          request.result,
+          event.oldVersion,
+          request.transaction!,
+        );
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -86,6 +94,81 @@ describe("IdbStore snapshot cursor implementation", () => {
         limit: 1,
       });
       expect(page.map((item) => item.id)).toEqual(["legacy-snapshot"]);
+    } finally {
+      await store.close();
+    }
+  });
+});
+
+describe("IdbStore v15 session-scoped identity migration", () => {
+  it("preserves legacy rows and permits the same logical id in another session", async () => {
+    const dbName = `session-identity-migration-${++dbCounter}`;
+    const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(dbName, 14);
+      request.onupgradeneeded = () => {
+        const characters = request.result.createObjectStore("characters", {
+          keyPath: "id",
+        });
+        characters.createIndex("sessionId", "sessionId");
+        const lorebook = request.result.createObjectStore("lorebook_entries", {
+          keyPath: "id",
+        });
+        lorebook.createIndex("sessionId", "sessionId");
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const oldCharacter = makeCharacter({
+      id: "shared-id",
+      sessionId: "legacy-session",
+      name: "Legacy Character",
+    });
+    const oldLorebook = makeLorebookEntry({
+      id: "shared-id",
+      sessionId: "legacy-session",
+      content: "Legacy lore",
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = legacy.transaction(
+        ["characters", "lorebook_entries"],
+        "readwrite",
+      );
+      tx.objectStore("characters").put(oldCharacter);
+      tx.objectStore("lorebook_entries").put(oldLorebook);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    legacy.close();
+
+    const store = await createIdbStore(dbName);
+    try {
+      await store.upsertCharacter(
+        makeCharacter({
+          id: "shared-id",
+          sessionId: "new-session",
+          name: "New Character",
+        }),
+      );
+      await store.upsertLorebookEntries([
+        makeLorebookEntry({
+          id: "shared-id",
+          sessionId: "new-session",
+          content: "New lore",
+        }),
+      ]);
+
+      expect(await store.listCharacters("legacy-session")).toMatchObject([
+        oldCharacter,
+      ]);
+      expect(await store.listCharacters("new-session")).toMatchObject([
+        { id: "shared-id", name: "New Character" },
+      ]);
+      expect(
+        await store.listSessionLorebookEntries("legacy-session"),
+      ).toMatchObject([oldLorebook]);
+      expect(
+        await store.listSessionLorebookEntries("new-session"),
+      ).toMatchObject([{ id: "shared-id", content: "New lore" }]);
     } finally {
       await store.close();
     }

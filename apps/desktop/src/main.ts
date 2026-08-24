@@ -27,7 +27,7 @@ import {
   userServerPortFile,
 } from "./paths.js";
 import { loadEnvFiles, loadKeysEnvForChild } from "./env-files.js";
-import { findFreePort, waitForServer } from "./network.js";
+import { fetchWithTimeout, findFreePort, waitForServer } from "./network.js";
 import { diagnoseStartupError, type DiagnosedError } from "./startup-errors.js";
 import {
   initPersistentLog,
@@ -353,7 +353,7 @@ function startHealthHeartbeat(healthUrl: string): void {
   stopHealthHeartbeat();
   heartbeatTimer = setInterval(async () => {
     try {
-      const res = await fetch(healthUrl);
+      const res = await fetchWithTimeout(healthUrl, 5_000);
       const ok = res.ok;
       if (ok !== lastHealthOk) {
         lastHealthOk = ok;

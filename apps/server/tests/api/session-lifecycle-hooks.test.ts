@@ -13,20 +13,23 @@ import { createPluginRegistry } from "@covel/plugin-loader";
 import { createMemoryStore } from "@covel/store";
 import { createHookPipeline } from "@covel/runtime";
 import { sessionRoutes } from "../../src/routes/api/session.js";
+import { createInProcessSessionLock } from "../../src/lib/session-lock.js";
 
 function build() {
   const store = createMemoryStore();
   const hookPipeline = createHookPipeline();
+  const sessionLock = createInProcessSessionLock();
   const app = new Hono();
   app.use("*", async (c, next) => {
     c.set("store", store);
     c.set("stateManager", createStateManager(store));
     c.set("pluginRegistry", createPluginRegistry());
     c.set("hookPipeline", hookPipeline);
+    c.set("sessionLock", sessionLock);
     await next();
   });
   app.route("/api/sessions", sessionRoutes);
-  return { app, hookPipeline };
+  return { app, hookPipeline, sessionLock, store };
 }
 
 async function createSession(app: Hono): Promise<string> {
@@ -109,6 +112,41 @@ describe("Session lifecycle hooks", () => {
       sessionId: id,
       reason: "deleted",
     });
+  });
+
+  it("waits for an active session writer before cascading delete", async () => {
+    const { app, sessionLock, store } = build();
+    const id = await createSession(app);
+    let releaseWriter!: () => void;
+    let markWriterStarted!: () => void;
+    const writerStarted = new Promise<void>((resolve) => {
+      markWriterStarted = resolve;
+    });
+    const writerGate = new Promise<void>((resolve) => {
+      releaseWriter = resolve;
+    });
+    const writer = sessionLock.withLock(id, async () => {
+      markWriterStarted();
+      await writerGate;
+      await store.addMessage({
+        id: "late-message",
+        sessionId: id,
+        role: "assistant",
+        content: "completed before delete",
+        createdAt: new Date().toISOString(),
+      });
+    });
+    await writerStarted;
+
+    const deleting = app.request(`/api/sessions/${id}`, { method: "DELETE" });
+    await Promise.resolve();
+    expect(await store.getSession(id)).not.toBeNull();
+
+    releaseWriter();
+    await writer;
+    expect((await deleting).status).toBe(200);
+    expect(await store.getSession(id)).toBeNull();
+    expect(await store.listMessages(id)).toEqual([]);
   });
 
   it("does not fire SessionEnd again when DELETE-ing an already-ended session", async () => {

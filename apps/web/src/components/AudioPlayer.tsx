@@ -258,7 +258,7 @@ export function AudioPlayer(props: AudioPlayerProps): ReactElement {
     >
       <audio
         ref={audioRef}
-        src={resolved.url}
+        src={isReady ? resolved.url : undefined}
         preload="metadata"
         aria-label={altText}
         className="hidden"

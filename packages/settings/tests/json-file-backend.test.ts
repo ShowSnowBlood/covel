@@ -4,7 +4,7 @@
  * hiccup during boot into "the next setting change wipes settings.json and
  * keys.env". Only a genuine 404 (nothing written yet) may read as empty.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createJsonFileBackend } from "../src/backends/json-file.js";
 
 function res(status: number, body: unknown): Response {
@@ -14,6 +14,10 @@ function res(status: number, body: unknown): Response {
     json: async () => body,
   } as Response;
 }
+
+afterEach(() => {
+  delete (globalThis as { covelIpc?: unknown }).covelIpc;
+});
 
 describe("json-file backend load contract", () => {
   it("treats 404 as an empty store", async () => {
@@ -46,5 +50,29 @@ describe("json-file backend load contract", () => {
         .mockResolvedValue(res(200, { entries: { "ui.locale": "en-US" } })),
     });
     await expect(backend.load()).resolves.toEqual({ "ui.locale": "en-US" });
+  });
+});
+
+describe("json-file backend IPC write contract", () => {
+  it("rejects when the main process reports a settings write failure", async () => {
+    (globalThis as { covelIpc?: unknown }).covelIpc = {
+      invoke: vi.fn().mockResolvedValue({ ok: false }),
+    };
+    const backend = createJsonFileBackend();
+
+    await expect(backend.save({ "ui.locale": "en-US" })).rejects.toThrow(
+      /settings:save.*failed/i,
+    );
+  });
+
+  it("rejects when the main process reports a secrets write failure", async () => {
+    (globalThis as { covelIpc?: unknown }).covelIpc = {
+      invoke: vi.fn().mockResolvedValue({ ok: false }),
+    };
+    const backend = createJsonFileBackend();
+
+    await expect(backend.saveSecrets({ openai: "sk-test" })).rejects.toThrow(
+      /keys:save.*failed/i,
+    );
   });
 });

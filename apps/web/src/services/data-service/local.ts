@@ -404,10 +404,11 @@ export class LocalDataService implements DataService {
 
     if (!session || !world) return;
 
-    // Sanitize IDs: server schema requires /^[a-z0-9-]+$/, but older local IDs
-    // may contain underscores (generated before the uid() fix). Replace them.
-    const serverWorldId = world.id.replace(/_/g, "-");
-    const serverSessionId = session.id.replace(/_/g, "-");
+    // Server and browser validators both accept underscores. Preserve legacy
+    // IDs exactly: actions continue to address the local SessionRecord id, so
+    // creating a differently named server mirror would make every turn 404.
+    const serverWorldId = world.id;
+    const serverSessionId = session.id;
 
     // Ensure world exists on server (pass local ID so server uses the same ID).
     // Only a 404 means "not there yet" — a transient 500 must not be answered

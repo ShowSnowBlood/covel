@@ -129,11 +129,7 @@ export function createIdbWorldDataStore(ctx: IdbStoreContext): IdbStoreSlice {
     },
 
     async deleteLorebookEntry(sessionId: string, id: string): Promise<void> {
-      const existing = (await db.get("lorebook_entries", id)) as
-        LorebookEntryRecord | undefined;
-      if (existing && existing.sessionId === sessionId) {
-        await mutations.deleteAndTrack("lorebook_entries", id);
-      }
+      await mutations.deleteAndTrack("lorebook_entries", [sessionId, id]);
     },
   };
 }

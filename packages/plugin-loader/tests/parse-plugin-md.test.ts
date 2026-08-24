@@ -138,6 +138,7 @@ describe("parsePluginMd", () => {
           "  zh: 中文描述",
           "  en: English description",
           "runtimeType: function",
+          "handler: ./handler.js",
           "trigger:",
           "  type: manual",
           "hooks:",

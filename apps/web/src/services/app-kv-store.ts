@@ -49,7 +49,20 @@ function openAppDb(): Promise<IDBDatabase> {
   dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (event) => {
-      upgradeBrowserIdbSchema(req.result, event.oldVersion);
+      const transaction = req.transaction!;
+      void upgradeBrowserIdbSchema(
+        req.result,
+        event.oldVersion,
+        transaction,
+      ).catch(() => {
+        // Reject the open request instead of allowing a partially migrated
+        // schema to commit after an asynchronous upgrade failure.
+        try {
+          transaction.abort();
+        } catch {
+          // The transaction already aborted or completed.
+        }
+      });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

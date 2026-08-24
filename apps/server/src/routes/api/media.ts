@@ -31,7 +31,10 @@ import {
   getMediaTokenSecret,
   verifyMediaToken,
 } from "../../middleware/media-token.js";
-import { checkSessionOwnerById } from "./session/session-guard.js";
+import {
+  checkHostedOperator,
+  checkSessionOwnerById,
+} from "./session/session-guard.js";
 import { rateLimiter, singleFlight } from "../../middleware/rate-limit.js";
 import { errorBody } from "../../api-error.js";
 
@@ -367,9 +370,8 @@ export async function buildProtectedMediaIds(
  * Hardening summary (audit P1/P2):
  *
  *   1. Disabled by default: must set `COVEL_MEDIA_CLEANUP_ENABLED=true`.
- *   2. Forbidden in `DEPLOYMENT_TIER=commercial` until an admin auth
- *      middleware is wired (no caller-identifying claim available right now,
- *      so we refuse to even inspect the body).
+ *   2. Forbidden in `DEPLOYMENT_TIER=commercial`; `demo` requires the hosted
+ *      operator credential before the route inspects cleanup policy.
  *   3. `dryRun:false` requires an explicit `X-Confirm-Cleanup: yes` header
  *      so an automated job or curl typo cannot delete bytes.
  *   4. Single-flight wrapper prevents two cleanup runs from racing each
@@ -395,6 +397,9 @@ mediaRoutes.post("/cleanup", singleFlight(), async (c) => {
       503,
     );
   }
+
+  const operatorDenied = checkHostedOperator(c);
+  if (operatorDenied) return operatorDenied;
 
   if (!isEnvTruthy("COVEL_MEDIA_CLEANUP_ENABLED")) {
     return jsonError("forbidden", "cleanup endpoint disabled", 403);

@@ -33,6 +33,13 @@ export class SettingsStore implements SettingsStoreApi {
     values: Promise.resolve(),
     secrets: Promise.resolve(),
   };
+  /** Last snapshot that the backend confirmed for each independently saved map. */
+  private readonly persistedSnapshots = {
+    values: new Map<SettingKey, unknown>(),
+    secrets: new Map<string, string>(),
+  };
+  /** Monotonic mutation revisions keep an older failure from undoing newer state. */
+  private readonly persistRevisions = { values: 0, secrets: 0 };
   private loaded: Promise<void>;
   private loadResolve!: () => void;
   /** Set when `init()` could not read existing state. See {@link assertHydrated}. */
@@ -58,6 +65,8 @@ export class SettingsStore implements SettingsStoreApi {
           this.secrets.set(provider, keyValue);
         }
       }
+      this.restore(this.persistedSnapshots.values, this.values);
+      this.restore(this.persistedSnapshots.secrets, this.secrets);
       this.hydrationError = null;
     } catch (err) {
       // Boot continues on defaults (read-only) rather than failing hard, but
@@ -84,8 +93,9 @@ export class SettingsStore implements SettingsStoreApi {
   }
 
   /**
-   * Apply an in-memory mutation and persist it, restoring the previous state if
-   * the adapter rejects.
+   * Apply an in-memory mutation and persist it. A latest failed mutation rolls
+   * back to the last backend-confirmed snapshot; an older failure leaves the
+   * newer optimistic snapshot alone because that queued save includes it.
    *
    * Without the rollback a single failed write (localStorage quota, sidecar
    * hiccup) leaves the map ahead of storage. Every UI call site is
@@ -95,23 +105,39 @@ export class SettingsStore implements SettingsStoreApi {
    */
   private async persist(
     target: "values" | "secrets",
-    mutate: () => () => void,
+    mutate: () => void,
   ): Promise<void> {
     this.assertHydrated();
     // Mutate synchronously so callers retain read-after-write behaviour, then
     // capture this mutation's full snapshot and enqueue only the backend I/O.
-    // Undo remains key-scoped so one failed write cannot roll back unrelated
-    // concurrent mutations.
-    const undo = mutate();
+    mutate();
+    const revision = ++this.persistRevisions[target];
     const snapshot =
       target === "values"
         ? this.serializeEntries()
         : (Object.fromEntries(this.secrets) as Record<string, string>);
     try {
       await this.enqueueSnapshot(target, snapshot);
+      this.replacePersistedSnapshot(target, snapshot);
     } catch (err) {
-      undo();
+      if (this.persistRevisions[target] === revision) {
+        this.restore(
+          target === "values" ? this.values : this.secrets,
+          this.persistedSnapshots[target] as Map<string, unknown>,
+        );
+      }
       throw err;
+    }
+  }
+
+  private replacePersistedSnapshot(
+    target: "values" | "secrets",
+    snapshot: Record<string, unknown> | Record<string, string>,
+  ): void {
+    const persisted = this.persistedSnapshots[target] as Map<string, unknown>;
+    persisted.clear();
+    for (const [key, value] of Object.entries(snapshot)) {
+      persisted.set(key, value);
     }
   }
 
@@ -128,16 +154,6 @@ export class SettingsStore implements SettingsStoreApi {
     // original rejection to the caller that owns that mutation.
     this.persistTails[target] = operation.catch(() => undefined);
     return operation;
-  }
-
-  /** Capture a key's current state so a failed write can put it back. */
-  private undoFor<V>(map: Map<string, V>, key: string): () => void {
-    const had = map.has(key);
-    const previous = map.get(key);
-    return () => {
-      if (had) map.set(key, previous as V);
-      else map.delete(key);
-    };
   }
 
   ready(): Promise<void> {
@@ -189,16 +205,12 @@ export class SettingsStore implements SettingsStoreApi {
       const provider = this.stripKeysPrefix(key);
       const str = typeof value === "string" ? value : String(value ?? "");
       await this.persist("secrets", () => {
-        const undo = this.undoFor(this.secrets, provider);
         if (str.trim().length === 0) this.secrets.delete(provider);
         else this.secrets.set(provider, str);
-        return undo;
       });
     } else {
       await this.persist("values", () => {
-        const undo = this.undoFor(this.values, key);
         this.values.set(key, value);
-        return undo;
       });
     }
     this.notify(key, value);
@@ -211,15 +223,11 @@ export class SettingsStore implements SettingsStoreApi {
     if (backend === "keys") {
       await this.persist("secrets", () => {
         const provider = this.stripKeysPrefix(key);
-        const undo = this.undoFor(this.secrets, provider);
         this.secrets.delete(provider);
-        return undo;
       });
     } else {
       await this.persist("values", () => {
-        const undo = this.undoFor(this.values, key);
         this.values.delete(key);
-        return undo;
       });
     }
     const fresh = entry ? entry.default : undefined;
@@ -232,22 +240,10 @@ export class SettingsStore implements SettingsStoreApi {
     // their natural response is to hit Reset, which would then wipe the very
     // settings.json / keys.env we failed to read.
     this.assertHydrated();
-    // A wipe is the one write where a whole-map snapshot IS the right undo —
-    // it touches every key by definition.
-    const valuesSnapshot = new Map(this.values);
-    const secretsSnapshot = new Map(this.secrets);
-    this.values.clear();
-    this.secrets.clear();
-    try {
-      await Promise.all([
-        this.enqueueSnapshot("values", {}),
-        this.enqueueSnapshot("secrets", {}),
-      ]);
-    } catch (err) {
-      this.restore(this.values, valuesSnapshot);
-      this.restore(this.secrets, secretsSnapshot);
-      throw err;
-    }
+    await Promise.all([
+      this.persist("values", () => this.values.clear()),
+      this.persist("secrets", () => this.secrets.clear()),
+    ]);
     for (const entry of this.registry.values()) {
       this.notify(entry.key, entry.default);
     }
@@ -312,23 +308,15 @@ export class SettingsStore implements SettingsStoreApi {
     // the map holding values that never reached storage.
     if (nonSecretUpdates.length > 0) {
       await this.persist("values", () => {
-        const undos = nonSecretUpdates.map(([key]) =>
-          this.undoFor(this.values, key),
-        );
         for (const [key, value] of nonSecretUpdates)
           this.values.set(key, value);
-        return () => undos.forEach((undo) => undo());
       });
     }
     if (secretUpdates.length > 0) {
       await this.persist("secrets", () => {
-        const undos = secretUpdates.map(([provider]) =>
-          this.undoFor(this.secrets, provider),
-        );
         for (const [provider, keyValue] of secretUpdates) {
           this.secrets.set(provider, keyValue);
         }
-        return () => undos.forEach((undo) => undo());
       });
     }
     for (const [key, value] of nonSecretUpdates) {

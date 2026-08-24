@@ -1,11 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  abortSignalWithTimeout,
   assertEntityEnvelope,
   readManualEntity,
   splitList,
 } from "../src/index.js";
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+
+describe("abortSignalWithTimeout", () => {
+  it("aborts provider work when the turn signal aborts", () => {
+    const controller = new AbortController();
+    const combined = abortSignalWithTimeout(controller.signal, 60_000);
+
+    expect(combined.aborted).toBe(false);
+    controller.abort(new Error("turn stopped"));
+    expect(combined.aborted).toBe(true);
+    expect(combined.reason).toEqual(new Error("turn stopped"));
+  });
+
+  it("returns a timeout signal when the turn has no control signal", () => {
+    const combined = abortSignalWithTimeout(undefined, 60_000);
+    expect(combined).toBeInstanceOf(AbortSignal);
+    expect(combined.aborted).toBe(false);
+  });
+});
 
 describe("splitList", () => {
   it("splits strings on comma / fullwidth-comma / newline", () => {

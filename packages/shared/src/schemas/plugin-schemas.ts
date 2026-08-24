@@ -644,6 +644,8 @@ export const permissionsDeclSchema = z
  * superRefine has to name Zod's refinement-ctx type.
  */
 interface ManifestCrossFieldView {
+  readonly runtimeType?: string;
+  readonly handler?: string;
   readonly stage?: string;
   readonly trigger?: {
     readonly type?: string;
@@ -671,6 +673,13 @@ function sharedManifestCrossFieldIssues(
   m: ManifestCrossFieldView,
 ): CrossFieldIssue[] {
   const issues: CrossFieldIssue[] = [];
+
+  if (m.runtimeType === "function" && !m.handler?.trim()) {
+    issues.push({
+      path: ["handler"],
+      message: "handler is required for runtimeType 'function'",
+    });
+  }
 
   // recordAs is only meaningful with a schema validating the recorded value.
   if (m.output?.recordAs !== undefined && m.output.schema === undefined) {

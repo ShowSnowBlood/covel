@@ -23,6 +23,7 @@ import { sessionRoutes } from "../../src/routes/api/session.js";
 import { messageRoutes } from "../../src/routes/api/messages.js";
 import { traceRoutes } from "../../src/routes/api/traces.js";
 import { subscribeRoutes } from "../../src/routes/api/subscribe.js";
+import { createInProcessSessionLock } from "../../src/lib/session-lock.js";
 
 const ENV_KEYS = ["DEPLOYMENT_TIER", "COVEL_DESKTOP_REST_TOKEN"] as const;
 const ORIGINAL_ENV = Object.fromEntries(
@@ -40,10 +41,12 @@ afterEach(() => {
 function createTestApp(store: DataStore, registry: PluginRegistry): Hono {
   const app = new Hono();
   const eventBus = createEventBus(store);
+  const sessionLock = createInProcessSessionLock();
   app.use("*", async (c, next) => {
     c.set("store", store);
     c.set("pluginRegistry", registry);
     c.set("eventBus", eventBus);
+    c.set("sessionLock", sessionLock);
     await next();
   });
   app.route("/api/sessions", sessionRoutes);

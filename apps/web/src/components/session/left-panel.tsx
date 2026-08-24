@@ -177,6 +177,7 @@ export function LeftPanel({
               )}
             </h3>
             <PluginListPanel
+              key={session.id}
               packages={enabledPackages}
               loadErrors={pluginLoadErrors}
               sessionPlugins={sessionPlugins}

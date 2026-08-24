@@ -19,7 +19,11 @@
  * up the new track via `plugin-data.changed` SSE.
  */
 
-import { persistTrack, recordFailure } from "../../lib/mimo-tts.js";
+import {
+  abortSignalWithTimeout,
+  persistTrack,
+  recordFailure,
+} from "../../lib/mimo-tts.js";
 
 const TRACKS_NAMESPACE = "tracks";
 const DEFAULT_PRESET_ID = "mimo-tts";
@@ -120,7 +124,7 @@ export default async function manualNarrateHandler(ctx) {
         format,
         triggeredBy: "manual",
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: abortSignalWithTimeout(ctx.signal, timeoutMs),
     });
     const ref = refs[0];
     if (!ref) throw new Error("speech provider returned no usable media");

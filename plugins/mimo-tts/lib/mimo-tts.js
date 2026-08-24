@@ -10,6 +10,16 @@
  */
 
 /**
+ * Bound speech work by a timeout while preserving player turn cancellation.
+ * @param {AbortSignal | undefined} signal
+ * @param {number} timeoutMs
+ */
+export function abortSignalWithTimeout(signal, timeoutMs) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+/**
  * Compute the human-friendly display fields the right-panel spec binds
  * against. Centralised here so auto / manual / failure paths agree.
  *

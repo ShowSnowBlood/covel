@@ -122,6 +122,7 @@ export function useBuildSessionActions({
     const worldId = state.world?.id ?? "";
 
     const postStart = (loreOverride?: unknown) => {
+      if (sessionIdRef.current !== sessionId) return;
       dispatch({ type: "SET_EXECUTING", value: true });
       dispatch({ type: "SET_EXECUTION_ERROR", error: null });
       runActionStream(
@@ -134,6 +135,7 @@ export function useBuildSessionActions({
         },
         handleSseEvent,
         dispatch,
+        { sessionIdRef },
       ).finally(() => {
         finalizeActionExecution(dispatch, sessionId, sessionIdRef);
         resyncSession(sessionId);
@@ -226,14 +228,17 @@ export function useBuildSessionActions({
             },
             handleSseEvent,
             dispatch,
-            { toastOnError: true },
+            { toastOnError: true, sessionIdRef },
           ).then(resolve);
         };
 
         // Settle the promise on an aborted sync too, or `sendMessage`'s
         // `.finally(finalizeActionExecution)` never runs and the UI stays
         // stuck on "executing".
-        ensureServerThenRun(ds, sessionId, fireAction, resolve);
+        ensureServerThenRun(ds, sessionId, fireAction, {
+          onAborted: resolve,
+          sessionIdRef,
+        });
       });
     },
     [ds, dispatch, state.session, handleSseEvent],
@@ -353,6 +358,7 @@ export function useBuildSessionActions({
         });
         filled = result.results?.[0]?.filledNarrative ?? "";
       } catch (err) {
+        if (sessionIdRef.current !== sid) return;
         console.error("[submitInteraction] submit-form failed:", err);
         sendMessage(Object.values(values).join(", "));
         return;
@@ -369,6 +375,7 @@ export function useBuildSessionActions({
       // So after the turn that may have created/updated the player, we pull a
       // snapshot to refresh both `characters` and `characterSchema`. Done after
       // the turn (not before) so a just-created character is included.
+      if (sessionIdRef.current !== sid) return;
       dispatch({ type: "SET_EXECUTING", value: true });
       dispatch({ type: "SET_EXECUTION_ERROR", error: null });
       try {
@@ -404,10 +411,13 @@ export function useBuildSessionActions({
 
   const runKernelAction = useCallback(
     (request: api.ActionRequest): void => {
+      if (sessionIdRef.current !== request.sessionId) return;
       dispatch({ type: "SET_EXECUTING", value: true });
       dispatch({ type: "SET_EXECUTION_ERROR", error: null });
 
-      runActionStream(request, handleSseEvent, dispatch).finally(() => {
+      runActionStream(request, handleSseEvent, dispatch, {
+        sessionIdRef,
+      }).finally(() => {
         finalizeActionExecution(dispatch, request.sessionId, sessionIdRef);
         if (request.sessionId) resyncSession(request.sessionId);
       });
@@ -421,14 +431,18 @@ export function useBuildSessionActions({
       const sessionId = state.session?.id;
       if (!sessionId) return;
 
-      ensureServerThenRun(ds, sessionId, () =>
-        runKernelAction({
-          requestId: crypto.randomUUID(),
-          type: "execute_command",
-          sessionId,
-          locale: i18n.language,
-          payload: { command },
-        }),
+      ensureServerThenRun(
+        ds,
+        sessionId,
+        () =>
+          runKernelAction({
+            requestId: crypto.randomUUID(),
+            type: "execute_command",
+            sessionId,
+            locale: i18n.language,
+            payload: { command },
+          }),
+        { sessionIdRef },
       );
     },
     [ds, state, runKernelAction],
@@ -457,17 +471,21 @@ export function useBuildSessionActions({
         });
       }
 
-      ensureServerThenRun(ds, sessionId, () =>
-        runKernelAction({
-          requestId: crypto.randomUUID(),
-          type: "retry_runtime",
-          sessionId,
-          locale: i18n.language,
-          payload: {
-            ...(runtimeId ? { runtimeId } : {}),
-            ...(sourceTurnId ? { retryFromTurnId: sourceTurnId } : {}),
-          },
-        }),
+      ensureServerThenRun(
+        ds,
+        sessionId,
+        () =>
+          runKernelAction({
+            requestId: crypto.randomUUID(),
+            type: "retry_runtime",
+            sessionId,
+            locale: i18n.language,
+            payload: {
+              ...(runtimeId ? { runtimeId } : {}),
+              ...(sourceTurnId ? { retryFromTurnId: sourceTurnId } : {}),
+            },
+          }),
+        { sessionIdRef },
       );
     },
     [ds, dispatch, state, runKernelAction],

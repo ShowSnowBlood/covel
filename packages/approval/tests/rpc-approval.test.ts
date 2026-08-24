@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createRpcApprovalGate } from "../src/rpc-approval.js";
 
 describe("createRpcApprovalGate", () => {
@@ -43,6 +43,40 @@ describe("createRpcApprovalGate", () => {
       expect(result.pending.pluginId).toBe("third-party");
       expect(result.pending.action).toBe("do-stuff");
       expect(result.pending.description).toBe("Run the thing");
+    }
+  });
+
+  it("expires a stale matching pending before considering reuse", () => {
+    const now = Date.parse("2026-08-24T00:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    try {
+      const gate = createRpcApprovalGate();
+      const first = gate.evaluate({
+        sessionId: "sess-1",
+        pluginId: "third-party",
+        action: "do-stuff",
+        payload: { version: 1 },
+        trustLevel: "community",
+      });
+      if (first.status !== "pending") throw new Error("unreachable");
+
+      vi.setSystemTime(now + 60 * 60 * 1000 + 1);
+      const retried = gate.evaluate({
+        sessionId: "sess-1",
+        pluginId: "third-party",
+        action: "do-stuff",
+        payload: { version: 2 },
+        trustLevel: "community",
+      });
+
+      expect(retried.status).toBe("pending");
+      if (retried.status !== "pending") throw new Error("unreachable");
+      expect(retried.approvalId).not.toBe(first.approvalId);
+      expect(retried.pending.payload).toEqual({ version: 2 });
+      expect(gate.listPending("sess-1")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
     }
   });
 

@@ -34,19 +34,19 @@ const REGISTRY: readonly StorageMigrationSummary[] = [
     id: "data:sqlite:schema",
     domain: "data",
     backend: "sqlite",
-    version: 1,
-    status: "manual-required",
+    version: 2,
+    status: "managed-by-backend",
     description:
-      "SQLite schema migrations run through the server Drizzle migration path.",
+      "SQLite boot migration preserves legacy rows while re-keying characters and lorebook entries by session.",
   },
   {
     id: "data:pg:schema",
     domain: "data",
     backend: "pg",
-    version: 1,
-    status: "manual-required",
+    version: 2,
+    status: "managed-by-backend",
     description:
-      "PostgreSQL schema migrations run through the server Drizzle migration path.",
+      "PostgreSQL boot migration preserves legacy rows while re-keying characters and lorebook entries by session.",
   },
   {
     id: "data:idb:store",

@@ -195,7 +195,10 @@ export function createRpcApprovalGate(): RpcApprovalGate {
         return { status: "allow", reason: "one-time-grant" };
       }
 
-      // 4. Otherwise create a pending approval for the dialog flow.
+      // 4. Otherwise create a pending approval for the dialog flow. Expire old
+      // entries before looking for a reusable request; otherwise a retry of
+      // the same action can keep an hour-old payload alive forever.
+      sweepStalePending();
       // Reuse an unresolved request for the same capability. This bounds
       // duplicate clicks and lets revoke/disable cancel one stable approval.
       for (const pending of state.pending.values()) {
@@ -211,10 +214,8 @@ export function createRpcApprovalGate(): RpcApprovalGate {
           };
         }
       }
-      // Enforce queue caps before allocation. Sweep stale entries
-      // first so a long-lived process doesn't get pinned at the cap by
-      // ancient unanswered pendings.
-      sweepStalePending();
+      // Enforce queue caps before allocation. The stale sweep above also keeps
+      // a long-lived process from being pinned at the cap by old requests.
       if (state.pending.size >= MAX_PENDING_GLOBAL) {
         return {
           status: "rejected",

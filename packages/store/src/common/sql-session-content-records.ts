@@ -174,7 +174,7 @@ export function createSqlSessionContentRecords(
 
     async upsertCharacter(record: CharacterRecord): Promise<void> {
       await runner.insert(characters, values.characterInsert(record), {
-        target: characters.id,
+        target: [characters.sessionId, characters.id],
         set: values.characterUpdate(record),
       });
     },

@@ -40,15 +40,31 @@ export function runActionStream(
   request: api.ActionRequest,
   handleSseEvent: SseEventHandler,
   dispatch: SessionDispatch,
-  opts?: { toastOnError?: boolean },
+  opts?: {
+    toastOnError?: boolean;
+    sessionIdRef?: MutableRef<string | null>;
+  },
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     api.sendAction(
       request,
-      handleSseEvent,
+      (envelope) => {
+        if (
+          opts?.sessionIdRef &&
+          opts.sessionIdRef.current !== request.sessionId
+        ) {
+          return;
+        }
+        handleSseEvent(envelope);
+      },
       (err) => {
-        dispatch({ type: "SET_EXECUTION_ERROR", error: err.message });
-        if (opts?.toastOnError) {
+        const isCurrent =
+          !opts?.sessionIdRef ||
+          opts.sessionIdRef.current === request.sessionId;
+        if (isCurrent) {
+          dispatch({ type: "SET_EXECUTION_ERROR", error: err.message });
+        }
+        if (isCurrent && opts?.toastOnError) {
           emitToast(
             "error",
             i18n.t("toast.sendMessageFailed", {
@@ -78,12 +94,25 @@ export function ensureServerThenRun(
   ds: DataService,
   sessionId: string,
   fireAction: () => void,
-  onAborted?: () => void,
+  opts?: {
+    onAborted?: () => void;
+    sessionIdRef?: MutableRef<string | null>;
+  },
 ): void {
   api
     .ensureServerSession(sessionId, (sid) => ds.syncToServer(sid))
-    .then(fireAction)
+    .then(() => {
+      if (opts?.sessionIdRef && opts.sessionIdRef.current !== sessionId) {
+        opts.onAborted?.();
+        return;
+      }
+      fireAction();
+    })
     .catch((err: unknown) => {
+      if (opts?.sessionIdRef && opts.sessionIdRef.current !== sessionId) {
+        opts.onAborted?.();
+        return;
+      }
       const detail = err instanceof Error ? err.message : String(err);
       console.error("[session] server context sync failed:", err);
       emitToast(
@@ -93,6 +122,6 @@ export function ensureServerThenRun(
         }) as string,
         detail,
       );
-      onAborted?.();
+      opts?.onAborted?.();
     });
 }

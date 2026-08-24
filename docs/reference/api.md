@@ -438,7 +438,7 @@ setup runtime 反复失败、耗尽重试预算（`maxTriggerCount`）后进入 
 
 ### Lorebook
 
-Session 级 lorebook 词条的只读查看 + 启用/删除管理。Entries 由插件通过 proposal commit 管道写入 store 层的 `lorebook_entries` 表，这些端点提供玩家 UI 与程序化读取视图，**不走提案系统**（单项 toggle/删除为 MVP 级别的直接写入）。
+Session 级 lorebook 词条的只读查看 + 启用/删除管理。Entries 由插件通过 proposal commit 管道写入 store 层的 `lorebook_entries` 表，这些端点提供玩家 UI 与程序化读取视图，**不走提案系统**（单项 toggle/删除为 MVP 级别的直接写入）。`entryId` 仅需在当前 session 内唯一；不同 session 可安全复用同一 ID。
 
 | 方法   | 路径                                  | 描述                                                            |
 | ------ | ------------------------------------- | --------------------------------------------------------------- |
@@ -478,6 +478,8 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 ### 角色数据
 
 > **接入状态（2026-04-27）**：当前内置 Web UI 主要通过 `GET /api/sessions/:id/snapshot` 获取角色快照；本节 REST 端点保留为轻量读取/管理 API。插件 runtime 推荐使用 `create-character` / `update-character` / `list-characters` / `get-character` 工具维护角色。`POST /characters` 是兼容管理入口，后续若收敛角色写路径，应保持 URL/响应兼容并优先替换内部实现。
+
+角色 `id` 仅需在当前 session 内唯一；不同 session 可安全复用同一 ID。
 
 | 方法 | 路径                           | 描述             |
 | ---- | ------------------------------ | ---------------- |
@@ -530,7 +532,7 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 | GET  | `/api/media/:id?token=<signed>`     | 内容寻址媒体下载（HMAC token + 会话引用校验）                                                                                                                                                                                     |
 | GET  | `/api/sessions/:id/media-token?id=` | 为指定 mediaId 颁发短时签名 token，供上面的下载端点使用                                                                                                                                                                           |
 | POST | `/api/media?sessionId=<id>`         | 玩家图片上传：原始字节 body（`Content-Type` = 文件 MIME，仅 `image/*`，≤20MB），内容寻址入库 + 记会话 owner/ref，返回 `{ id, mime, size }`。**`image/svg+xml` 一律 400 拒绝**——SVG 是可执行内容类型，内联渲染时会在应用源执行脚本 |
-| POST | `/api/media/cleanup`                | 破坏性维护端点：默认禁用 (`COVEL_MEDIA_CLEANUP_ENABLED`)，商业层 503，`dryRun:false` 需 `X-Confirm-Cleanup: yes`                                                                                                                  |
+| POST | `/api/media/cleanup`                | 破坏性维护端点：默认禁用 (`COVEL_MEDIA_CLEANUP_ENABLED`)，demo 层需 operator token，商业层 503，`dryRun:false` 需 `X-Confirm-Cleanup: yes`                                                                                        |
 
 ### 配置信息
 
@@ -1002,6 +1004,10 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 | `plugins` | string[] | 否   | 要激活的插件 ID 列表                                          |
 | `id`      | string   | 否   | 客户端自定义会话 ID（如不提供则自动生成 `{worldId}-{uuid8}`） |
 
+客户端自定义 `id` 已存在时返回
+`409 { "error": "Session already exists: <id>", "code": "session_already_exists" }`。
+创建操作不会覆盖原会话，也不会把原会话的子记录解释为新会话数据。
+
 世界包字段会影响准备页和 session 初始化：
 
 - `metadata.requiredPlugins`：准备页锁定启用。
@@ -1119,7 +1125,9 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 
 #### `DELETE /api/sessions/:id`
 
-删除一个游戏会话。
+删除一个游戏会话。删除与同一 session 的 turn、插件管理写入共用 session
+lock；请求会等待已取得锁的回合完成，再在锁内级联删除，因此完成中的回合
+无法在删除后写回孤儿记录。
 
 **参数:**
 
@@ -1883,6 +1891,10 @@ UI 与第三方调用方应优先按 `capabilities` / `outputKind` / `source` �
 #### `POST /api/sessions/:id/plugins/enable`
 
 启用一个插件。
+
+enable/disable 与同一 session 的其他写入共用 session lock，并在持锁后重新读取
+`activePlugins`。持久化成功后才更新进程内 registry，避免并发 lost update 和
+持久化失败造成的 registry/store 分裂。
 
 **请求体:**
 
@@ -2827,8 +2839,9 @@ data: {"type":"done","world":{"id":"frost-continent","name":"冰封大陆","meta
 
 | 条件                                                        | 行为                                                                                                                                              |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `COVEL_MEDIA_CLEANUP_ENABLED` 未设为 truthy（`true` / `1`） | 403 `{ "error": "cleanup endpoint disabled", "code": "forbidden" }`                                                                               |
 | `DEPLOYMENT_TIER=commercial`                                | 503 `{ "error": "cleanup endpoint not available in this deployment tier", "code": "unavailable" }` — 在管理员鉴权中间件就绪前永远不在商业部署可用 |
+| `DEPLOYMENT_TIER=demo` 且未提供正确 operator token          | 401 `{ "error": "Operator token required", "code": "operator_token_required" }`                                                                   |
+| `COVEL_MEDIA_CLEANUP_ENABLED` 未设为 truthy（`true` / `1`） | 403 `{ "error": "cleanup endpoint disabled", "code": "forbidden" }`                                                                               |
 | `dryRun:false` 且无 `X-Confirm-Cleanup: yes` 请求头         | 400 `{ "error": "confirmation header missing: …", "code": "invalid_request" }`                                                                    |
 | 同一时刻第二次并发请求                                      | 429 `{ "error": "Operation already in progress" }` (singleFlight)                                                                                 |
 | 任一会话的扫描行数超过 `scanLimit`（默认 1000）             | 400 `{ "error": "scan limit exceeded for session …", "code": "limit_exceeded" }`                                                                  |

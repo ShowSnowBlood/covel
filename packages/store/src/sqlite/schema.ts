@@ -20,6 +20,7 @@ import {
   integer,
   real,
   index,
+  primaryKey,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
@@ -258,7 +259,7 @@ export const messages = sqliteTable(
 export const characters = sqliteTable(
   "characters",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     sessionId: text("session_id").notNull(),
     name: text("name").notNull(),
     type: text("type").notNull(),
@@ -268,7 +269,10 @@ export const characters = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [index("characters_session_id_idx").on(table.sessionId)],
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.id] }),
+    index("characters_session_id_idx").on(table.sessionId),
+  ],
 );
 
 // ── Plugin Data ─────────────────────────────────────────────────
@@ -528,7 +532,7 @@ export const mediaRefs = sqliteTable(
 export const lorebookEntries = sqliteTable(
   "lorebook_entries",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     sessionId: text("session_id").notNull(),
     pluginId: text("plugin_id").notNull(),
     keys: text("keys").notNull(), // JSON string[]
@@ -542,6 +546,7 @@ export const lorebookEntries = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
+    primaryKey({ columns: [table.sessionId, table.id] }),
     index("lorebook_entries_session_id_idx").on(table.sessionId),
     index("lorebook_entries_plugin_id_idx").on(table.sessionId, table.pluginId),
   ],

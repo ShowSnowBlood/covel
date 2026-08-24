@@ -61,7 +61,19 @@ function openMediaDb(): Promise<IDBDatabase | null> {
       return;
     }
     req.onupgradeneeded = (event) => {
-      upgradeBrowserIdbSchema(req.result, event.oldVersion);
+      const transaction = req.transaction!;
+      void upgradeBrowserIdbSchema(
+        req.result,
+        event.oldVersion,
+        transaction,
+      ).catch((err: unknown) => {
+        console.warn("[media-cache] IndexedDB schema upgrade failed", err);
+        try {
+          transaction.abort();
+        } catch {
+          // The transaction already aborted or completed.
+        }
+      });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => {

@@ -19,6 +19,7 @@ function makeCtx({
   noTriggerEvent = false,
   existingCheckRows = [],
   existingMessage = null,
+  dice = [14, 6, 20],
 } = {}) {
   return {
     pluginId: "dice-check",
@@ -26,10 +27,20 @@ function makeCtx({
     sessionId: "sess-1",
     turnId: "turn-7",
     triggerEvent: noTriggerEvent ? undefined : { topic: TOPIC, data },
+    inputs:
+      dice === null
+        ? {}
+        : {
+            dicePool: {
+              value: dice,
+              source: { runtimeId: "dice-check/roller" },
+            },
+          },
     pluginData: {
-      get: vi.fn(async (namespace, key) =>
-        namespace === "message" && key === "turn-7" ? existingMessage : null,
-      ),
+      get: vi.fn(async (namespace, key) => {
+        if (namespace === "message" && key === "turn-7") return existingMessage;
+        return null;
+      }),
       list: vi.fn(async (namespace) =>
         namespace === "checks" ? existingCheckRows : [],
       ),
@@ -74,6 +85,7 @@ describe("dice-check recorder handler", () => {
       roll: 6,
       modifier: 1,
       dc: 12,
+      difficulty: "normal",
       total: 7,
       outcome: "failure",
     };
@@ -112,12 +124,17 @@ describe("dice-check recorder handler", () => {
     // Arrange
     const earlier = { action: "先前的判定", seq: 1 };
     const ctx = makeCtx({
-      data: { checks: [{ ...VALID_CHECK, outcome: "failure" }] },
+      data: {
+        checks: [
+          { ...VALID_CHECK, modifier: -3, total: 11, outcome: "failure" },
+        ],
+      },
       existingCheckRows: [
         { key: "turn-7-1", value: earlier },
         { key: "turn-3-1", value: {} },
       ],
       existingMessage: { __turnId: "turn-7", checks: [earlier] },
+      dice: [3, 14, 20],
     });
 
     // Act
@@ -139,6 +156,7 @@ describe("dice-check recorder handler", () => {
           { ...VALID_CHECK, roll: 20, total: 23, outcome: "critical-success" },
         ],
       },
+      dice: [20, 6, 8],
     });
 
     // Act
@@ -217,8 +235,7 @@ describe("dice-check recorder handler", () => {
     expect(checksRow.value.outcome).toBe("success");
   });
 
-  it("drops malformed optional fields instead of failing the receipt", async () => {
-    // Arrange — modifier as string, dc as float, unknown difficulty
+  it("rejects malformed consistency fields instead of storing an unverifiable receipt", async () => {
     const ctx = makeCtx({
       data: {
         checks: [
@@ -239,10 +256,46 @@ describe("dice-check recorder handler", () => {
     const result = await handler(ctx);
 
     // Assert
-    const checksRow = result.pluginData.find((r) => r.namespace === "checks");
-    expect(checksRow.value.modifier).toBeUndefined();
-    expect(checksRow.value.dc).toBeUndefined();
-    expect(checksRow.value.difficulty).toBeUndefined();
-    expect(checksRow.value.rollText).toBe("9 = 9");
+    expect(result.status).toBe("skipped");
+    expect(result.pluginData).toBeUndefined();
+  });
+
+  it.each([
+    ["a roll outside the pre-rolled pool", { roll: 2 }],
+    ["an inconsistent total", { total: 999 }],
+    ["a DC inconsistent with its difficulty", { dc: 16 }],
+    ["an outcome inconsistent with total vs DC", { outcome: "failure" }],
+  ])("rejects %s", async (_label, patch) => {
+    const ctx = makeCtx({
+      data: { checks: [{ ...VALID_CHECK, ...patch }] },
+    });
+
+    const result = await handler(ctx);
+    expect(result.status).toBe("skipped");
+    expect(result.pluginData).toBeUndefined();
+  });
+
+  it("fails closed when the pre-rolled audit row is missing", async () => {
+    const ctx = makeCtx({ data: { checks: [VALID_CHECK] }, dice: null });
+    const result = await handler(ctx);
+    expect(result.status).toBe("skipped");
+  });
+
+  it("fails closed without shifting positions when the dice pool is malformed", async () => {
+    const ctx = makeCtx({
+      data: { checks: [VALID_CHECK] },
+      dice: [99, VALID_CHECK.roll],
+    });
+    const result = await handler(ctx);
+    expect(result.status).toBe("skipped");
+  });
+
+  it("uses the same-execution roller output before pluginData commits", async () => {
+    const ctx = makeCtx({ data: { checks: [VALID_CHECK] } });
+
+    const result = await handler(ctx);
+
+    expect(result.status).toBe("done");
+    expect(ctx.pluginData.get).not.toHaveBeenCalledWith("rolls", "turn-7");
   });
 });

@@ -402,6 +402,7 @@ export function GameView({ session }: GameViewProps) {
           {/* Messages */}
           {viewMode === "stage" && stageReady ? (
             <StageView
+              key={session.id}
               session={session}
               world={world}
               messages={messages}

@@ -481,6 +481,11 @@ export async function loadRuntime(
     const handlerPath = path.resolve(runtimeDir, parsed.manifest.handler);
     await assertInsideRoot(discovery.rootPath, handlerPath, "Handler");
     const mod = await import(pathToFileURL(handlerPath).href);
+    if (typeof mod.default !== "function") {
+      throw new Error(
+        `Handler module "${parsed.manifest.handler}" does not export a default function (got ${typeof mod.default})`,
+      );
+    }
     handler = mod.default as FunctionHandler;
   }
 

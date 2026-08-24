@@ -81,6 +81,12 @@ export interface CharacterUpsertPayload {
   readonly description?: string;
   readonly fields?: unknown;
   readonly version?: number;
+  /**
+   * Version read by an update tool before it built this proposal. When set,
+   * `fields` is treated as a shallow patch and the commit handler rebases it
+   * onto the latest stored character, then increments the live version.
+   */
+  readonly expectedVersion?: number;
   readonly createdAt?: string;
   /**
    * Optional plugin-data mirror target. When provided, the commit handler

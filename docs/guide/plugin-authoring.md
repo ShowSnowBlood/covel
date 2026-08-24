@@ -120,7 +120,7 @@ CI 的 `check-plugin-i18n` 校验 `ui/*.json` spec、`PLUGIN.md` frontmatter，*
 
 **trigger 取值**：`auto` / `manual` / `scheduled` / `event` 四种，枚举闭合。
 
-**校验**：写完 manifest 跑 `pnpm validate:plugin <PLUGIN.md | 插件目录>`——一次执行 loader compat 解析（能否加载，报错带行号）+ strict authoring schema（`auto` / `scheduled` 缺 `stage` 直接报错）。另外 server 启动装载插件时会对「`auto` / `scheduled` 却没有 `stage`、又不是纯 UI / hook / entry / wires 注册面」的 runtime 打 `schedulable-missing-stage` warning——这类声明会被当作 UI-only 习语永不调度。
+**校验**：写完 manifest 跑 `pnpm validate:plugin <PLUGIN.md | 插件目录>`——一次执行 loader compat 解析（能否加载，报错带行号）+ strict authoring schema（`auto` / `scheduled` 缺 `stage` 直接报错）。`runtimeType: function` 必须同时声明 `handler`，且模块必须 `export default` 一个函数；缺声明或导出对象会在加载期直接失败。另外 server 启动装载插件时会对「`auto` / `scheduled` 却没有 `stage`、又不是纯 UI / hook / entry / wires 注册面」的 runtime 打 `schedulable-missing-stage` warning——这类声明会被当作 UI-only 习语永不调度。
 
 ## 附录
 

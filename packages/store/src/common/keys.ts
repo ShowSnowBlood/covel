@@ -27,6 +27,10 @@ export function lorebookEntryKey(sessionId: string, id: string): string {
   return `${sessionId}:${id}`;
 }
 
+export function characterKey(sessionId: string, id: string): string {
+  return `${sessionId}:${id}`;
+}
+
 export function vectorRowKey(
   sessionId: string,
   pluginId: string,

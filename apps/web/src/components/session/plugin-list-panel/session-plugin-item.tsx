@@ -26,17 +26,20 @@ export function SessionPluginItem({
   resolvedSlots,
   sessionId,
   runtimeModelOverrides,
+  onRuntimeModelOverrideChange,
   setupRuntimes,
 }: SessionPluginItemProps) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const runtimeKey = plugin.id;
-  const [boundSlot, handleSlotChange] = useRuntimeModelSlotOverride({
-    runtimeKey,
-    sessionId,
-    runtimeModelOverrides,
-  });
+  const [boundSlot, handleSlotChange, overrideError] =
+    useRuntimeModelSlotOverride({
+      runtimeKey,
+      sessionId,
+      runtimeModelOverrides,
+      onChange: onRuntimeModelOverrideChange,
+    });
 
   if (plugin.status === "error") {
     return (
@@ -164,6 +167,15 @@ export function SessionPluginItem({
               no slots
             </span>
           ))}
+        {overrideError && (
+          <span
+            className="mr-2 text-[9px] text-destructive"
+            role="alert"
+            title={overrideError}
+          >
+            {t("plugin.modelOverrideFailed", "Save failed")}
+          </span>
+        )}
         {onToggle && !isLocked && (
           <button
             type="button"

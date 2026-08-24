@@ -231,6 +231,11 @@ const authoringStructuralRejections: readonly Fixture[] = [
 
 const authoringCrossFieldRejections: readonly Fixture[] = [
   {
+    name: "function runtime without handler",
+    zodOnly: true,
+    manifest: { ...base, runtimeType: "function", stage: "pre-turn" },
+  },
+  {
     name: "event trigger without topic",
     zodOnly: true,
     manifest: { ...base, trigger: { type: "event" } },
@@ -279,6 +284,21 @@ const authoringCrossFieldRejections: readonly Fixture[] = [
 // ── Compat (input) malformed rejections ─────────────────────────────
 
 const compatMalformedRejections: readonly Fixture[] = [
+  {
+    name: "function runtime without handler",
+    zodOnly: true,
+    manifest: { ...base, runtimeType: "function", stage: "pre-turn" },
+  },
+  {
+    name: "function runtime with a blank handler",
+    zodOnly: true,
+    manifest: {
+      ...base,
+      runtimeType: "function",
+      handler: "   ",
+      stage: "pre-turn",
+    },
+  },
   {
     name: "inputs.select with an illegal JSON Pointer",
     manifest: {

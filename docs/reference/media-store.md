@@ -121,6 +121,10 @@ Returns assets owned by `sessionId` whose `meta` contains every key/value in `fi
 
 The framework exposes `POST /api/media/cleanup` for manual cleanup and scheduler integration. The route scans live sessions, messages, plugin data, runtime outputs, trace events, snapshots, turn results, `MediaStore.listAssets()`, and `MediaStore.listRefs()` with the shared `collectMediaRefIds()` scanner, then passes the protected id set into `MediaStore.cleanup()`.
 
+The endpoint is unavailable in `commercial` deployments. In `demo`, it
+requires the configured operator bearer token before feature-flag or policy
+evaluation; `self` keeps the local single-user behavior.
+
 Cleanup policy fields:
 
 | Field             | Meaning                                                                       |

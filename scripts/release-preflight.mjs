@@ -18,15 +18,11 @@
  *      `PLUGIN.md` or `runtimes/<sub>/PLUGIN.md` — what
  *      verify-release.mjs enforces in CI. Each PLUGIN.md's declared
  *      `events[]` also gets its `schema` path resolved, JSON-parsed, and
- *      shape-checked (has `type` or `properties`, i.e. looks like a JSON
- *      Schema). This is a structural check, not a full ajv compile: ajv is
- *      a dependency of packages/tools and apps/server but not of the repo
- *      root, and this script only declares node builtins + the root `yaml`
- *      devDependency (see check #2 above, which this script itself must
- *      satisfy). Full ajv 2020 validation of event payloads happens at
- *      runtime via the same dataSchemas validator emit-event already uses.
+ *      shape-checked, then passed through the production loader parser and
+ *      strict authoring schema.
  *   4. Every `worlds/<id>/` has `world.yaml` + at least one
- *      `WORLD*.md`.
+ *      `WORLD*.md`; world.yaml and worldData sources also pass through the
+ *      production schemas and diagnostics.
  *   5. `prompts/server/` has at least one `*.md`.
  *   6. `actionlint` passes (when installed).
  *
@@ -39,7 +35,7 @@
  * Wired into the root package.json as `pnpm release:preflight`.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -365,9 +361,33 @@ for (const entry of pluginDirs) {
     pluginIssues += checkEventsSchemas(manifestFile, dir);
   }
 }
+try {
+  execFileSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      path.join(
+        repoRoot,
+        "packages/plugin-loader/scripts/validate-manifest.ts",
+      ),
+      ...pluginDirs.map((entry) => path.join(repoRoot, "plugins", entry.name)),
+    ],
+    { cwd: repoRoot, encoding: "utf-8", stdio: "pipe" },
+  );
+} catch (e) {
+  const output = [e.stdout?.toString(), e.stderr?.toString()]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  fail(
+    `strict plugin manifest validation failed${output ? `:\n${output}` : ""}`,
+  );
+  pluginIssues++;
+}
 if (pluginIssues === 0)
   ok(
-    `all ${pluginDirs.length} plugins have package.json + PLUGIN.md (${eventSchemaChecks} manifest(s) checked for events[] schema refs)`,
+    `all ${pluginDirs.length} plugins have package.json + PLUGIN.md (${eventSchemaChecks} manifest(s) passed strict validation and events[] schema refs)`,
   );
 
 // ── 4. worlds/ structure ──────────────────────────────────────────
@@ -392,8 +412,29 @@ for (const entry of worldDirs) {
     worldIssues++;
   }
 }
+try {
+  execFileSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      path.join(repoRoot, "scripts/validate-release-worlds.ts"),
+      ...worldDirs.map((entry) => path.join(repoRoot, "worlds", entry.name)),
+    ],
+    { cwd: repoRoot, encoding: "utf-8", stdio: "pipe" },
+  );
+} catch (e) {
+  const output = [e.stdout?.toString(), e.stderr?.toString()]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  fail(`world manifest/data validation failed${output ? `:\n${output}` : ""}`);
+  worldIssues++;
+}
 if (worldIssues === 0)
-  ok(`all ${worldDirs.length} worlds have world.yaml + WORLD*.md`);
+  ok(
+    `all ${worldDirs.length} worlds have world.yaml + WORLD*.md and pass manifest/worldData validation`,
+  );
 
 // ── 5. prompts/server/ ────────────────────────────────────────────
 console.log("\n[5/6] prompts/server/*.md");

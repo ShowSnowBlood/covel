@@ -32,6 +32,7 @@ import type {
   SessionRecord,
   StoreBackend,
 } from "@covel/store";
+import { SessionAlreadyExistsError } from "@covel/store";
 import type { EventBus } from "@covel/events";
 import type { HookPipeline } from "@covel/runtime";
 import {
@@ -47,6 +48,7 @@ import {
   cleanupWorldDataMediaRefs,
   finalizeWorldDataMediaRefs,
   importWorldDataForSession,
+  type WorldDataImportedMediaRef,
 } from "../../world-data/session-import.js";
 import {
   decorateSessionList,
@@ -334,31 +336,39 @@ sessionRoutes.post("/", async (c) => {
   // commit atomically. Writes flow through the tx-bound view (`tx`), so a
   // mid-import failure auto-rolls-back the session row — and on PostgreSQL the
   // import runs on an isolated connection instead of serializing the store.
-  const importedMediaRefs = await store.withTransaction!(async (tx) => {
-    await tx.createSession(session);
-    const importedWorldData = await importWorldDataForSession({
-      store: tx,
-      mediaStore: c.get("mediaStore"),
-      sessionId: id,
-      worldId: rawWorldId,
-      worldsDirs,
-      covelHome,
-      now,
-      locale: session.locale,
-      preflight: {
-        activePlugins: plugins,
-        registry: pluginRegistry,
-      },
-      deferMediaFinalize: true,
-    });
-    if (!importedWorldData.imported) {
-      await importWorldCharacterBlueprints(tx, id, rawWorldId, now, {
-        activePlugins: plugins,
-        registry: pluginRegistry,
+  let importedMediaRefs: readonly WorldDataImportedMediaRef[];
+  try {
+    importedMediaRefs = await store.withTransaction!(async (tx) => {
+      await tx.createSession(session);
+      const importedWorldData = await importWorldDataForSession({
+        store: tx,
+        mediaStore: c.get("mediaStore"),
+        sessionId: id,
+        worldId: rawWorldId,
+        worldsDirs,
+        covelHome,
+        now,
+        locale: session.locale,
+        preflight: {
+          activePlugins: plugins,
+          registry: pluginRegistry,
+        },
+        deferMediaFinalize: true,
       });
+      if (!importedWorldData.imported) {
+        await importWorldCharacterBlueprints(tx, id, rawWorldId, now, {
+          activePlugins: plugins,
+          registry: pluginRegistry,
+        });
+      }
+      return importedWorldData.mediaRefs;
+    });
+  } catch (error) {
+    if (error instanceof SessionAlreadyExistsError) {
+      return c.json(errorBody(error.message, { code: error.code }), 409);
     }
-    return importedWorldData.mediaRefs;
-  });
+    throw error;
+  }
   try {
     await finalizeWorldDataMediaRefs({
       mediaStore: c.get("mediaStore"),
@@ -495,7 +505,6 @@ sessionRoutes.get("/:id/media-token", async (c) => {
 // GET /sessions/:id
 sessionRoutes.get("/:id", async (c) => {
   const store = c.get("store");
-  const id = c.req.param("id");
   const guard = await resolveSessionParam(c);
   if (!guard.ok) return guard.response;
   const session = guard.session;
@@ -549,23 +558,30 @@ sessionRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const guard = await resolveSessionParam(c);
   if (!guard.ok) return guard.response;
-  const session = guard.session;
-  await store.deleteSession(id);
-  // Drop the per-session character-tool override cache entry (audit R-19).
-  c.get("clearSessionToolOverrides")?.(id);
+  return c.get("sessionLock").withLock(id, async () => {
+    // Re-read under the lock: the pre-lock guard can become stale while a turn
+    // or another delete owns the session. Authorization remains fail-closed if
+    // the row changed or disappeared while this request waited.
+    const lockedGuard = await resolveSessionParam(c);
+    if (!lockedGuard.ok) return lockedGuard.response;
+    const session = lockedGuard.session;
 
-  // SessionEnd hook — session removed. `session` is read above for the guard.
-  if (session.status !== "ended") {
-    await fireSessionEnd(
-      c.get("hookPipeline"),
-      c.get("eventBus"),
-      id,
-      session.activePlugins ?? [],
-      "deleted",
-    );
-  }
+    await store.deleteSession(id);
+    // Drop the per-session character-tool override cache entry (audit R-19).
+    c.get("clearSessionToolOverrides")?.(id);
 
-  return c.json({ deleted: true });
+    if (session.status !== "ended") {
+      await fireSessionEnd(
+        c.get("hookPipeline"),
+        c.get("eventBus"),
+        id,
+        session.activePlugins ?? [],
+        "deleted",
+      );
+    }
+
+    return c.json({ deleted: true });
+  });
 });
 
 // ── Session plugin management ───────────────────────────────────
@@ -577,27 +593,29 @@ sessionRoutes.get("/:id/plugins", async (c) => {
   const id = c.req.param("id");
   const guard = await resolveSessionParam(c);
   if (!guard.ok) return guard.response;
-  const session = guard.session;
-
-  const previousActive = session.activePlugins ?? [];
-  const active = approvedActivePlugins(
-    previousActive,
-    pluginRegistry,
-    c.get("rpcApprovalGate"),
-    id,
-  );
-  if (active.length !== previousActive.length) {
-    for (const pluginId of previousActive) {
-      if (!active.includes(pluginId)) pluginRegistry.deactivate(pluginId, id);
+  return c.get("sessionLock").withLock(id, async () => {
+    const lockedGuard = await resolveSessionParam(c);
+    if (!lockedGuard.ok) return lockedGuard.response;
+    const previousActive = lockedGuard.session.activePlugins ?? [];
+    const active = approvedActivePlugins(
+      previousActive,
+      pluginRegistry,
+      c.get("rpcApprovalGate"),
+      id,
+    );
+    if (active.length !== previousActive.length) {
+      await store.updateSession(id, {
+        activePlugins: active,
+        updatedAt: new Date().toISOString(),
+      });
+      for (const pluginId of previousActive) {
+        if (!active.includes(pluginId)) pluginRegistry.deactivate(pluginId, id);
+      }
     }
-    await store.updateSession(id, {
-      activePlugins: active,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-  const available = buildAvailablePluginList(active, pluginRegistry);
+    const available = buildAvailablePluginList(active, pluginRegistry);
 
-  return c.json({ active, available });
+    return c.json({ active, available });
+  });
 });
 
 // POST /sessions/:id/plugins/enable
@@ -607,8 +625,6 @@ sessionRoutes.post("/:id/plugins/enable", async (c) => {
   const id = c.req.param("id");
   const guard = await resolveSessionParam(c);
   if (!guard.ok) return guard.response;
-  const session = guard.session;
-
   const parsed = await readJsonBody<{ pluginId: string }>(c);
   if (parsed instanceof Response) return parsed;
   const body = parsed.body;
@@ -649,29 +665,35 @@ sessionRoutes.post("/:id/plugins/enable", async (c) => {
     );
   }
 
-  // Trusted plugins are already loaded. Community code reaches this seam
-  // only after the gate has recorded an explicit session/one-time grant.
-  await c.get("activatePluginServerCode")?.(body.pluginId, id);
+  return c.get("sessionLock").withLock(id, async () => {
+    const lockedGuard = await resolveSessionParam(c);
+    if (!lockedGuard.ok) return lockedGuard.response;
+    const session = lockedGuard.session;
 
-  const active = resolveEnabledSessionPlugins(
-    session.activePlugins ?? [],
-    body.pluginId,
-    pluginRegistry,
-  );
-  for (const activePluginId of active) {
-    pluginRegistry.activate(activePluginId, id);
-  }
-  for (const previousPluginId of session.activePlugins ?? []) {
-    if (!active.includes(previousPluginId)) {
-      pluginRegistry.deactivate(previousPluginId, id);
-      c.get("rpcApprovalGate")?.revoke(id, previousPluginId);
+    // Trusted plugins are already loaded. Community code reaches this seam
+    // only after the gate has recorded an explicit session/one-time grant.
+    await c.get("activatePluginServerCode")?.(body.pluginId, id);
+
+    const active = resolveEnabledSessionPlugins(
+      session.activePlugins ?? [],
+      body.pluginId,
+      pluginRegistry,
+    );
+    await store.updateSession(id, {
+      activePlugins: active,
+      updatedAt: new Date().toISOString(),
+    });
+    for (const activePluginId of active) {
+      pluginRegistry.activate(activePluginId, id);
     }
-  }
-  await store.updateSession(id, {
-    activePlugins: active,
-    updatedAt: new Date().toISOString(),
+    for (const previousPluginId of session.activePlugins ?? []) {
+      if (!active.includes(previousPluginId)) {
+        pluginRegistry.deactivate(previousPluginId, id);
+        c.get("rpcApprovalGate")?.revoke(id, previousPluginId);
+      }
+    }
+    return c.json({ ok: true, active });
   });
-  return c.json({ ok: true, active });
 });
 
 // POST /sessions/:id/plugins/disable
@@ -681,8 +703,6 @@ sessionRoutes.post("/:id/plugins/disable", async (c) => {
   const id = c.req.param("id");
   const guard = await resolveSessionParam(c);
   if (!guard.ok) return guard.response;
-  const session = guard.session;
-
   const parsed = await readJsonBody<{ pluginId: string }>(c);
   if (parsed instanceof Response) return parsed;
   const body = parsed.body;
@@ -701,16 +721,22 @@ sessionRoutes.post("/:id/plugins/disable", async (c) => {
     );
   }
 
-  pluginRegistry.deactivate(body.pluginId, id);
-  c.get("rpcApprovalGate")?.revoke(id, body.pluginId);
-  const active = (session.activePlugins ?? []).filter(
-    (p) => p !== body.pluginId,
-  );
-  await store.updateSession(id, {
-    activePlugins: active,
-    updatedAt: new Date().toISOString(),
+  return c.get("sessionLock").withLock(id, async () => {
+    const lockedGuard = await resolveSessionParam(c);
+    if (!lockedGuard.ok) return lockedGuard.response;
+    const session = lockedGuard.session;
+
+    const active = (session.activePlugins ?? []).filter(
+      (p) => p !== body.pluginId,
+    );
+    await store.updateSession(id, {
+      activePlugins: active,
+      updatedAt: new Date().toISOString(),
+    });
+    pluginRegistry.deactivate(body.pluginId, id);
+    c.get("rpcApprovalGate")?.revoke(id, body.pluginId);
+    return c.json({ ok: true, active });
   });
-  return c.json({ ok: true, active });
 });
 
 // ── Session Snapshot (restore/reconnection) ────────────────────

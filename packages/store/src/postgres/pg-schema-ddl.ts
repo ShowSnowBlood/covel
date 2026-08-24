@@ -79,6 +79,57 @@ const SESSIONS_MIGRATIONS_SQL = `
 `;
 
 /**
+ * Legacy databases used a global `id` primary key for these session-owned
+ * records. Re-key in place; existing rows are already unique by `id`, so the
+ * stronger `(session_id, id)` identity is lossless and enables future reuse in
+ * another session. The catalog check avoids taking an ALTER lock on every boot.
+ */
+const SESSION_SCOPED_IDENTITY_MIGRATIONS_SQL = `
+  DO $migration$
+  DECLARE
+    table_name TEXT;
+    current_constraint TEXT;
+    current_columns TEXT[];
+  BEGIN
+    -- Serialize concurrent server boots without taking a table lock once the
+    -- migration is current. The ALTER statements below still acquire their
+    -- normal PostgreSQL DDL locks only when a legacy key is detected.
+    PERFORM pg_advisory_xact_lock(
+      hashtext('covel:data:session-scoped-identity:v2')
+    );
+    FOREACH table_name IN ARRAY ARRAY['characters', 'lorebook_entries'] LOOP
+      SELECT constraint_row.conname,
+             array_agg(attribute_row.attname::TEXT ORDER BY key_column.ordinality)
+        INTO current_constraint, current_columns
+        FROM pg_constraint AS constraint_row
+        CROSS JOIN LATERAL unnest(constraint_row.conkey)
+          WITH ORDINALITY AS key_column(attnum, ordinality)
+        JOIN pg_attribute AS attribute_row
+          ON attribute_row.attrelid = constraint_row.conrelid
+         AND attribute_row.attnum = key_column.attnum
+       WHERE constraint_row.contype = 'p'
+         AND constraint_row.conrelid = table_name::regclass
+       GROUP BY constraint_row.conname;
+
+      IF current_columns IS DISTINCT FROM ARRAY['session_id', 'id']::TEXT[] THEN
+        IF current_constraint IS NOT NULL THEN
+          EXECUTE format(
+            'ALTER TABLE %I DROP CONSTRAINT %I',
+            table_name,
+            current_constraint
+          );
+        END IF;
+        EXECUTE format(
+          'ALTER TABLE %I ADD PRIMARY KEY (session_id, id)',
+          table_name
+        );
+      END IF;
+    END LOOP;
+  END
+  $migration$;
+`;
+
+/**
  * BEFORE INSERT trigger: PG evaluates SERIAL defaults before BEFORE INSERT
  * triggers fire, so NEW.id is already populated. We mutate NEW.table_name in
  * place — no separate UPDATE statement needed. Drizzle does not model triggers,
@@ -104,6 +155,7 @@ const VECTOR_MODELS_TRIGGER_SQL = `
 export const CREATE_TABLES_SQL = [
   CREATE_CORE_TABLES_SQL,
   SESSIONS_MIGRATIONS_SQL,
+  SESSION_SCOPED_IDENTITY_MIGRATIONS_SQL,
   VECTOR_MODELS_TRIGGER_SQL,
   CREATE_MEDIA_TABLES_SQL,
 ].join("\n\n");

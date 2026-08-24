@@ -50,7 +50,13 @@ function makeMockPluginData() {
   };
 }
 
-function makeBaseCtx({ narrative, manualPayload, userSettings, speech } = {}) {
+function makeBaseCtx({
+  narrative,
+  manualPayload,
+  userSettings,
+  speech,
+  signal,
+} = {}) {
   return {
     sessionId: "sess-test",
     pluginId: "mimo-tts",
@@ -77,6 +83,7 @@ function makeBaseCtx({ narrative, manualPayload, userSettings, speech } = {}) {
     },
     pluginData: makeMockPluginData(),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    ...(signal ? { signal } : {}),
   };
 }
 
@@ -197,6 +204,19 @@ describe("auto-narrate handler", () => {
       text: "test",
     });
   });
+
+  it("aborts synthesis when the player stops the turn", async () => {
+    const controller = new AbortController();
+    const ctx = makeBaseCtx({
+      narrative: "test",
+      signal: controller.signal,
+    });
+
+    await autoHandler(ctx);
+    const providerSignal = ctx.speech.generate.mock.calls[0][0].signal;
+    controller.abort(new Error("player stopped turn"));
+    expect(providerSignal.aborted).toBe(true);
+  });
 });
 
 describe("manual-narrate handler", () => {
@@ -241,5 +261,18 @@ describe("manual-narrate handler", () => {
       expect.objectContaining({ voice: "voice-clone-42", format: "wav" }),
     );
     expect(result.ref.mime).toBe("audio/wav");
+  });
+
+  it("aborts manual synthesis when the player stops the turn", async () => {
+    const controller = new AbortController();
+    const ctx = makeBaseCtx({
+      manualPayload: { text: "hello" },
+      signal: controller.signal,
+    });
+
+    await manualHandler(ctx);
+    const providerSignal = ctx.speech.generate.mock.calls[0][0].signal;
+    controller.abort(new Error("player stopped turn"));
+    expect(providerSignal.aborted).toBe(true);
   });
 });

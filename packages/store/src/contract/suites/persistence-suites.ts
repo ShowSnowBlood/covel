@@ -310,14 +310,22 @@ export function registerPersistenceStoreSuites(
 
     it("isolates entries by sessionId", async () => {
       await store.upsertLorebookEntries([
-        makeLorebookEntry({ id: "lore-x", sessionId: "sess-lore-A" }),
-        makeLorebookEntry({ id: "lore-y", sessionId: "sess-lore-B" }),
+        makeLorebookEntry({
+          id: "lore-shared",
+          sessionId: "sess-lore-A",
+          content: "session A",
+        }),
+        makeLorebookEntry({
+          id: "lore-shared",
+          sessionId: "sess-lore-B",
+          content: "session B",
+        }),
       ]);
 
       const a = await store.listSessionLorebookEntries("sess-lore-A");
       const b = await store.listSessionLorebookEntries("sess-lore-B");
-      expect(a.map((r) => r.id)).toEqual(["lore-x"]);
-      expect(b.map((r) => r.id)).toEqual(["lore-y"]);
+      expect(a).toMatchObject([{ id: "lore-shared", content: "session A" }]);
+      expect(b).toMatchObject([{ id: "lore-shared", content: "session B" }]);
     });
 
     it("deleteLorebookEntry removes a single entry by sessionId+id", async () => {

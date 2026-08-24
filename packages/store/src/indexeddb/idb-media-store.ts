@@ -54,7 +54,7 @@ export interface IndexedDbMediaStoreOptions {
 async function openMediaDb(dbName: string): Promise<IDBPDatabase<IdbMediaDb>> {
   return openDB<IdbMediaDb>(dbName, DB_VERSION, {
     async upgrade(db, oldVersion, _newVersion, transaction) {
-      upgradeBrowserIdbSchema(db, oldVersion, transaction);
+      await upgradeBrowserIdbSchema(db, oldVersion, transaction);
       if (oldVersion > 0 && oldVersion < 12) {
         await backfillSnapshotMetadata(transaction);
       }

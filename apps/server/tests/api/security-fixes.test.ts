@@ -24,6 +24,7 @@ import { sessionRoutes } from "../../src/routes/api/session.js";
 import { stateRoutes } from "../../src/routes/api/state.js";
 import { rateLimiter } from "../../src/middleware/rate-limit.js";
 import { createMiscApiRoutes } from "../../src/routes/misc-api.js";
+import { createInProcessSessionLock } from "../../src/lib/session-lock.js";
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -36,10 +37,12 @@ function createTestApp(deps: {
   covelHome?: string;
 }) {
   const app = new Hono();
+  const sessionLock = createInProcessSessionLock();
   app.use("*", async (c, next) => {
     c.set("store", deps.store);
     c.set("stateManager", deps.stateManager);
     c.set("pluginRegistry", deps.pluginRegistry);
+    c.set("sessionLock", sessionLock);
     if (deps.mediaStore) c.set("mediaStore", deps.mediaStore);
     if (deps.worldsDirs) c.set("worldsDirs", deps.worldsDirs);
     if (deps.covelHome) c.set("covelHome", deps.covelHome);
@@ -113,6 +116,22 @@ describe("[HIGH] Client-supplied session ID validation", () => {
     expect(res.status).toBe(200);
     const body = (await json(res)) as { id: string };
     expect(body.id).toBe("my-custom-session-01");
+  });
+
+  it("rejects a duplicate custom session ID without replacing it", async () => {
+    const create = () =>
+      app.request("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "duplicate-session" }),
+      });
+
+    expect((await create()).status).toBe(200);
+    const duplicate = await create();
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toMatchObject({
+      code: "session_already_exists",
+    });
   });
 });
 

@@ -298,14 +298,23 @@ Table + index DDL is derived from the Drizzle schema
 (`packages/store/src/{sqlite,postgres}/schema.ts`) via
 `packages/store/src/common/ddl-codegen.ts`, using `CREATE TABLE IF NOT EXISTS`
 and additive `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` so fresh installs and
-existing databases both boot. The store package does **not** ship destructive
-auto-migrations — when a constraint becomes stricter (e.g. `media_refs UNIQUE`
-was widened from `(session_id, media_id, plugin_id)` to `(session_id, media_id)`
-to fix NULL-pluginId duplicate rows; see
-[`media-store.md`](./media-store.md#ownership)), the DDL still creates the new
-index, but operators with legacy duplicates must run a one-off cleanup SQL before
-the new index can be applied. Each such migration is documented next to the
-affected table in the relevant reference doc.
+existing databases both boot. Store-managed migrations include the lossless
+character/lorebook identity change from a global `id` primary key to
+`(session_id, id)`: SQLite rebuilds both tables in one transaction, PostgreSQL
+changes the primary-key constraint after checking the catalog, and browser
+IndexedDB v15 rebuilds both object stores in the active versionchange
+transaction. Existing rows remain unchanged because the legacy global key is a
+subset of the new composite key; operators should still back up durable stores
+before a release migration.
+
+Constraint changes that require data cleanup remain operator-managed. For
+example, `media_refs UNIQUE` was widened from
+`(session_id, media_id, plugin_id)` to `(session_id, media_id)` to fix
+NULL-pluginId duplicate rows (see
+[`media-store.md`](./media-store.md#ownership)). The DDL still creates the new
+index, but operators with legacy duplicates must run a one-off cleanup SQL
+before the new index can be applied. Each such migration is documented next to
+the affected table in the relevant reference doc.
 
 ## References
 

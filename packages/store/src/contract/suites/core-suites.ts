@@ -48,6 +48,24 @@ export function registerCoreStoreSuites(getStore: () => DataStore): void {
       expect(result).toEqual(session);
     });
 
+    it("rejects duplicate session ids without replacing existing data", async () => {
+      const original = makeSession({
+        id: "duplicate-session",
+        metadata: { owner: "original" },
+      });
+      await store.createSession(original);
+
+      await expect(
+        store.createSession({
+          ...original,
+          metadata: { owner: "replacement" },
+          updatedAt: ts(1),
+        }),
+      ).rejects.toThrow(/already exists/i);
+
+      expect(await store.getSession(original.id)).toEqual(original);
+    });
+
     it("should list all sessions", async () => {
       const s1 = makeSession();
       const s2 = makeSession();
@@ -591,6 +609,30 @@ export function registerCoreStoreSuites(getStore: () => DataStore): void {
       expect(list).toHaveLength(1);
       expect(list[0].name).toBe("Dark Hero");
       expect(list[0].version).toBe(2);
+    });
+
+    it("isolates the same character id across sessions", async () => {
+      await store.upsertCharacter(
+        makeCharacter({
+          id: "shared-character",
+          sessionId: "sess-character-A",
+          name: "Character A",
+        }),
+      );
+      await store.upsertCharacter(
+        makeCharacter({
+          id: "shared-character",
+          sessionId: "sess-character-B",
+          name: "Character B",
+        }),
+      );
+
+      expect(await store.listCharacters("sess-character-A")).toMatchObject([
+        { id: "shared-character", name: "Character A" },
+      ]);
+      expect(await store.listCharacters("sess-character-B")).toMatchObject([
+        { id: "shared-character", name: "Character B" },
+      ]);
     });
 
     it("deletes a character by sessionId and id", async () => {

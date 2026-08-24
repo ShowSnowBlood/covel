@@ -25,6 +25,7 @@ export function PluginItem({
   resolvedSlots,
   sessionId,
   runtimeModelOverrides,
+  onRuntimeModelOverrideChange,
   setupRuntimes,
 }: PluginItemProps) {
   const { t } = useTranslation();
@@ -35,11 +36,13 @@ export function PluginItem({
   );
   const primaryRuntime = agentRuntimes[0];
   const runtimeKey = primaryRuntime?.id ?? "";
-  const [boundSlot, handleSlotChange] = useRuntimeModelSlotOverride({
-    runtimeKey,
-    sessionId,
-    runtimeModelOverrides,
-  });
+  const [boundSlot, handleSlotChange, overrideError] =
+    useRuntimeModelSlotOverride({
+      runtimeKey,
+      sessionId,
+      runtimeModelOverrides,
+      onChange: onRuntimeModelOverrideChange,
+    });
 
   const displayName = text(pkg.displayName) || pkg.name;
   const description = text(pkg.description);
@@ -310,6 +313,15 @@ export function PluginItem({
                     "Override active — next turn will use this model",
                   )}
                 </p>
+              )}
+              {overrideError && (
+                <span
+                  className="text-[9px] text-destructive"
+                  role="alert"
+                  title={overrideError}
+                >
+                  {t("plugin.modelOverrideFailed", "Save failed")}
+                </span>
               )}
             </div>
           )}

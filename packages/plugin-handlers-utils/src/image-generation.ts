@@ -11,7 +11,7 @@
  * mapping) come in through {@link ImageGenerationPluginConfig}.
  */
 
-import { optionalString } from "./index.js";
+import { abortSignalWithTimeout, optionalString } from "./index.js";
 
 /** The slice of FunctionHandlerContext this trunk reads. */
 export interface ImageGenerationHandlerContext {
@@ -19,6 +19,7 @@ export interface ImageGenerationHandlerContext {
   readonly triggerEvent?: unknown;
   readonly manualPayload?: unknown;
   readonly userSettings?: unknown;
+  readonly signal?: AbortSignal;
   readonly images?: {
     generate(request: Record<string, unknown>): Promise<{
       refs: ReadonlyArray<{ id: string; mime: string; size: number }>;
@@ -212,7 +213,7 @@ export async function runImageGeneration(
     imageSize: plan.size,
     n: plan.n,
     requestTimeoutMs: plan.requestTimeoutMs,
-    ...(plan.recordFields ?? {}),
+    ...plan.recordFields,
     startedAt,
   };
 
@@ -238,7 +239,7 @@ export async function runImageGeneration(
       n: plan.n,
       quality: plan.quality || undefined,
       negativePrompt: plan.negativePrompt || undefined,
-      signal: AbortSignal.timeout(plan.requestTimeoutMs),
+      signal: abortSignalWithTimeout(ctx.signal, plan.requestTimeoutMs),
       metadata: { source: config.source, turnId: ctx.turnId },
     });
 

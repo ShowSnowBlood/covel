@@ -78,6 +78,8 @@
 
 🔵 core（`pluginType: core-plugin`，不可禁用） · ⚪ optional（`pluginType: plugin`，可禁用） · 🧠 uses LLM（`agent` runtime） · ⚙ pure function（`runtimeType: function`，零 token） · 🖼 UI only（只提供面板，无 runtime）
 
+Function runtime 契约：声明 `runtimeType: function` 时 `handler` 为必填的 runtime 相对路径，目标模块必须 `export default function`。manifest 校验会拒绝缺失 handler，loader 会拒绝没有默认函数导出的模块，避免插件安装后到首次激活才失败。
+
 ---
 
 ## 调度层级

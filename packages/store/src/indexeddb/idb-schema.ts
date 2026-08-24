@@ -2,9 +2,10 @@
 // upgrades. Keep all browser-local object stores on this single version.
 // v13: scheduling-redesign lifecycle stores (logical_turn_ledger /
 // setup_attempts / job_status). v14: runtime_exports (output.recordAs
-// publications). `ensureStore` is idempotent, so a bump creates only the
-// newly-added stores on an existing database.
-export const BROWSER_IDB_SCHEMA_VERSION = 14;
+// publications). v15: characters and lorebook entries use composite
+// `(sessionId, id)` keys. `ensureStore` is idempotent, so a bump creates only
+// newly-added stores unless an explicit migration below rebuilds one.
+export const BROWSER_IDB_SCHEMA_VERSION = 15;
 export const BROWSER_IDB_DATABASE_NAME = "covel-browser";
 export const APP_KV_STORE_STATE_SNAPSHOTS = "stateSnapshots";
 export const APP_KV_STORE_WORLD_OVERLAYS = "worldOverlays";
@@ -19,6 +20,7 @@ interface BrowserSchemaStore {
     keyPath: string | readonly string[],
     options?: IDBIndexParameters,
   ): unknown;
+  put(value: unknown): unknown;
 }
 
 interface BrowserSchemaCursor {
@@ -46,7 +48,9 @@ interface BrowserSchemaDatabase {
 }
 
 interface BrowserSchemaTransaction {
-  objectStore(name: string): BrowserSchemaStore;
+  objectStore(name: string): BrowserSchemaStore & {
+    getAll(): Promise<unknown[]> | IDBRequest<unknown[]>;
+  };
 }
 
 interface BrowserMigrationStore {
@@ -100,7 +104,7 @@ export function upgradeBrowserIdbSchema(
   db: BrowserSchemaDatabase,
   oldVersion: number,
   transaction?: BrowserSchemaTransaction,
-): void {
+): Promise<void> {
   if (oldVersion < 8 && db.objectStoreNames.contains("sessions")) {
     db.deleteObjectStore("sessions");
   }
@@ -136,7 +140,9 @@ export function upgradeBrowserIdbSchema(
   const messages = ensureStore(db, "messages", { keyPath: "id" });
   messages?.createIndex("sessionId", "sessionId");
 
-  const characters = ensureStore(db, "characters", { keyPath: "id" });
+  const characters = ensureStore(db, "characters", {
+    keyPath: ["sessionId", "id"],
+  });
   characters?.createIndex("sessionId", "sessionId");
 
   ensureStore(db, "worlds", { keyPath: "id" });
@@ -187,7 +193,7 @@ export function upgradeBrowserIdbSchema(
   ]);
 
   const lorebookEntries = ensureStore(db, "lorebook_entries", {
-    keyPath: "id",
+    keyPath: ["sessionId", "id"],
   });
   lorebookEntries?.createIndex("sessionId", "sessionId");
 
@@ -259,4 +265,39 @@ export function upgradeBrowserIdbSchema(
   ensureStore(db, APP_KV_STORE_SUBMITTED_BLOCKS);
   ensureStore(db, APP_KV_STORE_EXECUTION_STEPS);
   ensureStore(db, MEDIA_CACHE_STORE_BLOBS, { keyPath: "id" });
+
+  if (oldVersion > 0 && oldVersion < 15) {
+    if (!transaction) {
+      return Promise.reject(
+        new Error(
+          "IndexedDB v15 migration requires the active versionchange transaction",
+        ),
+      );
+    }
+    return migrateSessionScopedIdentityStores(db, transaction);
+  }
+  return Promise.resolve();
+}
+
+function requestResult<T>(value: Promise<T> | IDBRequest<T>): Promise<T> {
+  if (value instanceof Promise) return value;
+  return new Promise<T>((resolve, reject) => {
+    value.onsuccess = () => resolve(value.result);
+    value.onerror = () => reject(value.error);
+  });
+}
+
+async function migrateSessionScopedIdentityStores(
+  db: BrowserSchemaDatabase,
+  transaction: BrowserSchemaTransaction,
+): Promise<void> {
+  for (const name of ["characters", "lorebook_entries"] as const) {
+    const rows = await requestResult(transaction.objectStore(name).getAll());
+    db.deleteObjectStore(name);
+    const migrated = db.createObjectStore(name, {
+      keyPath: ["sessionId", "id"],
+    });
+    migrated.createIndex("sessionId", "sessionId");
+    for (const row of rows) migrated.put(row);
+  }
 }

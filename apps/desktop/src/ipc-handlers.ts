@@ -9,7 +9,12 @@ import {
 } from "./import-assets.js";
 import { writeLog } from "./logging.js";
 import { writeDataRoot, type ensureUserPaths } from "./paths.js";
-import { buildAppMenu, getMainWindow, isTrustedFrameUrl } from "./windows.js";
+import {
+  buildAppMenu,
+  getMainWindow,
+  isTrustedFrameUrl,
+  isTrustedStartupFrameUrl,
+} from "./windows.js";
 import { setDesktopLocaleFromSettings, t } from "./main-i18n.js";
 
 /**
@@ -29,6 +34,25 @@ function isTrustedSender(
     `[ipc] blocked '${channel}' from untrusted origin: ${
       event.senderFrame?.url ?? "unknown"
     }`,
+  );
+  return false;
+}
+
+function isTrustedRecoverySender(
+  event: Electron.IpcMainInvokeEvent,
+  channel: string,
+): boolean {
+  const frame = event.senderFrame;
+  const isMainFrame = frame !== null && frame === event.sender.mainFrame;
+  if (
+    isMainFrame &&
+    (isTrustedFrameUrl(frame.url) || isTrustedStartupFrameUrl(frame.url))
+  ) {
+    return true;
+  }
+  writeLog(
+    "warn",
+    `[ipc] blocked '${channel}' from untrusted recovery frame: ${frame?.url ?? "unknown"}`,
   );
   return false;
 }
@@ -90,12 +114,12 @@ export function registerDesktopIpcHandlers({
   // the same trusted-sender check the secret channels use — defense in depth
   // behind nav-pinning, so an untrusted frame can't drive restart/dir actions.
   ipcMain.handle("covel:retry-startup", (event) => {
-    if (!isTrustedSender(event, "covel:retry-startup")) return;
+    if (!isTrustedRecoverySender(event, "covel:retry-startup")) return;
     retryStartup();
   });
 
   ipcMain.handle("covel:open-logs-dir", async (event) => {
-    if (!isTrustedSender(event, "covel:open-logs-dir")) return;
+    if (!isTrustedRecoverySender(event, "covel:open-logs-dir")) return;
     await shell.openPath(paths.logsDir);
   });
 
@@ -105,7 +129,7 @@ export function registerDesktopIpcHandlers({
   });
 
   ipcMain.handle("covel:open-data-dir", async (event) => {
-    if (!isTrustedSender(event, "covel:open-data-dir")) return;
+    if (!isTrustedRecoverySender(event, "covel:open-data-dir")) return;
     await shell.openPath(paths.dataRoot);
   });
 

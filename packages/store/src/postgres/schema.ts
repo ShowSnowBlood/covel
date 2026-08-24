@@ -24,6 +24,7 @@ import {
   jsonb,
   serial,
   index,
+  primaryKey,
   uniqueIndex,
   customType,
 } from "drizzle-orm/pg-core";
@@ -269,7 +270,7 @@ export const messages = pgTable(
 export const characters = pgTable(
   "characters",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     sessionId: text("session_id").notNull(),
     name: text("name").notNull(),
     type: text("type").notNull(),
@@ -279,7 +280,10 @@ export const characters = pgTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [index("pg_characters_session_id_idx").on(table.sessionId)],
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.id] }),
+    index("pg_characters_session_id_idx").on(table.sessionId),
+  ],
 );
 
 // ── Plugin Data ─────────────────────────────────────────────────
@@ -500,7 +504,7 @@ export const workingMemory = pgTable(
 export const lorebookEntries = pgTable(
   "lorebook_entries",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     sessionId: text("session_id").notNull(),
     pluginId: text("plugin_id").notNull(),
     keys: jsonb("keys").notNull(), // JSON string[]
@@ -514,6 +518,7 @@ export const lorebookEntries = pgTable(
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
+    primaryKey({ columns: [table.sessionId, table.id] }),
     index("pg_lorebook_entries_session_id_idx").on(table.sessionId),
     index("pg_lorebook_entries_plugin_id_idx").on(
       table.sessionId,
