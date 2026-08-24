@@ -44,7 +44,7 @@ function NonMemoNarrativeMessageBody({
 }: NarrativeMessageBodyProps) {
   return (
     <div
-      className={`text-sm wrap-break-words w-full ${
+      className={`text-sm wrap-break-word w-full ${
         isUser
           ? "ui-message-player prose prose-sm max-w-[90%] md:max-w-[85%] border border-border p-4 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
           : isHiddenAssistantKind
