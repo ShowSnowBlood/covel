@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CircleUserRound, Loader2, WalletCards } from "lucide-react";
+import { CircleUserRound, WalletCards } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   fetchFrostFoxAccount,
@@ -66,9 +66,6 @@ export function FrostFoxAccountSummary() {
       </div>
       <div className="flex h-9 items-center gap-1 rounded-[var(--radius-control)] px-2 text-xs tabular-nums">
         <WalletCards className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>{balance}</span>
-      </div>
-    </div>
   );
 }
 
