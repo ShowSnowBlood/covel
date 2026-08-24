@@ -109,23 +109,23 @@ function RootLayout() {
     onClick: () => void;
     disabled?: boolean;
   }> = [
-    { id: "home", label: t("nav.home", "首页"), onClick: goHome },
-    { id: "world", label: t("nav.world", "世界"), onClick: goWorld },
+    { id: "home", label: t("nav.home", "Home"), onClick: goHome },
+    { id: "world", label: t("nav.world", "World"), onClick: goWorld },
     {
       id: "session",
-      label: t("nav.session", "会话"),
+      label: t("nav.session", "Session"),
       onClick: goSession,
       disabled: !hasSession,
     },
     {
       id: "plugins",
-      label: t("nav.plugins", "插件"),
+      label: t("nav.plugins", "Plugins"),
       onClick: goPlugins,
       disabled: !hasSession,
     },
     {
       id: "images",
-      label: t("nav.images", "图像"),
+      label: t("nav.images", "Images"),
       onClick: goImages,
       disabled: !hasSession,
     },
