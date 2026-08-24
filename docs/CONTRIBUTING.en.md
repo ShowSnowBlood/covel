@@ -64,6 +64,18 @@ Follow Conventional Commits:
 
 Common types: `feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`.
 
+### Automatic commit and push
+
+To continuously commit and push workspace changes, run:
+
+```bash
+pnpm auto:push
+```
+
+The watcher waits 2 seconds after edits settle, commits all non-ignored workspace changes with a Chinese Conventional Commit message, and pushes the current branch to `origin`. Press `Ctrl+C` to stop. It never force-pushes; detached HEADs, conflicts, and rejected pushes leave the local commit intact and are retried later.
+
+Use `pnpm auto:push -- --once` for a one-shot installation or verification run.
+
 ### Pull requests
 
 1. Branch off `main` into a feature branch

@@ -64,6 +64,18 @@ pnpm e2e                                   # Playwright 端到端
 
 常用 type：`feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`。
 
+### 自动提交与推送
+
+如需让当前工作区持续自动提交并推送修改，运行：
+
+```bash
+pnpm auto:push
+```
+
+该任务会等待修改停止 2 秒，将当前工作区的全部非忽略变更作为一次提交，并使用中文 Conventional Commit 消息推送到当前分支的 `origin`。按 `Ctrl+C` 停止。自动任务不会强制推送；遇到 detached HEAD、冲突或远端拒绝时保留本地提交并稍后重试。
+
+首次安装或验证脚本时可使用 `pnpm auto:push -- --once`。
+
 ### Pull Request
 
 1. 从 `main` 分出一个 feature branch
