@@ -22,6 +22,13 @@ export * from "./api/packages.js";
 export * from "./api/llm.js";
 export * from "./api/media.js";
 export * from "./api/actions.js";
+export * from "./api/frostfox.js";
+export {
+  getManagedFrostFoxCatalog,
+  getManagedFrostFoxPresets,
+  hydrateManagedFrostFoxModels,
+  setManagedFrostFoxCatalog,
+} from "./api/frostfox-models.js";
 export {
   addCustomPreset,
   clearPrepRuntimeBindings,

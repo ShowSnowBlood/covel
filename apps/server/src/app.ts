@@ -38,6 +38,11 @@ import { createMiscApiRoutes } from "./routes/misc-api.js";
 import { createConfigApiRoutes } from "./routes/config-api.js";
 import { createPerRequestLlmMiddleware } from "./middleware/per-request-llm.js";
 import { createRequestBodyLimitMiddleware } from "./middleware/request-body-limit.js";
+import { FrostFoxService } from "./frostfox/service.js";
+import {
+  createFrostFoxPrincipalMiddleware,
+  createFrostFoxRoutes,
+} from "./routes/frostfox.js";
 import {
   errorBody,
   makeErrorHandler,
@@ -176,6 +181,9 @@ const ai = createAiStack();
 const storeBackend = resolveBackendFromEnv();
 const store = await createStoreFromEnv();
 const mediaStore = await createMediaStoreFromEnv(process.env);
+const frostFox = await FrostFoxService.create({ env, ai });
+app.use("/api/*", createFrostFoxPrincipalMiddleware(frostFox));
+app.use("/auth/frostfox/*", createFrostFoxPrincipalMiddleware(frostFox));
 
 // ── Session lock ────────────────────────────────────────────────
 //
@@ -285,6 +293,7 @@ const perRequestLlm = createPerRequestLlmMiddleware({
   envApiKeys: apiKeys,
   defaultLlmAdapter: llmAdapter,
   defaultPluginGateway: pluginGateway,
+  frostFox,
 });
 // ── Seed worlds ──────────────────────────────────────────────────
 // Bundled worlds are always seeded. When COVEL_USER_WORLDS_DIR is set
@@ -397,6 +406,9 @@ async function drainPhase(
 export const drainServerResources = async (): Promise<void> => {
   await drainPhase("stop world watchers", () => stopWatchers());
   await drainPhase("flush event bus", () => api.eventBus.flush());
+  if (frostFox) {
+    await drainPhase("close FrostFox integration", () => frostFox.close());
+  }
   await drainPhase("close data store", () => store.close());
   if (lockSql) {
     // `timeout: 1` (seconds) force-closes connections still held by an
@@ -406,6 +418,7 @@ export const drainServerResources = async (): Promise<void> => {
 };
 
 // ── Mount routes ─────────────────────────────────────────────────
+app.route("/", createFrostFoxRoutes(frostFox));
 app.route("/", api.app);
 app.route("/", createModelDbRoutes(ai));
 app.route("/", createMiscApiRoutes(ai, api.registry, store));

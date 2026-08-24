@@ -5,6 +5,7 @@ import {
   fetchModelDbInfo,
   getCapabilityOverrides,
   getCustomPresets,
+  getManagedFrostFoxCatalog,
   getParamOverrides,
   getProviderPriceMultiplier,
   getSlotConfig,
@@ -60,6 +61,7 @@ export function LlmSlotsPane() {
   const [modelDbInfo, setModelDbInfo] = useState<ModelDbInfo | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const managedCatalog = getManagedFrostFoxCatalog();
 
   useEffect(() => {
     fetchModelDbInfo()
@@ -408,7 +410,9 @@ export function LlmSlotsPane() {
                   )}
                   {providerChoices.map((provider) => (
                     <option key={provider} value={provider}>
-                      {provider}
+                      {managedCatalog?.channels.find(
+                        (channel) => channel.providerId === provider,
+                      )?.displayName ?? provider}
                     </option>
                   ))}
                 </select>
@@ -450,7 +454,11 @@ export function LlmSlotsPane() {
                   )}
                   {modelChoices.map((preset) => (
                     <option key={preset.id} value={preset.id}>
-                      {preset.model}
+                      {managedCatalog?.channels.some(
+                        (channel) => channel.providerId === preset.provider,
+                      )
+                        ? preset.name.split(" · ").at(-1)
+                        : preset.model}
                     </option>
                   ))}
                 </select>
@@ -460,7 +468,11 @@ export function LlmSlotsPane() {
             <div className="text-xs text-muted-foreground grid grid-cols-3 gap-1">
               <span>
                 {t("settings.providerLabel", "Provider")}:{" "}
-                {effectiveProvider || "—"}
+                {(managedCatalog?.channels.find(
+                  (channel) => channel.providerId === effectiveProvider,
+                )?.displayName ??
+                  effectiveProvider) ||
+                  "—"}
               </span>
               <span>
                 {t("settings.modelLabel", "Model")}: {effectiveModel || "—"}

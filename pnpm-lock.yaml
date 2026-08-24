@@ -127,6 +127,9 @@ importers:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+      better-sqlite3:
+        specifier: ^12.11.1
+        version: 12.11.1
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -149,6 +152,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/yazl':
         specifier: ^3.3.1
         version: 3.3.1
@@ -2812,6 +2818,7 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abbrev@4.0.0:
     resolution: {integrity: sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA==}

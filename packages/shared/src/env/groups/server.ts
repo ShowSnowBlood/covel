@@ -136,4 +136,54 @@ export const SERVER_ENV_VARS = [
     description:
       "Comma-separated request paths the Hono request logger skips, so health polling does not flood server.log.",
   },
+  {
+    name: "COVEL_FROSTFOX_SAAS_ENABLED",
+    group: "server",
+    type: "boolean",
+    status: "active",
+    defaultValue: "false",
+    description:
+      "Enables the confidential Web-only FrostFox first-party account and managed Gateway integration. Requires DEPLOYMENT_TIER=commercial and persistent storage.",
+  },
+  {
+    name: "COVEL_FROSTFOX_ROUTER_BASE_URL",
+    group: "server",
+    type: "url",
+    status: "active",
+    secret: false,
+    description:
+      "Canonical HTTPS FrostFox Router origin used as the account issuer.",
+  },
+  {
+    name: "COVEL_FROSTFOX_CLIENT_ID",
+    group: "server",
+    type: "string",
+    status: "active",
+    description: "Registered first-party FrostFox Client ID.",
+  },
+  {
+    name: "COVEL_FROSTFOX_CLIENT_SECRET",
+    group: "server",
+    type: "secret",
+    status: "active",
+    secret: true,
+    description:
+      "Encrypted-at-rest FrostFox service credential; never sent to the browser.",
+  },
+  {
+    name: "COVEL_FROSTFOX_CALLBACK_URL",
+    group: "server",
+    type: "url",
+    status: "active",
+    description: "Exact HTTPS callback pre-registered in the FrostFox Router.",
+  },
+  {
+    name: "COVEL_FROSTFOX_CREDENTIAL_KEY",
+    group: "server",
+    type: "secret",
+    status: "active",
+    secret: true,
+    description:
+      "32-byte Base64Url envelope key used to encrypt Router account keys at rest.",
+  },
 ] as const satisfies readonly EnvVarDefinition[];

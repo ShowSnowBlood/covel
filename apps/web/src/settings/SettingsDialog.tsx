@@ -13,6 +13,7 @@ import {
   buildNavTree,
   filterNav,
   APPEARANCE_NODE_ID,
+  ACCOUNT_NODE_ID,
   OPERATOR_ACCESS_NODE_ID,
   PACKAGES_NODE_ID,
   type NavNode,
@@ -27,6 +28,7 @@ import { LlmPresetsPane } from "./panes/LlmPresetsPane.js";
 import { PackagesPane } from "./panes/PackagesPane.js";
 import { AppearancePane } from "./panes/AppearancePane.js";
 import { OperatorAccessPane } from "./panes/OperatorAccessPane.js";
+import { FrostFoxAccountPane } from "./panes/FrostFoxAccountPane.js";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -217,6 +219,7 @@ function renderPane(
   if (node.id === "data") return <DataPane />;
   if (node.id === "desktop") return <DesktopPane />;
   if (node.id === APPEARANCE_NODE_ID) return <AppearancePane />;
+  if (node.id === ACCOUNT_NODE_ID) return <FrostFoxAccountPane />;
   if (node.id === OPERATOR_ACCESS_NODE_ID) return <OperatorAccessPane />;
   if (node.id === PACKAGES_NODE_ID) return <PackagesPane />;
 

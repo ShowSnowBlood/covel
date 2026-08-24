@@ -29,6 +29,8 @@ const PACKAGES_NODE_ID = "packages";
 const PACKAGES_LABEL = { "zh-CN": "导入包", "en-US": "Import Packages" };
 const APPEARANCE_NODE_ID = "appearance";
 const APPEARANCE_LABEL = { "zh-CN": "外观", "en-US": "Appearance" };
+const ACCOUNT_NODE_ID = "account";
+const ACCOUNT_LABEL = { "zh-CN": "账号", "en-US": "Account" };
 
 /**
  * Theme keys are registered under `general` so the store owns their values,
@@ -182,6 +184,14 @@ export function buildNavTree(
         kind: "group",
         children: [],
       });
+      nodes.push({
+        id: ACCOUNT_NODE_ID,
+        label: locale.startsWith("en")
+          ? ACCOUNT_LABEL["en-US"]
+          : ACCOUNT_LABEL["zh-CN"],
+        kind: "group",
+        children: [],
+      });
     } else if (entries.length > 0) {
       nodes.push({
         id: group,
@@ -215,7 +225,12 @@ export function buildNavTree(
   return nodes;
 }
 
-export { APPEARANCE_NODE_ID, OPERATOR_ACCESS_NODE_ID, PACKAGES_NODE_ID };
+export {
+  ACCOUNT_NODE_ID,
+  APPEARANCE_NODE_ID,
+  OPERATOR_ACCESS_NODE_ID,
+  PACKAGES_NODE_ID,
+};
 
 export function filterNav(
   nodes: NavNode[],

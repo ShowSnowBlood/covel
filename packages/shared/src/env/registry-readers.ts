@@ -198,6 +198,32 @@ export function readRuntimeEnv(source: EnvSource = defaultSource()) {
     logsDir: readEnvString("COVEL_LOGS_DIR", undefined, source),
     modelDbPath: readEnvString("COVEL_MODEL_DB_PATH", undefined, source),
     promptsDir: readEnvString("COVEL_PROMPTS_DIR", undefined, source),
+    frostFoxSaasEnabled: isEnvEnabled("COVEL_FROSTFOX_SAAS_ENABLED", source),
+    frostFoxRouterBaseUrl: readEnvString(
+      "COVEL_FROSTFOX_ROUTER_BASE_URL",
+      undefined,
+      source,
+    ),
+    frostFoxClientId: readEnvString(
+      "COVEL_FROSTFOX_CLIENT_ID",
+      undefined,
+      source,
+    ),
+    frostFoxClientSecret: readEnvString(
+      "COVEL_FROSTFOX_CLIENT_SECRET",
+      undefined,
+      source,
+    ),
+    frostFoxCallbackUrl: readEnvString(
+      "COVEL_FROSTFOX_CALLBACK_URL",
+      undefined,
+      source,
+    ),
+    frostFoxCredentialKey: readEnvString(
+      "COVEL_FROSTFOX_CREDENTIAL_KEY",
+      undefined,
+      source,
+    ),
     // Optional explicit override. When unset (undefined) the server derives
     // the compaction window from the active narrative slot's model capability.
     compactorContextWindow: readEnvIntOptional(

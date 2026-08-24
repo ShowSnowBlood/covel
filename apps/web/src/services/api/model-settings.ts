@@ -5,6 +5,7 @@ import {
   profilesFromLegacyPresets,
   type ProviderModelProfile,
 } from "./provider-model-profiles.js";
+import { getManagedFrostFoxPresets } from "./frostfox-models.js";
 
 /** Routes that need the provider API keys header. */
 const AI_ROUTES = ["/api/actions", "/api/ai/", "/api/kernel/"];
@@ -383,9 +384,12 @@ export function setProviderProfiles(profiles: ProviderModelProfile[]): void {
   // Dual-write the old flattened shape for downgrade/export compatibility.
   void store.set("llm.customPresets", flattenProviderProfiles(normalized));
 
-  const validModelRefs = new Set(
-    normalized.flatMap((profile) => profile.models.map((model) => model.ref)),
-  );
+  const validModelRefs = new Set([
+    ...normalized.flatMap((profile) =>
+      profile.models.map((model) => model.ref),
+    ),
+    ...getManagedFrostFoxPresets().map((preset) => preset.id),
+  ]);
   const secrets = (
     store as unknown as { snapshotSecrets(): Record<string, string> }
   ).snapshotSecrets();
@@ -499,7 +503,9 @@ export function getCustomPresets(): CustomPreset[] {
     setCustomPresets(merged);
   }
 
-  return merged;
+  const managed = getManagedFrostFoxPresets();
+  const managedIds = new Set(managed.map((preset) => preset.id));
+  return [...merged.filter((preset) => !managedIds.has(preset.id)), ...managed];
 }
 
 export function setCustomPresets(presets: CustomPreset[]): void {

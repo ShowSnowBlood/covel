@@ -75,6 +75,7 @@ import {
   parseCreateSessionBody,
 } from "./session/request-helpers.js";
 import { importWorldCharacterBlueprints } from "./session/world-character-blueprints.js";
+import type { FrostFoxPrincipal } from "../../frostfox/service.js";
 
 type Env = {
   Variables: {
@@ -84,10 +85,12 @@ type Env = {
     worldsDirs?: readonly string[];
     covelHome?: string;
     storeBackend?: StoreBackend;
+    frostFoxPrincipal: FrostFoxPrincipal | null;
   };
 };
 
 export const sessionRoutes = new Hono<Env>();
+const FROSTFOX_LOCAL_USER_ID_KEY = "frostFoxLocalUserId";
 
 /**
  * Whether any plugin in the set declares a setup-stage runtime. Discovered by
@@ -115,13 +118,7 @@ function sessionHasSetupRuntime(
   return false;
 }
 
-/**
- * Prepare a session for the wire: (1) strip the persisted owner-token hash — an
- * internal credential check a caller has no use for — and (2) refresh the legacy
- * `turnCount` / `preGameCompleted` fields from the clock. The kernel no longer
- * writes those columns; deriving them here keeps the response shape identical
- * while the persisted columns stay frozen for old-kernel / rollback reads.
- */
+/** Strip internal authorization metadata and derive the legacy session clock. */
 function sanitizeSessionForResponse<
   T extends {
     readonly metadata?: Record<string, unknown> | null;
@@ -135,9 +132,12 @@ function sanitizeSessionForResponse<
   const { turnCount, preGameCompleted } = deriveLegacyClockForSession(session);
   const withClock = { ...session, turnCount, preGameCompleted };
   const metadata = withClock.metadata;
-  if (!metadata || !(SESSION_OWNER_TOKEN_HASH_KEY in metadata))
-    return withClock;
-  const { [SESSION_OWNER_TOKEN_HASH_KEY]: _omit, ...rest } = metadata;
+  if (!metadata) return withClock;
+  const {
+    [SESSION_OWNER_TOKEN_HASH_KEY]: _ownerTokenHash,
+    [FROSTFOX_LOCAL_USER_ID_KEY]: _frostFoxOwner,
+    ...rest
+  } = metadata;
   return { ...withClock, metadata: rest };
 }
 
@@ -217,42 +217,52 @@ sessionRoutes.get("/", async (c) => {
     return c.json({ items: [] });
   }
 
-  // Hosted tiers (demo/commercial): the listing spans every tenant's sessions
-  // and there is no user identity to filter by, so it is operator-only
-  // (COVEL_DESKTOP_REST_TOKEN). Per-session access uses owner tokens instead.
-  if (isOwnerAuthEnforced(env.deploymentTier) && !hasOperatorToken(c)) {
+  const principal = c.get("frostFoxPrincipal");
+  const operator = hasOperatorToken(c);
+  if (isOwnerAuthEnforced(env.deploymentTier) && !operator && !principal) {
     return c.json({ items: [] });
   }
 
   const store = c.get("store");
   const worldId = c.req.query("worldId");
   const sessions = await store.listSessions();
+  const accountSessions =
+    principal && !operator
+      ? sessions.filter(
+          (session) =>
+            session.metadata?.[FROSTFOX_LOCAL_USER_ID_KEY] ===
+            principal.localUserId,
+        )
+      : sessions;
   const filtered = worldId
-    ? sessions.filter((s) => s.worldId === worldId)
-    : sessions;
-  // Decorate each session with embedding metadata so the archive list
-  // can show RAG status badges without an extra round-trip per row.
-  // listVectorModels is called once and shared across all sessions.
+    ? accountSessions.filter((session) => session.worldId === worldId)
+    : accountSessions;
   const decorated = await decorateSessionList(store, filtered);
   return c.json({ items: decorated.map(sanitizeSessionForResponse) });
 });
 
 // POST /sessions
 sessionRoutes.post("/", async (c) => {
-  // On hosted tiers (demo/commercial) session CREATION is
-  // operator-only — otherwise any anonymous caller could mint themselves a
-  // session + owner token on a shared host. COVEL_DESKTOP_REST_TOKEN is the
-  // only auth primitive the codebase ships, so this is a single-operator
-  // gate ONLY: full principal identity, per-user tenant isolation, and
-  // quota/billing are product-level work and deliberately NOT implemented
-  // here. self/desktop/dev tiers stay open (loopback is the boundary).
-  if (isOwnerAuthEnforced() && !hasOperatorToken(c)) {
-    return c.json(
-      errorBody("Operator token required to create sessions on this tier", {
-        code: "operator_token_required",
-      }),
-      401,
-    );
+  const env = readRuntimeEnv();
+  const principal = c.get("frostFoxPrincipal");
+  if (isOwnerAuthEnforced(env.deploymentTier) && !hasOperatorToken(c)) {
+    if (!principal || !env.frostFoxSaasEnabled) {
+      const frostFoxRequired =
+        env.deploymentTier === "commercial" && env.frostFoxSaasEnabled;
+      return c.json(
+        errorBody(
+          frostFoxRequired
+            ? "FrostFox account connection required"
+            : "Operator token required to create sessions on this tier",
+          {
+            code: frostFoxRequired
+              ? "frostfox_account_required"
+              : "operator_token_required",
+          },
+        ),
+        401,
+      );
+    }
   }
 
   const store = c.get("store");
@@ -327,7 +337,12 @@ sessionRoutes.post("/", async (c) => {
     activePlugins: plugins,
     createdAt: now,
     updatedAt: now,
-    metadata: { [SESSION_OWNER_TOKEN_HASH_KEY]: owner.tokenHash },
+    metadata: {
+      [SESSION_OWNER_TOKEN_HASH_KEY]: owner.tokenHash,
+      ...(principal
+        ? { [FROSTFOX_LOCAL_USER_ID_KEY]: principal.localUserId }
+        : {}),
+    },
   };
 
   // Scoped transaction: createSession + world-data import + blueprint fallback

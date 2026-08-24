@@ -36,11 +36,18 @@ import {
 import type { AiStack } from "../ai-setup.js";
 import type { SlotOverridesInput } from "@covel/ai-provider";
 import {
+  AiProviderError,
   PROVIDER_PROTOCOLS,
   REASONING_EFFORT_VALUES,
 } from "@covel/ai-provider";
 import type { PluginRuntimeGateway } from "@covel/plugin-loader";
 import { decodeBase64Json } from "../lib/base64-json.js";
+import {
+  FrostFoxService,
+  FrostFoxServiceError,
+  type FrostFoxAiContext,
+} from "../frostfox/service.js";
+import { errorBody } from "../api-error.js";
 
 export interface PerRequestLlmOptions {
   readonly ai: AiStack;
@@ -63,6 +70,8 @@ export interface PerRequestLlmOptions {
    * per-session UI settings.
    */
   readonly defaultPluginGateway: PluginRuntimeGateway;
+  /** Trusted first-party account integration; absent on desktop/self-hosted tiers. */
+  readonly frostFox?: FrostFoxService | null;
 }
 
 const MAX_HEADER_BYTES = 64 * 1024; // sanity cap — browsers rarely send bigger
@@ -71,11 +80,55 @@ export function createPerRequestLlmMiddleware(
   opts: PerRequestLlmOptions,
 ): MiddlewareHandler {
   return async (c, next) => {
-    const requestKeys = parseProviderKeys(c.req.header("X-Provider-Keys"));
-    const slotOverrides = parseSlotOverrides(c.req.header("X-Slot-Config"));
+    const browserKeys = parseProviderKeys(c.req.header("X-Provider-Keys"));
+    const parsedOverrides = parseSlotOverrides(c.req.header("X-Slot-Config"));
+    let frostFoxContext: FrostFoxAiContext | null = null;
+    if (opts.frostFox) {
+      try {
+        frostFoxContext = await opts.frostFox.prepareAiContext(
+          c.get("frostFoxPrincipal"),
+        );
+      } catch (error) {
+        if (error instanceof FrostFoxServiceError) {
+          return c.json(
+            errorBody(error.code, { code: error.code }),
+            error.status === 400 ? 400 : 401,
+          );
+        }
+        throw error;
+      }
+    }
+    if (opts.frostFox && isFrostFoxAiRequest(c.req.path) && !frostFoxContext) {
+      return c.json(
+        errorBody("FrostFox account connection required", {
+          code: "frostfox_account_required",
+        }),
+        401,
+      );
+    }
+    let slotOverrides: SlotOverridesInput | null;
+    try {
+      slotOverrides = opts.frostFox
+        ? opts.frostFox.sanitizeSlotOverrides(
+            parsedOverrides,
+            frostFoxContext !== null,
+          )
+        : parsedOverrides;
+    } catch (error) {
+      if (error instanceof FrostFoxServiceError) {
+        return c.json(errorBody(error.code, { code: error.code }), 400);
+      }
+      throw error;
+    }
+    // Managed credentials win for their reserved provider ids. Browser keys
+    // can still supply every ordinary provider, but can never replace or
+    // redirect the derived FrostFox Gateway key.
+    const requestKeys = {
+      ...(browserKeys ?? {}),
+      ...(frostFoxContext?.apiKeys ?? {}),
+    };
 
-    const hasRequestKeys =
-      requestKeys !== null && Object.keys(requestKeys).length > 0;
+    const hasRequestKeys = Object.keys(requestKeys).length > 0;
     const hasOverrides =
       slotOverrides !== null &&
       ((slotOverrides.customPresets?.length ?? 0) > 0 ||
@@ -88,7 +141,7 @@ export function createPerRequestLlmMiddleware(
     }
 
     const perRequestAdapter = createGatewayAdapter(opts.ai.gateway, {
-      apiKeys: requestKeys ?? {},
+      apiKeys: requestKeys,
       envApiKeys: opts.envApiKeys,
       ...(slotOverrides ? { slotOverrides } : {}),
     });
@@ -96,13 +149,11 @@ export function createPerRequestLlmMiddleware(
     // Keep the function-runtime gateway in lock-step with the
     // agent-runtime LLM adapter. Both are rebuilt from the same merged
     // keys / slot overrides so `ctx.gateway.resolveSlot(...)` inside a
-    // function handler resolves the same browser-declared custom presets
-    // (e.g. a user-added DashScope preset for image plugins) as the
-    // agent-runtime side sees via `llmAdapter`.
+    // function handler resolves the same browser-declared custom presets.
     const perRequestPluginGateway = createPluginRuntimeGateway(
       opts.ai.gateway,
       {
-        apiKeys: requestKeys ?? {},
+        apiKeys: requestKeys,
         envApiKeys: opts.envApiKeys,
         ...(slotOverrides ? { slotOverrides } : {}),
       },
@@ -110,7 +161,22 @@ export function createPerRequestLlmMiddleware(
 
     c.set("llmAdapter", perRequestAdapter);
     c.set("pluginGateway", perRequestPluginGateway);
-    await next();
+    try {
+      await next();
+    } catch (error) {
+      if (
+        opts.frostFox &&
+        frostFoxContext &&
+        error instanceof AiProviderError &&
+        error.statusCode === 401 &&
+        error.provider.startsWith("frostfox-")
+      ) {
+        await opts.frostFox
+          .handleGatewayUnauthorized(frostFoxContext.principal)
+          .catch(() => undefined);
+      }
+      throw error;
+    }
   };
 }
 
@@ -230,4 +296,12 @@ function parseSlotOverrides(
   } catch {
     return null;
   }
+}
+function isFrostFoxAiRequest(path: string): boolean {
+  return (
+    path === "/api/actions" ||
+    path.startsWith("/api/ai/") ||
+    path.startsWith("/api/kernel/") ||
+    /^\/api\/sessions\/[^/]+\/(resume|plugin-rpc)(?:\/|$)/.test(path)
+  );
 }

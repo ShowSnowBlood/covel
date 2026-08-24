@@ -8,8 +8,13 @@ import {
   setStorageMode,
   storageModeForServerStorage,
 } from "@/services/data-service";
-import { fetchServerHealth, loadProviderKeysFromStorage } from "@/services/api";
+import {
+  fetchServerHealth,
+  hydrateManagedFrostFoxModels,
+  loadProviderKeysFromStorage,
+} from "@/services/api";
 import { probeDesktopMode } from "@/lib/desktop-bridge";
+import { emitToast } from "@/lib/toast-channel.js";
 import {
   applyAppearance,
   applyColorScheme,
@@ -62,6 +67,31 @@ async function syncStorageMode(): Promise<void> {
   } catch {
     // server unreachable — keep current mode
   }
+}
+function consumeFrostFoxCallbackResult(): void {
+  const url = new URL(window.location.href);
+  const result = url.searchParams.get("frostfox");
+  if (result !== "connected" && result !== "error") return;
+  if (result === "connected") {
+    emitToast(
+      "success",
+      i18n.t("settings.frostfox.connectedToast"),
+      i18n.t("settings.frostfox.connectedToastDetail"),
+    );
+  } else {
+    emitToast(
+      "error",
+      i18n.t("settings.frostfox.connectionFailedToast"),
+      url.searchParams.get("code") ?? "frostfox_connection_failed",
+    );
+  }
+  url.searchParams.delete("frostfox");
+  url.searchParams.delete("code");
+  window.history.replaceState(
+    null,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
 }
 
 async function migrateLegacyThemeScheme(store: ReturnType<typeof getSettings>) {
@@ -138,7 +168,12 @@ probeDesktopMode()
     store.subscribe<number>("ui.chatMessageWindow", (next) => {
       configureMessagesWindowCap(next);
     });
-    return Promise.all([syncStorageMode(), loadProviderKeysFromStorage()]);
+    consumeFrostFoxCallbackResult();
+    return Promise.all([
+      syncStorageMode(),
+      loadProviderKeysFromStorage(),
+      hydrateManagedFrostFoxModels(),
+    ]);
   })
   // Nothing in the bootstrap is allowed to stop the app from mounting. Every
   // step above is a preference/hydration concern; a rejection here used to

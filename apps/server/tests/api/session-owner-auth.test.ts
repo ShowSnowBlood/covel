@@ -23,8 +23,13 @@ import { sessionRoutes } from "../../src/routes/api/session.js";
 import { messageRoutes } from "../../src/routes/api/messages.js";
 import { traceRoutes } from "../../src/routes/api/traces.js";
 import { subscribeRoutes } from "../../src/routes/api/subscribe.js";
+import type { FrostFoxPrincipal } from "../../src/frostfox/service.js";
 
-const ENV_KEYS = ["DEPLOYMENT_TIER", "COVEL_DESKTOP_REST_TOKEN"] as const;
+const ENV_KEYS = [
+  "DEPLOYMENT_TIER",
+  "COVEL_DESKTOP_REST_TOKEN",
+  "COVEL_FROSTFOX_SAAS_ENABLED",
+] as const;
 const ORIGINAL_ENV = Object.fromEntries(
   ENV_KEYS.map((k) => [k, process.env[k]]),
 );
@@ -37,13 +42,18 @@ afterEach(() => {
   }
 });
 
-function createTestApp(store: DataStore, registry: PluginRegistry): Hono {
+function createTestApp(
+  store: DataStore,
+  registry: PluginRegistry,
+  principal: FrostFoxPrincipal | null = null,
+): Hono {
   const app = new Hono();
   const eventBus = createEventBus(store);
   app.use("*", async (c, next) => {
     c.set("store", store);
     c.set("pluginRegistry", registry);
     c.set("eventBus", eventBus);
+    c.set("frostFoxPrincipal", principal);
     await next();
   });
   app.route("/api/sessions", sessionRoutes);
@@ -279,6 +289,40 @@ describe("commercial tier — owner token hard-required", () => {
       headers: { authorization: "Bearer operator-secret" },
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("commercial tier — FrostFox account sessions", () => {
+  it("creates sessions without the operator token and filters the listing by account", async () => {
+    process.env.DEPLOYMENT_TIER = "commercial";
+    process.env.COVEL_DESKTOP_REST_TOKEN = "operator-secret";
+    process.env.COVEL_FROSTFOX_SAAS_ENABLED = "1";
+    const accountA: FrostFoxPrincipal = {
+      localUserId: "local-a",
+      routerAccountId: "router-a",
+      accountName: "A",
+      balance: 10,
+      credentialState: "active",
+      lastVerifiedAt: new Date().toISOString(),
+    };
+    const accountB: FrostFoxPrincipal = {
+      ...accountA,
+      localUserId: "local-b",
+      routerAccountId: "router-b",
+      accountName: "B",
+    };
+    const registry = createPluginRegistry();
+    const appA = createTestApp(store, registry, accountA);
+    const appB = createTestApp(store, registry, accountB);
+
+    const created = await createSession(appA);
+    expect(created.metadata).not.toHaveProperty("frostFoxLocalUserId");
+    expect(await (await appA.request("/api/sessions")).json()).toMatchObject({
+      items: [{ id: created.id }],
+    });
+    expect(await (await appB.request("/api/sessions")).json()).toEqual({
+      items: [],
+    });
   });
 });
 

@@ -53,10 +53,10 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 
 **分层强制（tiered enforcement）**：
 
-| `DEPLOYMENT_TIER`     | 行为                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `self`（默认）/ 桌面  | **不强制**。单机本地游玩零 token 可用；网络边界由默认回环监听保障（`COVEL_BIND_HOST=127.0.0.1`，见 env-registry）。带 token 也不校验。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `demo` / `commercial` | **硬性强制**。所有会话作用域端点（session CRUD、messages、traces、actions、plugin-rpc、steer/abort、SSE subscribe、snapshots、state 等经 `resolveSessionParam` 的路由，以及会话 id 走 query/body/间接引用的端点：approvals 列表/撤销/决策、`POST /api/media?sessionId=`、`/api/worlds/:id/world-data/preflight`、`sync-data`、`sync-dimensions`、`GET /api/ui-specs?sessionId=`）缺失或错误 token 一律返回 `401 { code: "session_owner_required" }`（未知会话返回 404）。无哈希的历史会话 fail-closed。`GET /api/sessions` 列表在这两个层级仅对持有运维 token 的调用方返回内容，其余返回空列表；`POST /api/sessions` **创建会话需运维 token**（缺失返回 `401 { code: "operator_token_required" }`）——这是单运维方门禁，完整的用户身份/租户隔离/配额属产品级工作，尚未实现。 |
+| `DEPLOYMENT_TIER`     | 行为                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `self`（默认）/ 桌面  | **不强制**。单机本地游玩零 token 可用；网络边界由默认回环监听保障（`COVEL_BIND_HOST=127.0.0.1`，见 env-registry）。带 token 也不校验。                                                                                                                                                                                                                                                                                                                                    |
+| `demo` / `commercial` | **硬性强制**。所有会话作用域端点仍要求每会话 owner token（未知会话返回 404、缺失或错误 token 返回 `401 session_owner_required`）。`demo` 以及未启用 FrostFox 的 `commercial` 部署中，`GET /api/sessions` 和 `POST /api/sessions` 只接受运维 token。启用 `COVEL_FROSTFOX_SAAS_ENABLED=1` 的 `commercial` 部署中，已连接 FrostFox 账号可创建会话并只列出绑定到自身本地账号的会话；服务端在内部 metadata 记录账号归属，响应会剥离该字段。运维 token 仍可查看和管理全部会话。 |
 
 **Token 提交方式**（三选一）：
 
@@ -64,7 +64,7 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 2. `X-Session-Token: <ownerToken>`
 3. `?session_token=<ownerToken>` query 参数（供无法设置 header 的 EventSource / SSE 客户端使用）
 
-**运维 master token**：设置了 `COVEL_DESKTOP_REST_TOKEN` 时，以该值作为 Bearer token 可通过任意会话的 owner 校验（管理工具 / e2e harness 用），并且是 hosted 层级创建会话、世界写入/维度导入、AI 世界生成、模型探测/刷新、provider key 可用性查询（`GET /api/provider-keys`）以及 community server-code 激活的凭证。community ESM 会在服务端进程内注册全局能力，因此 hosted 层级同时要求 owner token 与 operator token；这是当前单运维方信任模型，不提供多租户代码沙箱。`DEPLOYMENT_TIER=demo|commercial` 启动时若未配置该 token，`validateSecurityPosture` 会直接拒绝启动。
+**运维 master token**：设置了 `COVEL_DESKTOP_REST_TOKEN` 时，以该值作为 Bearer token 可通过任意会话的 owner 校验，并且是 hosted 层级的全局管理凭据。启用 FrostFox 的 `commercial` 部署允许已连接账号创建并列出自己的会话；世界写入/维度导入、模型探测/刷新、provider key 可用性查询和 community server-code 激活仍要求 operator token。`DEPLOYMENT_TIER=demo|commercial` 启动时若未配置该 token，`validateSecurityPosture` 仍会拒绝启动。
 
 纯 Web 客户端可在 **Settings → Operator Access（运维访问）** 输入或清除该 token。凭据只保存在当前浏览器的 `localStorage`，仅在上述 operator-gated 同源请求中作为 `Authorization: Bearer <token>` 发送；保存或清除后客户端会重新加载，以新凭据重取会话与世界数据。`self` 层级继续允许无 token 使用，并忽略该可选凭据。
 
@@ -84,6 +84,34 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 单运维方模型下这是可接受的：批准 community 代码等同于信任它在本进程内运行。多租户隔离需要真正的代码沙箱，尚未实现。
 
 > CORS（`CORS_ORIGIN`）只是浏览器策略，**不构成鉴权**；真正的授权边界是 owner token + 部署层级 + 回环监听。
+
+### 第一方 FrostFox 账号与模型
+
+商业托管 Web 部署可启用 FrostFox 第一方 SaaS 协议。该集成只适用于有可信后端的 Web 客户端；桌面端和 self-hosted 部署继续使用本地 provider 配置。
+
+服务端配置 `COVEL_FROSTFOX_*` 后，浏览器只持有 `HttpOnly; Secure` 的 Covel 会话 Cookie。`clientSecret`、Router `accountKey`、派生 `sk-ff-` 和账户绑定密文始终留在服务端，不能进入 URL、Cookie 值、前端状态或日志。
+
+| 方法   | 路径                                                | 说明                                                                                          |
+| ------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| GET    | `/auth/frostfox/start`                              | 创建一次性登录事务，生成 state + PKCE，并跳转到 Router `/saas/authorize`                      |
+| GET    | `/auth/frostfox/callback?code=<code>&state=<state>` | 校验登录事务并 exchange；成功后用 `/me` 原子建立或恢复本地绑定，然后回到 Covel 根路径         |
+| GET    | `/api/frostfox/account`                             | 返回启用状态和当前账户的最小身份视图，不返回任何凭据                                          |
+| GET    | `/api/frostfox/models`                              | 用托管 Gateway Key 按同步渠道读取模型目录；返回的 provider/model 绑定只用于当前会话的模型选择 |
+| POST   | `/api/frostfox/logout`                              | 清除当前 Covel 会话 Cookie，不解绑账户凭据                                                    |
+| DELETE | `/api/frostfox/account`                             | 显式解绑当前 SaaS 本地账户、删除服务端账户 Key 密文并撤销会话；不轮转 Router 账户 Key         |
+
+`/api/frostfox/models` 的目录按 `client-config.configurationVersion` 和凭据世代短时缓存。模型请求最终仍由 Router Gateway 执行渠道启用态、分组货架、余额、限流、计费和模型上架判断。渠道映射是命名同步，不是 ACL。
+
+启用 FrostFox 后，以下会话执行路径没有有效账号 Cookie 时 fail-closed，返回 `401 { "code": "frostfox_account_required" }`：`/api/actions`、`/api/ai/*`、`/api/kernel/*`、`/api/sessions/:id/resume` 和 `/api/sessions/:id/plugin-rpc`。账户 Key 的不可区分失效只进入待恢复状态，不自动删除旧密文。
+
+固定派生算法：
+
+```text
+HMAC-SHA256(key=UTF8(accountKey), message=ASCII("frostfox-gateway:v2\n" + clientId))
+gatewayKey = "sk-ff-" + Base64UrlNoPadding(digest)
+```
+
+相关环境变量、商业部署要求和密钥保存边界见 [`docs/guide/env-registry.md`](../guide/env-registry.md)。
 
 ---
 

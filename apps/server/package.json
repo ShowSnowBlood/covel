@@ -42,6 +42,7 @@
     "ajv": "^8.20.0",
     "gray-matter": "^4.0.3",
     "hono": "4.12.29",
+    "better-sqlite3": "^12.11.1",
     "postgres": "^3.4.9",
     "tsx": "4.22.4",
     "yaml": "^2.9.0",
@@ -49,6 +50,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/yazl": "^3.3.1",
     "drizzle-kit": "^0.31.10",
     "typescript": "^7.0.2",

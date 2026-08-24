@@ -93,6 +93,14 @@ providerRequestMetadata = { speechWire = "mimo-tts/mimo" }
 - 未注册的 wire id 在生成时抛 `CONFIG_ERROR`（报错信息含修复指引），不会静默回落。
 - 插件在 `entry` 模块里用 `covel.registerWires({ image?, speech?, transcription? })` 注册自定义 wire（frontmatter 的 `wires` 字段仍被接受但已弃用）—— 见 [plugin-authoring-advanced.md § 注册自定义 wire](../guide/plugin-authoring-advanced.md#注册自定义-wireentry-里的-covelregisterwires)；wire 与 MediaStore 的关系见 [media-store.md](./media-store.md#media-wire-registries-image--speech--transcription)。
 
+## FrostFox 托管模型（商业 Web）
+
+启用第一方 SaaS 后，服务端从 Router `client-config` 原子同步渠道映射，并用已连接账号的派生 Gateway Key 分别调用每个渠道的 `/v1/models`。设置界面将返回目录显示在“服务商与模型”，玩家可在“用途分配”中选择具体模型；模型 ID 仍作为不透明字符串原样发送。
+
+每个同步渠道在请求内编译为保留的 `frostfox-*` provider，服务端固定其 Router `baseUrl`、`openai-chat-v1` 协议和 `X-FrostFox-Channel-Id`。浏览器只能提交模型 ID 与用途绑定，不能覆盖派生 Key、Router origin 或渠道 UUID。`X-Provider-Keys` 中伪造的同名 provider key 会被服务端托管凭据覆盖。
+
+托管模型只在当前 FrostFox 账号会话中解析；退出或解绑后清除前端目录，未连接账号的 AI 执行请求 fail-closed。桌面端和 self-hosted 配置路径不变。
+
 ## API Key 流转
 
 Key 永远不进 `llm.toml`：dev 放 `.env.llm`，桌面端放 `~/.covel/keys.env`（mode 600），纯 web 放 localStorage（`covel:keys`）。每次 AI 请求经 `X-Provider-Keys` header（base64 JSON `{provider: key}`）到达服务端，按目标 slot 的 `provider` 名分发绑定 —— wire 拿到的 `config.apiKey` 已是该 slot provider 的 key，客户端 key 覆盖 env key。

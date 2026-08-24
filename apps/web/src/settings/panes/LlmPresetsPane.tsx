@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Plus, Search, Server, Upload } from "lucide-react";
 import {
+  Download,
+  Plus,
+  Search,
+  Server,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
+import {
+  getManagedFrostFoxCatalog,
   getProviderProfiles,
   profilesFromLegacyPresets,
   setProviderProfiles,
@@ -41,6 +49,7 @@ export function LlmPresetsPane() {
   const [providerDraft, setProviderDraft] =
     useState<ProviderDraft>(EMPTY_PROVIDER_DRAFT);
   const [modelIdsDraft, setModelIdsDraft] = useState("");
+  const frostFoxCatalog = getManagedFrostFoxCatalog();
 
   const catalog = useMemo(
     () => buildProviderCatalog(state.presets, profiles),
@@ -206,6 +215,61 @@ export function LlmPresetsPane() {
           {t("settings.addProvider", "Add provider")}
         </Button>
       </div>
+      {frostFoxCatalog && (
+        <section className="border border-primary/30 bg-primary/5">
+          <div className="flex items-start gap-3 border-b border-primary/20 p-3">
+            <ShieldCheck
+              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <h4 className="text-xs font-semibold">
+                {t("settings.frostfox.managedModelsTitle")}
+              </h4>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                {t("settings.frostfox.managedModelsDescription")}
+              </p>
+            </div>
+          </div>
+          <div className="divide-y divide-border/70">
+            {frostFoxCatalog.channels.map((channel) => (
+              <div
+                key={channel.channelKey}
+                className="grid grid-cols-[9rem_minmax(0,1fr)] gap-3 p-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium">
+                    {channel.displayName}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">
+                    {channel.channelKey}
+                  </p>
+                </div>
+                <div className="flex min-w-0 flex-wrap gap-1.5">
+                  {channel.models.map((model) => (
+                    <span
+                      key={model.id}
+                      className="max-w-full truncate rounded-[var(--radius-control)] border border-border bg-background px-2 py-1 text-[10px]"
+                      title={model.id}
+                    >
+                      {model.name}
+                    </span>
+                  ))}
+                  {channel.models.length === 0 && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {channel.error
+                        ? t("settings.frostfox.channelError", {
+                            code: channel.error,
+                          })
+                        : t("settings.frostfox.noModels")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid min-h-[28rem] grid-cols-[10.5rem_minmax(0,1fr)] border border-border">
         <aside className="flex min-w-0 flex-col border-r border-border bg-muted/10">

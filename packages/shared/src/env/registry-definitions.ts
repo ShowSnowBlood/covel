@@ -38,6 +38,9 @@ export const COVEL_ENV_REGISTRY = [
 
 export type CovelEnvName = (typeof COVEL_ENV_REGISTRY)[number]["name"];
 
-export const COVEL_FEATURE_FLAGS = ["COVEL_LLM_RETRY_DISABLED"] as const;
+export const COVEL_FEATURE_FLAGS = [
+  "COVEL_LLM_RETRY_DISABLED",
+  "COVEL_FROSTFOX_SAAS_ENABLED",
+] as const;
 
 export type CovelFeatureFlag = (typeof COVEL_FEATURE_FLAGS)[number];

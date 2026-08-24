@@ -20,6 +20,7 @@ import type { RuntimeManifest } from "@covel/shared";
 import type { BudgetOptions, CompactorRunner } from "@covel/context";
 import type { SessionLock } from "./lib/session-lock.js";
 import type { EventDirectory } from "./routes/api/bootstrap/event-directory.js";
+import type { FrostFoxPrincipal } from "./frostfox/service.js";
 
 type LoadRuntimeFn = (
   manifest: RuntimeManifest,
@@ -57,6 +58,8 @@ declare module "hono" {
     eventBus: EventBus;
     pluginRegistry: PluginRegistry;
     llmAdapter: LLMAdapter;
+    /** Authenticated first-party SaaS account, or null when not connected. */
+    frostFoxPrincipal: FrostFoxPrincipal | null;
     /**
      * Narrow gateway facade exposed to function-runtime handlers via
      * `FunctionHandlerContext.gateway`. Set by `bootstrapApi()` when the
