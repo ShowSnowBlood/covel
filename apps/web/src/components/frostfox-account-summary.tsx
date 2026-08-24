@@ -25,7 +25,10 @@ export function FrostFoxAccountSummary() {
     };
 
     void refresh();
-    const interval = window.setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
+    const interval = window.setInterval(
+      () => void refresh(),
+      REFRESH_INTERVAL_MS,
+    );
     return () => {
       active = false;
       window.clearInterval(interval);

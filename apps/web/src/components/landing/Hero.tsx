@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-
 export function Hero() {
   const { t } = useTranslation();
 
@@ -116,22 +115,24 @@ export function Hero() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-        </div>
+          </div>
 
-        <div className="flex items-end justify-between gap-6">
-          <p className="ui-eyebrow text-muted-foreground/70 max-w-xs hidden md:block">
-            {t(
-              "home.heroFootnote",
-              "Trigger → Context → LLM → Tool loop → Proposal → Commit → Render. Scroll to follow a single turn.",
-            )}
-          </p>
-          <div className="flex items-center gap-2 text-muted-foreground animate-bounce-slow ml-auto">
-            <span className="ui-eyebrow">{t("home.scrollHint", "Scroll")}</span>
-            <ArrowDown className="h-4 w-4" />
+          <div className="flex items-end justify-between gap-6">
+            <p className="ui-eyebrow text-muted-foreground/70 max-w-xs hidden md:block">
+              {t(
+                "home.heroFootnote",
+                "Trigger → Context → LLM → Tool loop → Proposal → Commit → Render. Scroll to follow a single turn.",
+              )}
+            </p>
+            <div className="flex items-center gap-2 text-muted-foreground animate-bounce-slow ml-auto">
+              <span className="ui-eyebrow">
+                {t("home.scrollHint", "Scroll")}
+              </span>
+              <ArrowDown className="h-4 w-4" />
+            </div>
           </div>
         </div>
       </div>
-</div>
     </section>
   );
 }
