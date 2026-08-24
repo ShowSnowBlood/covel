@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { FrostFoxAccountSummary } from "@/components/frostfox-account-summary";
 import { ToastHost } from "@/components/ui/toast-host";
 import { ConfirmHost } from "@/components/ui/confirm-host";
 import { AppErrorBoundary } from "@/components/error-boundary";
@@ -209,6 +210,7 @@ function RootLayout() {
               style={isElectron ? noDragStyle : undefined}
             >
               <ThemeToggle />
+              <FrostFoxAccountSummary />
               <button
                 onClick={toggleLocale}
                 aria-label={
