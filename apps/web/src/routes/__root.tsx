@@ -154,16 +154,12 @@ function RootLayout() {
           }`}
           style={isElectron ? dragStyle : undefined}
         >
-          <Link
-            to="/"
-            className={`absolute top-1/2 -translate-y-1/2 ui-title flex items-center gap-2 tracking-tight pointer-events-auto ${
-              isHome
-                ? "left-6 text-xl font-semibold uppercase sm:left-10 md:left-16"
-                : `left-1/2 -translate-x-1/2 ${isSession ? "text-lg" : "text-2xl"}`
-            }`}
-            style={isElectron ? noDragStyle : undefined}
-          >
-            {!isHome && (
+          {!isHome && (
+            <Link
+              to="/"
+              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ui-title flex items-center gap-2 tracking-tight pointer-events-auto ${isSession ? "text-lg" : "text-2xl"}`}
+              style={isElectron ? noDragStyle : undefined}
+            >
               <img
                 src="/icon.png"
                 alt=""
@@ -171,9 +167,9 @@ function RootLayout() {
                 className={`rounded-md object-cover ${isSession ? "h-6 w-6" : "h-8 w-8"}`}
                 draggable={false}
               />
-            )}
-            <span>Covel</span>
-          </Link>
+              <span>Covel</span>
+            </Link>
+          )}
 
           <div
             className={`w-full flex h-full items-center justify-between ${isMacDesktop ? "pl-[88px] pr-4 md:pr-6" : "px-4 md:px-6"}`}
