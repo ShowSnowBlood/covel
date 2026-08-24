@@ -1,6 +1,13 @@
 import { type CSSProperties } from "react";
 import type { TFunction } from "i18next";
-import { Eye, Trash2, ArrowRight } from "lucide-react";
+import {
+  Eye,
+  Trash2,
+  ArrowRight,
+  CheckCircle2,
+  LockKeyhole,
+} from "lucide-react";
+
 import type { WorldRecord } from "@/services/api.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { worldVisual } from "@/lib/world-visuals.js";
@@ -15,8 +22,16 @@ export interface WorldCardProps {
   dimmed: boolean;
   /** Resolved storage label (e.g. "Built-in", "Server file"). */
   storageLabel: string;
+  /** Sequential campaign level, or undefined for free-play worlds. */
+  levelNumber?: number;
+  locked?: boolean;
+  completed?: boolean;
+  lockLabel?: string;
+
   t: TFunction;
   onEnter: (worldId: string) => void;
+  onLocked?: () => void;
+
   onViewDetails: (e: React.MouseEvent, worldId: string) => void;
   onDelete: (e: React.MouseEvent, worldId: string) => void;
 }
@@ -32,8 +47,15 @@ export function WorldCard({
   isEntering,
   dimmed,
   storageLabel,
+  levelNumber,
+  locked = false,
+  completed = false,
+  lockLabel,
   t,
+
   onEnter,
+  onLocked,
+
   onViewDetails,
   onDelete,
 }: WorldCardProps) {
@@ -41,10 +63,18 @@ export function WorldCard({
   return (
     <article
       aria-busy={isEntering}
-      onClick={() => onEnter(world.id)}
-      className={`group relative min-h-[320px] md:min-h-[332px] cursor-pointer overflow-hidden rounded-[var(--radius-card)] border border-border bg-card transition-all hover:border-primary/40 ${
-        isEntering ? "opacity-100" : ""
-      } ${dimmed ? "opacity-30 pointer-events-none" : ""}`}
+      aria-disabled={locked}
+      onClick={() => (locked ? onLocked?.() : onEnter(world.id))}
+      className={`group relative min-h-[320px] md:min-h-[332px] overflow-hidden rounded-[var(--radius-card)] border border-border bg-card transition-all hover:border-primary/40 ${
+        locked
+          ? onLocked
+            ? "cursor-pointer"
+            : "cursor-not-allowed"
+          : "cursor-pointer"
+      } ${isEntering ? "opacity-100" : ""} ${
+        dimmed ? "opacity-30 pointer-events-none" : ""
+      }`}
+
       style={
         {
           "--world-accent": visual.accent,
@@ -62,7 +92,12 @@ export function WorldCard({
         height={1024}
         loading={index < 2 ? "eager" : "lazy"}
         fetchPriority={index < 2 ? "high" : "auto"}
-        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
+        className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 ${
+          locked
+            ? "scale-[1.01] grayscale opacity-55"
+            : "group-hover:scale-[1.025]"
+        }`}
+
         draggable={false}
       />
       <div
@@ -90,14 +125,42 @@ export function WorldCard({
       <div className="relative z-10 flex min-h-[320px] md:min-h-[332px] flex-col justify-between p-5 md:p-6 text-white">
         <div className="flex items-start justify-between gap-4">
           <span className="ui-meta text-[10px] text-white/62 tabular-nums">
-            № {String(index + 1).padStart(2, "0")} · {world.id}
+            {levelNumber
+              ? t("session.levelNumber", {
+                  level: levelNumber,
+                  defaultValue: "LEVEL {{level}}",
+                })
+              : `№ ${String(index + 1).padStart(2, "0")} · ${world.id}`}
           </span>
-          <span
-            className="ui-tag border-white/18 bg-black/18 text-white/70 backdrop-blur-sm"
-            title={t("session.worldStorage", "World storage")}
-          >
-            {storageLabel}
-          </span>
+          {levelNumber ? (
+            <span
+              className={`ui-tag inline-flex items-center gap-1.5 border-white/18 backdrop-blur-sm ${
+                completed
+                  ? "bg-emerald-950/55 text-emerald-200"
+                  : locked
+                    ? "bg-black/35 text-white/64"
+                    : "bg-white/12 text-white"
+              }`}
+            >
+              {completed ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : locked ? (
+                <LockKeyhole className="h-3 w-3" />
+              ) : null}
+              {completed
+                ? t("session.levelCompleted", "Completed")
+                : locked
+                  ? t("session.levelLocked", "Locked")
+                  : t("session.levelAvailable", "Available")}
+            </span>
+          ) : (
+            <span
+              className="ui-tag border-white/18 bg-black/18 text-white/70 backdrop-blur-sm"
+              title={t("session.worldStorage", "World storage")}
+            >
+              {storageLabel}
+            </span>
+          )}
         </div>
 
         <div className="space-y-3.5">
@@ -152,10 +215,20 @@ export function WorldCard({
             </div>
             <span
               className="ui-meta inline-flex items-center gap-1.5 transition-all group-hover:gap-2.5"
-              style={{ color: "var(--world-accent)" }}
+              style={{
+                color: locked ? "rgba(255,255,255,.58)" : "var(--world-accent)",
+              }}
             >
-              {t("session.enter", "Enter")}
-              <ArrowRight className="w-3 h-3" />
+              {locked
+                ? (lockLabel ?? t("session.levelLocked", "Locked"))
+                : completed
+                  ? t("session.levelReplay", "Play again")
+                  : t("session.enter", "Enter")}
+              {locked ? (
+                <LockKeyhole className="w-3 h-3" />
+              ) : (
+                <ArrowRight className="w-3 h-3" />
+              )}
             </span>
           </div>
         </div>

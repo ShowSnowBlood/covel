@@ -9,7 +9,11 @@ import {
   LayoutTemplate,
   ListTree,
   SlidersHorizontal,
+  Trophy,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
+
 import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/button.js";
 import { Toggle } from "@/components/ui/toggle.js";
@@ -36,6 +40,11 @@ interface GameViewHeaderProps {
   onBackToWorldSelect: () => void;
   onResetSession: () => void;
   suspensionsCount: number;
+  campaignLevel?: number;
+  canCompleteLevel: boolean;
+  levelCompleted: boolean;
+  completingLevel: boolean;
+  onCompleteLevel: () => void;
 }
 
 export function GameViewHeader({
@@ -54,6 +63,11 @@ export function GameViewHeader({
   onBackToWorldSelect,
   onResetSession,
   suspensionsCount,
+  campaignLevel,
+  canCompleteLevel,
+  levelCompleted,
+  completingLevel,
+  onCompleteLevel,
 }: GameViewHeaderProps) {
   return (
     <div className="ui-panel-header px-3 flex justify-between items-center gap-2 z-10">
@@ -133,6 +147,39 @@ export function GameViewHeader({
             <Clapperboard className="w-3.5 h-3.5" />
           </Toggle>
         </div>
+
+        {campaignLevel !== undefined && (
+          <Button
+            variant={levelCompleted ? "ghost" : "outline"}
+            size="sm"
+            className="h-7 shrink-0 gap-1.5 px-2 text-[10px] uppercase tracking-[0.12em]"
+            onClick={onCompleteLevel}
+            disabled={!canCompleteLevel || completingLevel || levelCompleted}
+            title={
+              levelCompleted
+                ? t("session.levelCompleted", "Completed")
+                : canCompleteLevel
+                  ? t("session.completeLevel", "Complete level")
+                  : t(
+                      "session.completeLevelHint",
+                      "Begin the story before completing this level.",
+                    )
+            }
+          >
+            {completingLevel ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : levelCompleted ? (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            ) : (
+              <Trophy className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden xl:inline">
+              {levelCompleted
+                ? t("session.levelCompleted", "Completed")
+                : t("session.completeLevel", "Complete level")}
+            </span>
+          </Button>
+        )}
 
         <Button
           variant="ghost"

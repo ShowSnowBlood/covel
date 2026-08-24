@@ -37,6 +37,12 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS frostfox_account_bindings_subject_uq
   ON frostfox_account_bindings(issuer, router_account_id);
+CREATE TABLE IF NOT EXISTS frostfox_account_progression (
+  local_user_id TEXT PRIMARY KEY,
+  completed_level INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (local_user_id) REFERENCES frostfox_account_bindings(local_user_id) ON DELETE CASCADE
+);
 `;
 
 const POSTGRES_DDL = `
@@ -64,6 +70,11 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
   updated_at TEXT NOT NULL,
   UNIQUE (issuer, router_account_id)
 );
+CREATE TABLE IF NOT EXISTS frostfox_account_progression (
+  local_user_id TEXT PRIMARY KEY REFERENCES frostfox_account_bindings(local_user_id) ON DELETE CASCADE,
+  completed_level INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
 `;
 
 export type FrostFoxCredentialState = "active" | "recovery_required";
@@ -90,6 +101,12 @@ export interface FrostFoxBinding {
   readonly updatedAt: string;
 }
 
+export interface FrostFoxProgression {
+  readonly localUserId: string;
+  readonly completedLevel: number;
+  readonly updatedAt: string;
+}
+
 export interface FrostFoxCredentialStore {
   createLoginTransaction(record: FrostFoxLoginTransaction): Promise<void>;
   consumeLoginTransaction(
@@ -103,6 +120,11 @@ export interface FrostFoxCredentialStore {
   ): Promise<FrostFoxBinding | null>;
   getBindingByLocalUserId(localUserId: string): Promise<FrostFoxBinding | null>;
   upsertBinding(record: FrostFoxBinding): Promise<FrostFoxBinding>;
+  getProgression(localUserId: string): Promise<FrostFoxProgression>;
+  setCompletedLevel(
+    localUserId: string,
+    completedLevel: number,
+  ): Promise<FrostFoxProgression>;
   deleteBinding(localUserId: string): Promise<void>;
   purgeExpiredTransactions(now: number): Promise<void>;
   close(): Promise<void>;
@@ -219,6 +241,7 @@ function aesGcmDecrypt(
 export function createMemoryCredentialStore(): FrostFoxCredentialStore {
   const transactions = new Map<string, FrostFoxLoginTransaction>();
   const bindings = new Map<string, FrostFoxBinding>();
+  const progressions = new Map<string, FrostFoxProgression>();
 
   return {
     async createLoginTransaction(record) {
@@ -259,8 +282,32 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
       bindings.set(next.localUserId, next);
       return next;
     },
+    async getProgression(localUserId) {
+      return (
+        progressions.get(localUserId) ?? {
+          localUserId,
+          completedLevel: 0,
+          updatedAt: "",
+        }
+      );
+    },
+    async setCompletedLevel(localUserId, completedLevel) {
+      const existing = progressions.get(localUserId);
+      const next: FrostFoxProgression = {
+        localUserId,
+        completedLevel: Math.max(
+          existing?.completedLevel ?? 0,
+          Math.max(0, Math.floor(completedLevel)),
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+      progressions.set(localUserId, next);
+      return next;
+    },
+
     async deleteBinding(localUserId) {
       bindings.delete(localUserId);
+      progressions.delete(localUserId);
     },
     async purgeExpiredTransactions(now) {
       for (const [key, record] of transactions) {
@@ -270,6 +317,7 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
     async close() {
       transactions.clear();
       bindings.clear();
+      progressions.clear();
     },
   };
 }
@@ -281,6 +329,8 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
   }
   const db = new Database(dbPath);
   db.pragma("busy_timeout = 5000");
+  db.pragma("foreign_keys = ON");
+
   db.exec(SQLITE_DDL);
 
   const insertTransaction = db.prepare(`
@@ -317,6 +367,18 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
       updated_at = excluded.updated_at
     RETURNING *
   `);
+  const progressionByLocalUser = db.prepare(`
+    SELECT * FROM frostfox_account_progression WHERE local_user_id = ?
+  `);
+  const upsertProgression = db.prepare(`
+    INSERT INTO frostfox_account_progression (local_user_id, completed_level, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(local_user_id) DO UPDATE SET
+      completed_level = max(frostfox_account_progression.completed_level, excluded.completed_level),
+      updated_at = excluded.updated_at
+    RETURNING *
+  `);
+
   const deleteBinding = db.prepare(
     "DELETE FROM frostfox_account_bindings WHERE local_user_id = ?",
   );
@@ -350,6 +412,21 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
       const row = upsertBinding.get(...bindingParams(record));
       if (!row) throw new Error("failed to upsert FrostFox binding");
       return mapBindingRow(row);
+    },
+    async getProgression(localUserId) {
+      const row = progressionByLocalUser.get(localUserId);
+      return row
+        ? mapProgressionRow(row)
+        : { localUserId, completedLevel: 0, updatedAt: "" };
+    },
+    async setCompletedLevel(localUserId, completedLevel) {
+      const row = upsertProgression.get(
+        localUserId,
+        Math.max(0, Math.floor(completedLevel)),
+        new Date().toISOString(),
+      );
+      if (!row) throw new Error("failed to upsert FrostFox progression");
+      return mapProgressionRow(row);
     },
     async deleteBinding(localUserId) {
       deleteBinding.run(localUserId);
@@ -431,6 +508,33 @@ async function createPostgresCredentialStore(
       if (!rows[0]) throw new Error("failed to upsert FrostFox binding");
       return mapBindingRow(rows[0]);
     },
+    async getProgression(localUserId) {
+      const rows = await sql.unsafe(
+        "SELECT * FROM frostfox_account_progression WHERE local_user_id = $1",
+        [localUserId],
+      );
+      return rows[0]
+        ? mapProgressionRow(rows[0])
+        : { localUserId, completedLevel: 0, updatedAt: "" };
+    },
+    async setCompletedLevel(localUserId, completedLevel) {
+      const rows = await sql.unsafe(
+        `INSERT INTO frostfox_account_progression (local_user_id, completed_level, updated_at)
+         VALUES ($1, $2, $3)
+         ON CONFLICT(local_user_id) DO UPDATE SET
+           completed_level = greatest(frostfox_account_progression.completed_level, excluded.completed_level),
+           updated_at = excluded.updated_at
+         RETURNING *`,
+        [
+          localUserId,
+          Math.max(0, Math.floor(completedLevel)),
+          new Date().toISOString(),
+        ],
+      );
+      if (!rows[0]) throw new Error("failed to upsert FrostFox progression");
+      return mapProgressionRow(rows[0]);
+    },
+
     async deleteBinding(localUserId) {
       await sql.unsafe(
         "DELETE FROM frostfox_account_bindings WHERE local_user_id = $1",
@@ -495,6 +599,14 @@ function mapBindingRow(row: unknown): FrostFoxBinding {
     ),
     lastVerifiedAt: String(value.last_verified_at),
     createdAt: String(value.created_at),
+    updatedAt: String(value.updated_at),
+  };
+}
+function mapProgressionRow(row: unknown): FrostFoxProgression {
+  const value = asRow(row);
+  return {
+    localUserId: String(value.local_user_id),
+    completedLevel: Number(value.completed_level),
     updatedAt: String(value.updated_at),
   };
 }

@@ -12,7 +12,11 @@ import { SettingsDialog } from "@/settings/SettingsDialog.js";
 import { WorldDetailView } from "@/components/world/world-detail-view.js";
 import { WorldEditor } from "@/components/world/world-editor.js";
 import { AiWorldGenerator } from "@/components/world/ai-world-generator.js";
-import { WorldListView } from "@/components/world/world-list-view.js";
+import {
+  WorldListView,
+  type LevelProgressionMode,
+} from "@/components/world/world-list-view.js";
+
 import * as api from "@/services/api.js";
 import type { WorldRecord, PackageSummary } from "@/services/api.js";
 import { text } from "@/components/world/editor-helpers.js";
@@ -85,6 +89,38 @@ export function WorldSelectScreen({
   const [enteringWorldId, setEnteringWorldId] = useState<string | null>(null);
   const [deletingWorldId, setDeletingWorldId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [progressionMode, setProgressionMode] =
+    useState<LevelProgressionMode>("loading");
+  const [progression, setProgression] =
+    useState<api.FrostFoxProgressionStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProgression() {
+      try {
+        const account = await api.fetchFrostFoxAccount(true);
+        if (cancelled) return;
+        if (!account.enabled) {
+          setProgressionMode("disabled");
+          return;
+        }
+        if (!account.authenticated) {
+          setProgressionMode("account-required");
+          return;
+        }
+        const next = await api.fetchFrostFoxProgression(true);
+        if (cancelled) return;
+        setProgression(next);
+        setProgressionMode("ready");
+      } catch {
+        if (!cancelled) setProgressionMode("error");
+      }
+    }
+    void loadProgression();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Entering a world used to defer the actual navigation to
   // `requestAnimationFrame`, so the busy state could paint one frame first.
@@ -231,8 +267,13 @@ export function WorldSelectScreen({
         enteringWorldId={enteringWorldId}
         storageLabel={worldStorageLabel}
         onOpenGenerator={() => setGeneratorOpen(true)}
+        progressionMode={progressionMode}
+        progression={progression}
+
         onOpenSettings={() => onSettingsOpenChange(true)}
         onEnterWorld={handleEnterWorld}
+        onConnectAccount={() => window.location.assign("/auth/frostfox/start")}
+
         onViewDetails={handleViewDetails}
         onDeleteWorld={handleDeleteClick}
       />

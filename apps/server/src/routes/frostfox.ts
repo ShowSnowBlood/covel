@@ -155,6 +155,85 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
     }
   });
 
+  app.get("/api/frostfox/progression", async (c) => {
+    noStore(c);
+    if (!service) {
+      return c.json(
+        errorBody("FrostFox account connection is not enabled", {
+          code: "frostfox_saas_disabled",
+        }),
+        404,
+      );
+    }
+    const principal = c.get("frostFoxPrincipal");
+    if (!principal) {
+      return c.json(
+        errorBody("FrostFox account connection required", {
+          code: "frostfox_account_required",
+        }),
+        401,
+      );
+    }
+    try {
+      return c.json(await service.getProgression(principal));
+    } catch (error) {
+      return serviceError(c, error);
+    }
+  });
+
+  app.post("/api/frostfox/progression/complete", async (c) => {
+    noStore(c);
+    if (!service) {
+      return c.json(
+        errorBody("FrostFox account connection is not enabled", {
+          code: "frostfox_saas_disabled",
+        }),
+        404,
+      );
+    }
+    if (!hasExpectedOrigin(c, service)) {
+      return c.json(
+        errorBody("Request origin is not allowed", {
+          code: "frostfox_origin_invalid",
+        }),
+        403,
+      );
+    }
+    const principal = c.get("frostFoxPrincipal");
+    if (!principal) {
+      return c.json(
+        errorBody("FrostFox account connection required", {
+          code: "frostfox_account_required",
+        }),
+        401,
+      );
+    }
+    const body: unknown = await c.req.json().catch(() => null);
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
+      typeof (body as { worldId?: unknown }).worldId !== "string"
+    ) {
+      return c.json(
+        errorBody("worldId is required", {
+          code: "frostfox_level_input_invalid",
+        }),
+        400,
+      );
+    }
+    try {
+      return c.json(
+        await service.completeLevel(
+          principal,
+          (body as { worldId: string }).worldId,
+        ),
+      );
+    } catch (error) {
+      return serviceError(c, error);
+    }
+  });
+
   app.post("/api/frostfox/logout", async (c) => {
     noStore(c);
     if (service && !hasExpectedOrigin(c, service)) {

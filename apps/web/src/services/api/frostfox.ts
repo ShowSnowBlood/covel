@@ -36,6 +36,12 @@ export interface FrostFoxModelCatalog {
   readonly configurationVersion: string;
   readonly channels: readonly FrostFoxManagedChannel[];
 }
+export interface FrostFoxProgressionStatus {
+  readonly completedLevel: number;
+  readonly unlockedLevel: number;
+  readonly totalLevels: number;
+  readonly updatedAt: string | null;
+}
 
 export async function fetchFrostFoxAccount(
   silentErrors = false,
@@ -51,6 +57,25 @@ export async function fetchFrostFoxModels(
   return request<FrostFoxModelCatalog>("/api/frostfox/models", {
     silentErrors,
   });
+}
+export async function fetchFrostFoxProgression(
+  silentErrors = false,
+): Promise<FrostFoxProgressionStatus> {
+  return request<FrostFoxProgressionStatus>("/api/frostfox/progression", {
+    silentErrors,
+  });
+}
+
+export async function completeFrostFoxLevel(
+  worldId: string,
+): Promise<FrostFoxProgressionStatus> {
+  return request<FrostFoxProgressionStatus>(
+    "/api/frostfox/progression/complete",
+    {
+      method: "POST",
+      body: JSON.stringify({ worldId }),
+    },
+  );
 }
 
 export async function signOutFrostFox(): Promise<void> {

@@ -1,4 +1,6 @@
+import { FROSTFOX_LEVEL_COUNT, frostFoxLevelForWorld } from "@covel/shared";
 import type { TFunction } from "i18next";
+
 import {
   Sparkles,
   KeyRound,
@@ -6,11 +8,18 @@ import {
   Wand2,
   FolderOpen,
   ArrowRight,
+  Check,
+  LockKeyhole,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button.js";
 import { ScrollArea } from "@/components/ui/scroll-area.js";
 import type { WorldRecord } from "@/services/api.js";
 import { WorldCard } from "@/components/world/world-card.js";
+import type { FrostFoxProgressionStatus } from "@/services/api.js";
+
+export type LevelProgressionMode =
+  "loading" | "disabled" | "account-required" | "ready" | "error";
 
 export interface WorldListViewProps {
   worlds: WorldRecord[];
@@ -23,8 +32,13 @@ export interface WorldListViewProps {
   enteringWorldId: string | null;
   /** Resolve a storage label for a world (Built-in / Server / Browser …). */
   storageLabel: (world: WorldRecord) => string;
+  progressionMode: LevelProgressionMode;
+  progression: FrostFoxProgressionStatus | null;
+
   onOpenGenerator: () => void;
   onOpenSettings: () => void;
+  onConnectAccount: () => void;
+
   onEnterWorld: (worldId: string) => void;
   onViewDetails: (e: React.MouseEvent, worldId: string) => void;
   onDeleteWorld: (e: React.MouseEvent, worldId: string) => void;
@@ -42,12 +56,32 @@ export function WorldListView({
   enabledPluginCount,
   enteringWorldId,
   storageLabel,
+  progressionMode,
+  progression,
   onOpenGenerator,
+
   onOpenSettings,
+  onConnectAccount,
+
   onEnterWorld,
   onViewDetails,
   onDeleteWorld,
 }: WorldListViewProps) {
+  const campaignEnabled = progressionMode !== "disabled";
+  const orderedWorlds = campaignEnabled
+    ? [...worlds].sort((left, right) => {
+        const leftLevel = frostFoxLevelForWorld(left.id);
+        const rightLevel = frostFoxLevelForWorld(right.id);
+        if (leftLevel !== null && rightLevel !== null)
+          return leftLevel - rightLevel;
+        if (leftLevel !== null) return -1;
+        if (rightLevel !== null) return 1;
+        return 0;
+      })
+    : worlds;
+  const completedLevel = progression?.completedLevel ?? 0;
+  const unlockedLevel = progression?.unlockedLevel ?? 0;
+
   return (
     <ScrollArea className="w-full h-full">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-10 py-5 md:py-8">
@@ -131,12 +165,129 @@ export function WorldListView({
           </aside>
         </header>
 
+        {campaignEnabled && (
+          <section
+            aria-label={t("session.levelProgress", "Level progress")}
+            className="mb-5 overflow-hidden rounded-[var(--radius-card)] border border-border bg-card/72"
+          >
+            <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div>
+                <p className="ui-eyebrow text-primary">
+                  {t("session.campaignRoute", "Campaign route")}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {progressionMode === "loading"
+                    ? t("session.levelProgressLoading", "Loading progress…")
+                    : progressionMode === "account-required"
+                      ? t(
+                          "session.levelAccountRequired",
+                          "Sign in to start and save your progress.",
+                        )
+                      : progressionMode === "error"
+                        ? t(
+                            "session.levelProgressError",
+                            "Progress is unavailable. Try again shortly.",
+                          )
+                        : completedLevel >= FROSTFOX_LEVEL_COUNT
+                          ? t(
+                              "session.allLevelsCompleted",
+                              "All levels completed.",
+                            )
+                          : t("session.nextLevelUnlocked", {
+                              level: unlockedLevel,
+                              defaultValue: "Level {{level}} is unlocked.",
+                            })}
+                </p>
+              </div>
+              {progressionMode === "account-required" ? (
+                <Button size="sm" onClick={onConnectAccount}>
+                  {t("account.connectAction", "Connect account")}
+                </Button>
+              ) : progressionMode === "ready" ? (
+                <p className="ui-meta tabular-nums text-foreground">
+                  {t("session.levelProgressCount", {
+                    completed: completedLevel,
+                    total: FROSTFOX_LEVEL_COUNT,
+                    defaultValue: "{{completed}} / {{total}} cleared",
+                  })}
+                </p>
+              ) : null}
+            </div>
+            <ol className="grid grid-cols-3">
+              {Array.from({ length: FROSTFOX_LEVEL_COUNT }, (_, index) => {
+                const level = index + 1;
+                const completed = level <= completedLevel;
+                const available =
+                  progressionMode === "ready" && level === unlockedLevel;
+                return (
+                  <li
+                    key={level}
+                    className={`flex items-center gap-2.5 border-r border-border px-3 py-3 last:border-r-0 sm:px-5 ${
+                      available ? "bg-primary/[0.06]" : ""
+                    }`}
+                  >
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold tabular-nums ${
+                        completed
+                          ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-600"
+                          : available
+                            ? "border-primary/50 bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      {completed ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : level > unlockedLevel ||
+                        progressionMode !== "ready" ? (
+                        <LockKeyhole className="h-3 w-3" />
+                      ) : (
+                        level
+                      )}
+                    </span>
+                    <span className="ui-meta hidden text-foreground sm:inline">
+                      {t("session.levelNumber", {
+                        level,
+                        defaultValue: "LEVEL {{level}}",
+                      })}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        )}
+
         {/* World list — cover-led plates with the same action surface. */}
-        {worlds.length > 0 && (
+        {orderedWorlds.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-            {worlds.map((world, index) => {
+            {orderedWorlds.map((world, index) => {
               const isEntering = enteringWorldId === world.id;
               const dimmed = enteringWorldId !== null && !isEntering;
+              const levelNumber = campaignEnabled
+                ? (frostFoxLevelForWorld(world.id) ?? undefined)
+                : undefined;
+              const completed =
+                levelNumber !== undefined && levelNumber <= completedLevel;
+              const locked =
+                levelNumber !== undefined &&
+                (progressionMode !== "ready" || levelNumber > unlockedLevel);
+              const lockLabel =
+                progressionMode === "account-required"
+                  ? t("session.levelSignIn", "Sign in to unlock")
+                  : progressionMode === "loading"
+                    ? t("session.levelProgressLoading", "Loading progress…")
+                    : progressionMode === "error"
+                      ? t(
+                          "session.levelProgressUnavailable",
+                          "Progress unavailable",
+                        )
+                      : levelNumber !== undefined
+                        ? t("session.completePriorLevel", {
+                            level: levelNumber - 1,
+                            defaultValue: "Clear level {{level}} first",
+                          })
+                        : undefined;
+
               return (
                 <WorldCard
                   key={world.id}
@@ -145,8 +296,19 @@ export function WorldListView({
                   isEntering={isEntering}
                   dimmed={dimmed}
                   storageLabel={storageLabel(world)}
+                  levelNumber={levelNumber}
+                  locked={locked}
+                  completed={completed}
+                  lockLabel={lockLabel}
+
                   t={t}
                   onEnter={onEnterWorld}
+                  onLocked={
+                    progressionMode === "account-required"
+                      ? onConnectAccount
+                      : undefined
+                  }
+
                   onViewDetails={onViewDetails}
                   onDelete={onDeleteWorld}
                 />
@@ -155,7 +317,7 @@ export function WorldListView({
           </div>
         )}
 
-        {worlds.length === 0 && (
+        {orderedWorlds.length === 0 && (
           <div className="text-center py-16 md:py-24 border-y border-dashed border-[var(--rule-color)]">
             <FolderOpen className="w-10 h-10 mx-auto text-muted-foreground/60" />
             <h2 className="font-display font-bold text-xl mt-5">

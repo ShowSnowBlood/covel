@@ -126,6 +126,27 @@ describe("FrostFox first-party SaaS", () => {
     expect(await service!.resolvePrincipal(connected.sessionToken)).toEqual(
       connected.principal,
     );
+    expect(await service!.getProgression(connected.principal)).toEqual({
+      completedLevel: 0,
+      unlockedLevel: 1,
+      totalLevels: 3,
+      updatedAt: null,
+    });
+    await expect(
+      service!.completeLevel(connected.principal, "haruka-academy"),
+    ).rejects.toMatchObject({
+      code: "frostfox_level_locked",
+      status: 409,
+    });
+    expect(
+      await service!.completeLevel(connected.principal, "mistport"),
+    ).toMatchObject({ completedLevel: 1, unlockedLevel: 2, totalLevels: 3 });
+    expect(
+      await service!.completeLevel(connected.principal, "mistport"),
+    ).toMatchObject({ completedLevel: 1, unlockedLevel: 2 });
+    expect(
+      await service!.completeLevel(connected.principal, "haruka-academy"),
+    ).toMatchObject({ completedLevel: 2, unlockedLevel: 3 });
 
     const context = await service!.prepareAiContext(connected.principal);
     const providerId = service!.clientConfig.providers()[0]!.providerId;

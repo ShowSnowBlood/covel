@@ -1,3 +1,5 @@
+import { frostFoxLevelForWorld } from "@covel/shared";
+
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { usePanelCollapse } from "./game-view/use-panel-collapse.js";
@@ -24,7 +26,14 @@ import { StageView } from "./stage/StageView.js";
 import { hasSubmittedForm } from "./stage/stage-selectors.js";
 import { useStageMediaPreload } from "./stage/use-stage-media-preload.js";
 import { useSession } from "@/stores/session-store.js";
-import type { SessionRecord } from "@/services/api.js";
+import {
+  completeFrostFoxLevel,
+  fetchFrostFoxProgression,
+  updateSession,
+  type FrostFoxProgressionStatus,
+  type SessionRecord,
+} from "@/services/api.js";
+
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
 import { useDocumentSessionState } from "@/hooks/use-document-session-state.js";
 import { LeftPanel } from "./left-panel.js";
@@ -84,6 +93,60 @@ export function GameView({ session }: GameViewProps) {
     submittedBlockValues,
   } = state;
   const { t } = useTranslation();
+  const campaignLevel = world ? frostFoxLevelForWorld(world.id) : null;
+  const [levelProgression, setLevelProgression] =
+    useState<FrostFoxProgressionStatus | null>(null);
+  const [completingLevel, setCompletingLevel] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (campaignLevel === null) {
+      setLevelProgression(null);
+      return;
+    }
+    fetchFrostFoxProgression(true)
+      .then((next) => {
+        if (!cancelled) setLevelProgression(next);
+      })
+      .catch(() => {
+        if (!cancelled) setLevelProgression(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignLevel]);
+
+  const levelCompleted =
+    campaignLevel !== null &&
+    levelProgression !== null &&
+    campaignLevel <= levelProgression.completedLevel;
+  const canCompleteLevel =
+    campaignLevel !== null &&
+    levelProgression !== null &&
+    campaignLevel === levelProgression.unlockedLevel &&
+    session.turnCount > 0 &&
+    !executing;
+
+  async function handleCompleteLevel() {
+    if (campaignLevel === null || !canCompleteLevel || completingLevel) return;
+    setCompletingLevel(true);
+    try {
+      const next = await completeFrostFoxLevel(world!.id);
+      setLevelProgression(next);
+      try {
+        await updateSession(session.id, { status: "ended" });
+      } catch {
+        // Progression is authoritative; request() already reports the
+        // secondary session-status failure to the player.
+      }
+      onBackToWorldSelect();
+    } catch {
+      // request() already surfaced the completion failure.
+    } finally {
+      setCompletingLevel(false);
+    }
+  }
+
   const { resolvedSlots, refresh: refreshSlots } = useSlotConfig(
     presets,
     llmConfig,
@@ -395,6 +458,11 @@ export function GameView({ session }: GameViewProps) {
                 onBackToWorldSelect={onBackToWorldSelect}
                 onResetSession={onResetSession}
                 suspensionsCount={suspensions.length}
+                campaignLevel={campaignLevel ?? undefined}
+                canCompleteLevel={canCompleteLevel}
+                levelCompleted={levelCompleted}
+                completingLevel={completingLevel}
+                onCompleteLevel={handleCompleteLevel}
               />
             </div>
           )}

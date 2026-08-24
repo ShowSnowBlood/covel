@@ -7,7 +7,12 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { SlotOverridesInput } from "@covel/ai-provider";
-import type { DeploymentTier } from "@covel/shared";
+import {
+  FROSTFOX_LEVEL_COUNT,
+  frostFoxLevelForWorld,
+  type DeploymentTier,
+} from "@covel/shared";
+
 import type { AiStack } from "../ai-setup.js";
 import {
   basicAuthorization,
@@ -76,6 +81,13 @@ export interface FrostFoxModelCatalog {
   readonly configurationVersion: string;
   readonly channels: readonly FrostFoxModelChannel[];
 }
+export interface FrostFoxProgressionStatus {
+  readonly completedLevel: number;
+  readonly unlockedLevel: number;
+  readonly totalLevels: number;
+  readonly updatedAt: string | null;
+}
+
 export interface FrostFoxAiContext {
   readonly principal: FrostFoxPrincipal;
   readonly apiKeys: Record<string, string>;
@@ -308,6 +320,33 @@ export class FrostFoxService {
   async unbind(principal: FrostFoxPrincipal): Promise<void> {
     await this.store.deleteBinding(principal.localUserId);
     this.modelCache.delete(principal.localUserId);
+  }
+  async getProgression(
+    principal: FrostFoxPrincipal,
+  ): Promise<FrostFoxProgressionStatus> {
+    await this.requiredBinding(principal.localUserId);
+    const progression = await this.store.getProgression(principal.localUserId);
+    return progressionStatus(progression.completedLevel, progression.updatedAt);
+  }
+
+  async completeLevel(
+    principal: FrostFoxPrincipal,
+    worldId: string,
+  ): Promise<FrostFoxProgressionStatus> {
+    await this.requiredBinding(principal.localUserId);
+    const level = frostFoxLevelForWorld(worldId);
+    if (level === null) {
+      throw new FrostFoxServiceError("frostfox_unknown_level", 400);
+    }
+    const current = await this.store.getProgression(principal.localUserId);
+    if (level > current.completedLevel + 1) {
+      throw new FrostFoxServiceError("frostfox_level_locked", 409);
+    }
+    const progression = await this.store.setCompletedLevel(
+      principal.localUserId,
+      level,
+    );
+    return progressionStatus(progression.completedLevel, progression.updatedAt);
   }
 
   async handleGatewayUnauthorized(principal: FrostFoxPrincipal): Promise<void> {
@@ -677,6 +716,17 @@ function principalFromBinding(binding: FrostFoxBinding): FrostFoxPrincipal {
     balance: binding.balance,
     credentialState: binding.credentialState,
     lastVerifiedAt: binding.lastVerifiedAt,
+  };
+}
+function progressionStatus(
+  completedLevel: number,
+  updatedAt: string,
+): FrostFoxProgressionStatus {
+  return {
+    completedLevel,
+    unlockedLevel: Math.min(completedLevel + 1, FROSTFOX_LEVEL_COUNT),
+    totalLevels: FROSTFOX_LEVEL_COUNT,
+    updatedAt: updatedAt || null,
   };
 }
 

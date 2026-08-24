@@ -16,6 +16,11 @@ export {
   MAX_WORKING_MEMORY_VALUE_CHARS,
   workingMemoryQuotaViolation,
 } from "./utils/working-memory-quota.js";
+export {
+  FROSTFOX_LEVEL_COUNT,
+  FROSTFOX_LEVEL_WORLD_IDS,
+  frostFoxLevelForWorld,
+} from "./frostfox-progression.js";
 export type { WorkingMemoryQuotaViolation } from "./utils/working-memory-quota.js";
 export {
   MAX_CACHE_BREAKPOINTS,
