@@ -108,6 +108,7 @@ describe("normalize golden (bundled plugin set)", () => {
       "char-creator/character-tracker",
       "codex",
       "core-quest",
+      "faction-reputation",
       "guide",
       "inventory",
       "mimo-tts/auto-narrate",
