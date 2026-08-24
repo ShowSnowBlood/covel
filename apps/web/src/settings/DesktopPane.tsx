@@ -447,7 +447,7 @@ export function DesktopPane() {
           />
         </div>
         <div className="flex items-start gap-1.5 pt-1 text-xs text-muted-foreground">
-          <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+          <Info className="w-3 h-3 mt-0.5 shrink-0" />
           <span>
             {t("settings.desktopKeysNote", {
               path: info?.keysEnvPath ?? "~/.covel/keys.env",
@@ -470,7 +470,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="text-muted-foreground min-w-[80px]">{label}:</span>
+      <span className="text-muted-foreground min-w-20">{label}:</span>
       <span
         className={`flex-1 break-all ${mono ? "font-mono text-[11px]" : ""}`}
       >

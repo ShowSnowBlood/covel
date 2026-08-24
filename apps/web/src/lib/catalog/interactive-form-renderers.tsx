@@ -65,7 +65,7 @@ export const Tabs: ComponentRenderer = ({ element, bindings }) => {
               else if (bindPath) set(bindPath, tab.value);
             }}
             className={clsx(
-              "inline-flex items-center gap-1 px-2 py-1 text-[11px] border-b-2 -mb-[5px] transition-colors",
+              "inline-flex items-center gap-1 px-2 py-1 text-[11px] border-b-2 -mb-1.25 transition-colors",
               "ui-eyebrow px-2.5 py-1 border-b-[1.5px]",
               active
                 ? clsx("text-foreground", accent || "border-foreground")

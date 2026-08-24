@@ -21,7 +21,7 @@ export function text(v: I18nText | undefined, locale?: string): string {
 export const inputCls =
   "w-full border border-border bg-background px-3 py-2 text-sm";
 export const textareaCls =
-  "w-full border border-border bg-background px-3 py-2 text-sm min-h-[80px] resize-y";
+  "w-full border border-border bg-background px-3 py-2 text-sm min-h-20 resize-y";
 export const selectCls = "border border-border bg-background px-3 py-2 text-sm";
 
 export type DimensionsState = WorldDimensions;

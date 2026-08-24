@@ -113,7 +113,7 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
           const busy = uploadingKey === entry.key;
           return (
             <div key={entry.key} className="space-y-1">
-              <div className="group relative overflow-hidden rounded-[var(--radius-card)] border border-border bg-card/60 transition-colors hover:border-primary/40">
+              <div className="group relative overflow-hidden rounded-(--radius-card) border border-border bg-card/60 transition-colors hover:border-primary/40">
                 <button
                   type="button"
                   className="block w-full cursor-zoom-in disabled:cursor-default"
@@ -134,7 +134,7 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
                       fit="cover"
                     />
                   ) : (
-                    <div className="flex aspect-[3/4] items-center justify-center text-muted-foreground/50">
+                    <div className="flex aspect-3/4 items-center justify-center text-muted-foreground/50">
                       <ImageIcon className="h-5 w-5" />
                     </div>
                   )}

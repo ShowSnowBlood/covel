@@ -63,7 +63,7 @@ export const Card: ComponentRenderer = ({ element, children }) => {
     // Used heavily by plugins for choice grids — needs comfortable padding
     // and inter-child spacing or the content reads as a wall of text.
     return (
-      <div className="px-3 py-3 space-y-2 border-l-2 border-[var(--rule-color)] hover:border-[var(--accent-primary)] transition-colors">
+      <div className="px-3 py-3 space-y-2 border-l-2 border-(--rule-color) hover:border-(--accent-primary) transition-colors">
         {body}
       </div>
     );

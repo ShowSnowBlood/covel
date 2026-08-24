@@ -68,7 +68,7 @@ export function WorldDetailView({
 
         {/* Description */}
         {world.description && (
-          <p className="text-sm text-muted-foreground break-words [overflow-wrap:anywhere]">
+          <p className="text-sm text-muted-foreground wrap-break-word">
             {text(world.description)}
           </p>
         )}

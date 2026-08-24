@@ -148,11 +148,11 @@ function RuntimeChip({
       }
     >
       <StatusIcon status={rt.status} />
-      <span className="font-medium truncate max-w-[120px] ui-chip-name">
+      <span className="font-medium truncate max-w-30 ui-chip-name">
         {rt.label}
       </span>
       {rt.status === "tool" && rt.toolName && (
-        <span className="text-[10px] text-muted-foreground truncate max-w-[140px] font-mono">
+        <span className="text-[10px] text-muted-foreground truncate max-w-35 font-mono">
           {rt.toolName}
         </span>
       )}

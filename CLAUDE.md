@@ -82,9 +82,11 @@ Provider API keys flow through the `SettingsStore` too: writes end up in `keys.e
 
 ## Monorepo Structure
 
-- pnpm workspaces + Turborepo. `pnpm@11.9.0`, Node ≥ 26 (dev scripts use `--env-file-if-exists`).
+- pnpm workspaces + Turborepo. `pnpm@11.22.0`, Node ≥ 26 (dev scripts use `--env-file-if-exists`).
 - ESM-only (`"type": "module"`), TypeScript strict, ES2022, NodeNext module resolution — **use `.js` extensions in TS imports**.
 - Packages export TS source directly (`"import": "./src/index.ts"`) — no build step for dev.
+- Run Tailwind diagnostics through `apps/web/scripts/check-tailwind-canonical.mjs`. Keep `tailwind-lint` read-only: v0.12.1 can treat ordinary TypeScript identifiers as classes and corrupt them through `--fix`.
+- Canonical numeric Tailwind utilities depend on the default `--spacing` scale. Audit fixed-layout geometry before overriding that token globally.
 
 - Top level: `apps/` (web · server · desktop) · `packages/` · `plugins/` (see [docs/reference/plugins.md](./docs/reference/plugins.md)) · `prompts/` (externalised locale-aware prompt templates) · `worlds/` — **`worlds/_archive/` is not loaded**.
 - `@covel/settings` carries the unified SettingsStore + localStorage/json-file backends, split out of `shared` so pure-type consumers avoid pulling in browser/Electron code.

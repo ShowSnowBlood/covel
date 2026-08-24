@@ -9,7 +9,7 @@ Thanks for considering contributing! This document outlines the process for cont
 ## Development environment
 
 - Node.js ≥ 26
-- pnpm 11.9.0 (see the root `package.json` `packageManager`)
+- pnpm 11.22.0 (see the root `package.json` `packageManager`)
 - Optional: Docker (for PostgreSQL mode)
 
 ```bash

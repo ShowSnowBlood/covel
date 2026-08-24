@@ -229,7 +229,7 @@ export function LlmPresetsPane() {
         </Button>
       </div>
 
-      <div className="grid min-h-[28rem] grid-cols-[10.5rem_minmax(0,1fr)] border border-border">
+      <div className="grid min-h-112 grid-cols-[10.5rem_minmax(0,1fr)] border border-border">
         <aside className="flex min-w-0 flex-col border-r border-border bg-muted/10">
           <div className="border-b border-border p-2">
             <div className="relative">

@@ -54,7 +54,7 @@ export function PluginItem({
   const toggleDisabled = executing === true || isLocked;
 
   return (
-    <div className="border border-border rounded-[var(--radius-card)] overflow-hidden">
+    <div className="border border-border rounded-(--radius-card) overflow-hidden">
       <div className="flex items-center gap-0 hover:bg-muted/50 transition-colors">
         <button
           type="button"

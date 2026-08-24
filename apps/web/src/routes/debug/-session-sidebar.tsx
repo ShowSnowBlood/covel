@@ -16,8 +16,8 @@ export function SessionSidebar({
   const { t } = useTranslation();
 
   return (
-    <div className="w-56 flex-shrink-0 border-r border-[var(--rule-color)] flex flex-col min-h-0 ui-rail">
-      <div className="px-3 py-2 border-b border-[var(--rule-color)]">
+    <div className="w-56 shrink-0 border-r border-(--rule-color) flex flex-col min-h-0 ui-rail">
+      <div className="px-3 py-2 border-b border-(--rule-color)">
         <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t("debugger.sessions")}
         </h2>

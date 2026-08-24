@@ -165,7 +165,7 @@ export function PluginShowcase() {
       aria-labelledby="plugins-heading"
       className="relative w-full bg-card border-t border-border"
     >
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-20 md:py-28">
+      <div className="max-w-350 mx-auto px-6 md:px-10 py-20 md:py-28">
         <div
           ref={headerRef}
           className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-12 items-end mb-12 md:mb-16 transition-all duration-700"
@@ -196,7 +196,7 @@ export function PluginShowcase() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 md:auto-rows-[200px] gap-px bg-border border border-border rounded-[var(--radius-card)] overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-6 md:auto-rows-50 gap-px bg-border border border-border rounded-(--radius-card) overflow-hidden">
           {cards.map((card, i) => (
             <PluginCard
               key={card.tile.key}

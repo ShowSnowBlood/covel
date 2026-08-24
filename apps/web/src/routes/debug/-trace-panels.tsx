@@ -169,7 +169,7 @@ export function TurnCard({
       {expanded && (
         <div className="border-t border-border">
           {runtimes.length > 0 && (
-            <div className="px-3 py-2 space-y-1 border-b border-[var(--rule-color)] ui-rail">
+            <div className="px-3 py-2 space-y-1 border-b border-(--rule-color) ui-rail">
               <h4 className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                 {t("debugger.runtimes")}
               </h4>
@@ -264,10 +264,10 @@ function RuntimeRow({
     <div
       className={`border ${
         runtime.status === "completed"
-          ? "border-emerald-500/15 bg-emerald-500/[0.02]"
+          ? "border-emerald-500/15 bg-emerald-500/2"
           : runtime.status === "failed"
-            ? "border-destructive/15 bg-destructive/[0.02]"
-            : "border-blue-500/15 bg-blue-500/[0.02]"
+            ? "border-destructive/15 bg-destructive/2"
+            : "border-blue-500/15 bg-blue-500/2"
       }`}
     >
       <button
@@ -363,7 +363,7 @@ function EventRow({
       <Icon className={`w-3 h-3 shrink-0 ${style.color}`} />
 
       <span
-        className={`font-mono text-[10px] ${style.color} shrink-0 min-w-[120px]`}
+        className={`font-mono text-[10px] ${style.color} shrink-0 min-w-30`}
       >
         {displayType}
       </span>

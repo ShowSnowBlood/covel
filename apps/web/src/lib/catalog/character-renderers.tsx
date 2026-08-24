@@ -79,7 +79,7 @@ function BlueprintChip({
       className={clsx(
         "ui-chip inline-flex max-w-full items-center px-1.5 py-0.5 text-[9px] leading-none border",
         tone === "primary" &&
-          "border-[var(--accent-primary)]/30 bg-[color-mix(in_oklab,var(--accent-primary)_10%,transparent)] text-[var(--accent-primary)]",
+          "border-(--accent-primary)/30 bg-[color-mix(in_oklab,var(--accent-primary)_10%,transparent)] text-(--accent-primary)",
         tone === "success" &&
           "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
         tone === "info" &&

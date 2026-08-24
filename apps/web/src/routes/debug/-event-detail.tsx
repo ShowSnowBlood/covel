@@ -66,7 +66,7 @@ function renderStructuredData(
           <MessageSquare className="w-3 h-3" />{" "}
           {t("debugger.promptMessages", { count: messages.length })}
         </h4>
-        <div className="space-y-1 max-h-[400px] overflow-y-auto">
+        <div className="space-y-1 max-h-100 overflow-y-auto">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -88,7 +88,7 @@ function renderStructuredData(
                   ({message.toolCallId})
                 </span>
               )}
-              <pre className="mt-1 whitespace-pre-wrap break-all text-muted-foreground leading-relaxed max-h-[150px] overflow-y-auto">
+              <pre className="mt-1 whitespace-pre-wrap break-all text-muted-foreground leading-relaxed max-h-37.5 overflow-y-auto">
                 {message.content ||
                   (message.toolCalls
                     ? JSON.stringify(message.toolCalls, null, 2)
@@ -131,7 +131,7 @@ function renderStructuredData(
             <h4 className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
               {t("debugger.responseText")}
             </h4>
-            <pre className="text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border p-2 whitespace-pre-wrap break-all leading-relaxed max-h-[200px] overflow-y-auto">
+            <pre className="text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border p-2 whitespace-pre-wrap break-all leading-relaxed max-h-50 overflow-y-auto">
               {data.text as string}
             </pre>
           </div>
@@ -168,7 +168,7 @@ function renderStructuredData(
         <h4 className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
           <Wrench className="w-3 h-3" /> {t("debugger.toolResult")}
         </h4>
-        <pre className="text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border p-2 whitespace-pre-wrap break-all leading-relaxed max-h-[200px] overflow-y-auto">
+        <pre className="text-[10px] font-mono text-muted-foreground bg-muted/20 border border-border p-2 whitespace-pre-wrap break-all leading-relaxed max-h-50 overflow-y-auto">
           {resultStr}
         </pre>
       </div>
@@ -213,9 +213,7 @@ function MetaField({
   if (!value) return null;
   return (
     <div className="flex items-baseline gap-2 text-[10px]">
-      <span className="text-muted-foreground shrink-0 min-w-[70px]">
-        {label}
-      </span>
+      <span className="text-muted-foreground shrink-0 min-w-17.5">{label}</span>
       <span className={`truncate ${mono ? "font-mono" : ""} text-foreground`}>
         {value}
       </span>
