@@ -1,6 +1,12 @@
+import { FROSTFOX_LEVEL_WORLD_IDS } from "@covel/shared";
+import { useEffect, useState } from "react";
+
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { fetchFrostFoxProgression } from "@/services/api.js";
+import { worldVisualForId } from "@/lib/world-visuals.js";
+
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
@@ -10,6 +16,30 @@ export function GameHome() {
   const { status, loading } = useFrostFoxAccount();
   const settings = useSettingsDialog();
   const requiresLogin = Boolean(status?.enabled && !status.authenticated);
+  const [currentLevel, setCurrentLevel] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!status?.authenticated) {
+      setCurrentLevel(1);
+      return;
+    }
+    fetchFrostFoxProgression(true)
+      .then((progression) => {
+        if (!cancelled) setCurrentLevel(progression.unlockedLevel);
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentLevel(1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status?.account?.id, status?.authenticated]);
+
+  const currentWorldId = FROSTFOX_LEVEL_WORLD_IDS[currentLevel - 1];
+  const currentWorldVisual = worldVisualForId(currentWorldId);
+  const homeCover =
+    currentWorldVisual?.image ?? "/visuals/backgrounds/moonveil-home-2k.webp";
 
   return (
     <section
@@ -17,14 +47,15 @@ export function GameHome() {
       className="relative isolate h-full min-h-[560px] w-full overflow-hidden bg-[#071013] text-[#f4f0e5]"
     >
       <img
-        src="/visuals/backgrounds/moonveil-home-2k.webp"
+        key={homeCover}
+        src={homeCover}
         alt=""
         width={2048}
         height={1152}
         loading="eager"
         fetchPriority="high"
         draggable={false}
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        className="absolute inset-0 h-full w-full animate-in object-cover object-center fade-in-0 duration-700"
       />
       <div
         className="absolute inset-0"

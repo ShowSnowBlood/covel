@@ -678,6 +678,337 @@
   animation: ui-blink 1s step-end infinite;
 }
 
+/* Campaign covers — a sealed level keeps its art desaturated beneath two
+   physical chain runs. Newly unlocked levels play one finite break sequence. */
+.level-lock-overlay {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 20%,
+      rgb(2 5 7 / 0.28) 62%,
+      rgb(2 5 7 / 0.58) 100%
+    ),
+    linear-gradient(180deg, rgb(3 7 9 / 0.18), rgb(3 7 9 / 0.38));
+  box-shadow: inset 0 0 70px rgb(0 0 0 / 0.48);
+}
+
+.level-chain {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: 146%;
+  align-items: center;
+  justify-content: center;
+  color: #d1bd7c;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.7));
+  transform-origin: center;
+}
+
+.level-chain-a {
+  transform: translate(-50%, -50%) rotate(24deg);
+}
+
+.level-chain-b {
+  transform: translate(-50%, -50%) rotate(-24deg);
+}
+
+.level-chain-half {
+  display: flex;
+  width: 50%;
+  align-items: center;
+  justify-content: space-around;
+  position: relative;
+
+  will-change: transform, opacity;
+}
+
+.level-chain-link {
+  height: clamp(1.7rem, 4vw, 2.35rem);
+  width: clamp(1.7rem, 4vw, 2.35rem);
+  flex: none;
+  stroke: currentColor;
+  position: relative;
+  z-index: 1;
+}
+
+.level-chain-half::before {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 0.22rem;
+  border-block: 1px solid rgb(255 238 179 / 0.42);
+  background: #7a6536;
+  box-shadow: 0 2px 3px rgb(0 0 0 / 0.7);
+  content: "";
+}
+
+.level-chain-joint {
+  height: 0.72rem;
+  width: 0.72rem;
+  flex: none;
+  border: 2px solid #f3dfa0;
+  border-radius: 999px;
+  position: relative;
+  z-index: 1;
+
+  background: #6c5931;
+  box-shadow: 0 0 0 3px rgb(4 8 10 / 0.72);
+}
+
+.level-lock-seal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  height: 4.25rem;
+  width: 4.25rem;
+  place-items: center;
+  border: 1px solid rgb(241 220 156 / 0.72);
+  border-radius: 999px;
+  background: rgb(10 14 14 / 0.9);
+  color: #ead48f;
+  box-shadow:
+    0 0 0 5px rgb(5 9 10 / 0.72),
+    0 12px 30px rgb(0 0 0 / 0.58),
+    inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+}
+
+.level-lock-seal-ring {
+  display: grid;
+  height: 3rem;
+  width: 3rem;
+  place-items: center;
+  border: 1px dashed rgb(234 212 143 / 0.55);
+  border-radius: inherit;
+}
+
+.level-lock-flash,
+.level-lock-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+}
+
+.level-lock-flash {
+  height: 8rem;
+  width: 8rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(255 236 171 / 0.9), transparent 68%);
+  transform: translate(-50%, -50%) scale(0.2);
+}
+
+.level-lock-spark {
+  height: 0.32rem;
+  width: 0.32rem;
+  border-radius: 999px;
+  background: #ffe9a5;
+  box-shadow: 0 0 9px #f7d56e;
+}
+
+.level-lock-spark-a {
+  --spark-x: -5rem;
+  --spark-y: -3.25rem;
+}
+
+.level-lock-spark-b {
+  --spark-x: 5.5rem;
+  --spark-y: -2.5rem;
+}
+
+.level-lock-spark-c {
+  --spark-x: -4.5rem;
+  --spark-y: 3.6rem;
+}
+
+.level-lock-spark-d {
+  --spark-x: 4.75rem;
+  --spark-y: 3.1rem;
+}
+
+.level-cover-unlocking {
+  animation: level-cover-reveal 1.55s cubic-bezier(0.22, 0.78, 0.18, 1) both;
+}
+
+.level-lock-overlay[data-state="unlocking"] {
+  animation: level-seal-release 1.55s ease-out both;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-chain-half-start {
+  animation: level-chain-break-start 1.35s cubic-bezier(0.2, 0.82, 0.25, 1) both;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-chain-half-end {
+  animation: level-chain-break-end 1.35s cubic-bezier(0.2, 0.82, 0.25, 1) both;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-chain-b .level-chain-half,
+.level-lock-overlay[data-state="unlocking"] .level-chain-b .level-chain-joint {
+  animation-delay: 80ms;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-chain-joint {
+  animation: level-chain-joint-break 0.9s ease-out both;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-lock-seal {
+  animation: level-lock-break 1.2s cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-lock-flash {
+  animation: level-lock-flash 0.72s ease-out 0.32s both;
+}
+
+.level-lock-overlay[data-state="unlocking"] .level-lock-spark {
+  animation: level-lock-spark 0.78s ease-out 0.38s both;
+}
+
+@keyframes level-cover-reveal {
+  0%,
+  28% {
+    filter: grayscale(1) brightness(0.72);
+    opacity: 0.55;
+    transform: scale(1.01);
+  }
+  48% {
+    filter: grayscale(0.72) brightness(1.18);
+    opacity: 0.78;
+    transform: scale(1.035);
+  }
+  100% {
+    filter: grayscale(0) brightness(1);
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes level-seal-release {
+  0%,
+  52% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 0.34;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes level-chain-break-start {
+  0%,
+  24% {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+  30% {
+    transform: translateX(0.35rem) rotate(2deg);
+  }
+  37% {
+    transform: translateX(-0.55rem) rotate(-3deg);
+  }
+  44% {
+    opacity: 1;
+    transform: translateX(-0.2rem) rotate(1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-92%) translateY(-2rem) rotate(-14deg);
+  }
+}
+
+@keyframes level-chain-break-end {
+  0%,
+  24% {
+    opacity: 1;
+    transform: translateX(0) rotate(0);
+  }
+  30% {
+    transform: translateX(-0.35rem) rotate(-2deg);
+  }
+  37% {
+    transform: translateX(0.55rem) rotate(3deg);
+  }
+  44% {
+    opacity: 1;
+    transform: translateX(0.2rem) rotate(-1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(92%) translateY(2rem) rotate(14deg);
+  }
+}
+
+@keyframes level-chain-joint-break {
+  0%,
+  34% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  46% {
+    opacity: 1;
+    transform: scale(1.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@keyframes level-lock-break {
+  0%,
+  27% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+  }
+  36% {
+    transform: translate(-50%, -50%) scale(1.12) rotate(-5deg);
+  }
+  46% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.94) rotate(8deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -145%) scale(0.65) rotate(28deg);
+  }
+}
+
+@keyframes level-lock-flash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  28% {
+    opacity: 0.88;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.55);
+  }
+}
+
+@keyframes level-lock-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--spark-x)),
+        calc(-50% + var(--spark-y))
+      )
+      scale(1.2);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────
    Reduced motion — collapse animations/transitions and disable smooth
    scrolling for users who request it (WCAG 2.3.3 / vestibular safety).

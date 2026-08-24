@@ -122,6 +122,8 @@
     "levelCompleted": "Completed",
     "levelLocked": "Locked",
     "levelAvailable": "Available",
+    "levelUnlocking": "Unlocking…",
+
     "levelReplay": "Play again",
     "levelSignIn": "Sign in to unlock",
     "completePriorLevel": "Clear level {{level}} first",

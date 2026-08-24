@@ -34,6 +34,7 @@ export interface WorldListViewProps {
   storageLabel: (world: WorldRecord) => string;
   progressionMode: LevelProgressionMode;
   progression: FrostFoxProgressionStatus | null;
+  unlockingLevel: number | null;
 
   onOpenGenerator: () => void;
   onOpenSettings: () => void;
@@ -58,6 +59,8 @@ export function WorldListView({
   storageLabel,
   progressionMode,
   progression,
+  unlockingLevel,
+
   onOpenGenerator,
 
   onOpenSettings,
@@ -271,6 +274,11 @@ export function WorldListView({
               const locked =
                 levelNumber !== undefined &&
                 (progressionMode !== "ready" || levelNumber > unlockedLevel);
+              const unlocking =
+                progressionMode === "ready" &&
+                levelNumber !== undefined &&
+                levelNumber === unlockingLevel;
+
               const lockLabel =
                 progressionMode === "account-required"
                   ? t("session.levelSignIn", "Sign in to unlock")
@@ -300,6 +308,7 @@ export function WorldListView({
                   locked={locked}
                   completed={completed}
                   lockLabel={lockLabel}
+                  unlocking={unlocking}
 
                   t={t}
                   onEnter={onEnterWorld}

@@ -1,4 +1,6 @@
 import { request } from "./request.js";
+export const FROSTFOX_RECENT_UNLOCK_STORAGE_KEY =
+  "covel:frostfox:recent-unlock";
 
 export interface FrostFoxAccountView {
   readonly id: string;

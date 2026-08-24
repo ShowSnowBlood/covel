@@ -6,11 +6,13 @@ import {
   ArrowRight,
   CheckCircle2,
   LockKeyhole,
+  Link2,
 } from "lucide-react";
 
 import type { WorldRecord } from "@/services/api.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { worldVisual } from "@/lib/world-visuals.js";
+const CHAIN_HALF_LINKS = [0, 1, 2, 3] as const;
 
 export interface WorldCardProps {
   world: WorldRecord;
@@ -27,6 +29,8 @@ export interface WorldCardProps {
   locked?: boolean;
   completed?: boolean;
   lockLabel?: string;
+  /** Plays once when this level has just become available. */
+  unlocking?: boolean;
 
   t: TFunction;
   onEnter: (worldId: string) => void;
@@ -51,6 +55,8 @@ export function WorldCard({
   locked = false,
   completed = false,
   lockLabel,
+  unlocking = false,
+
   t,
 
   onEnter,
@@ -63,14 +69,20 @@ export function WorldCard({
   return (
     <article
       aria-busy={isEntering}
-      aria-disabled={locked}
-      onClick={() => (locked ? onLocked?.() : onEnter(world.id))}
+      aria-disabled={locked || unlocking}
+      onClick={() => {
+        if (unlocking) return;
+        if (locked) onLocked?.();
+        else onEnter(world.id);
+      }}
       className={`group relative min-h-[320px] md:min-h-[332px] overflow-hidden rounded-[var(--radius-card)] border border-border bg-card transition-all hover:border-primary/40 ${
-        locked
-          ? onLocked
-            ? "cursor-pointer"
-            : "cursor-not-allowed"
-          : "cursor-pointer"
+        unlocking
+          ? "cursor-wait"
+          : locked
+            ? onLocked
+              ? "cursor-pointer"
+              : "cursor-not-allowed"
+            : "cursor-pointer"
       } ${isEntering ? "opacity-100" : ""} ${
         dimmed ? "opacity-30 pointer-events-none" : ""
       }`}
@@ -93,10 +105,10 @@ export function WorldCard({
         loading={index < 2 ? "eager" : "lazy"}
         fetchPriority={index < 2 ? "high" : "auto"}
         className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 ${
-          locked
+          locked || unlocking
             ? "scale-[1.01] grayscale opacity-55"
             : "group-hover:scale-[1.025]"
-        }`}
+        } ${unlocking ? "level-cover-unlocking" : ""}`}
 
         draggable={false}
       />
@@ -121,6 +133,7 @@ export function WorldCard({
         className="absolute left-0 top-0 h-1 w-24 transition-all group-hover:w-40"
         style={{ background: "var(--world-accent)" }}
       />
+      {(locked || unlocking) && <LevelLockOverlay unlocking={unlocking} />}
 
       <div className="relative z-10 flex min-h-[320px] md:min-h-[332px] flex-col justify-between p-5 md:p-6 text-white">
         <div className="flex items-start justify-between gap-4">
@@ -149,9 +162,11 @@ export function WorldCard({
               ) : null}
               {completed
                 ? t("session.levelCompleted", "Completed")
-                : locked
-                  ? t("session.levelLocked", "Locked")
-                  : t("session.levelAvailable", "Available")}
+                : unlocking
+                  ? t("session.levelUnlocking", "Unlocking")
+                  : locked
+                    ? t("session.levelLocked", "Locked")
+                    : t("session.levelAvailable", "Available")}
             </span>
           ) : (
             <span
@@ -216,15 +231,20 @@ export function WorldCard({
             <span
               className="ui-meta inline-flex items-center gap-1.5 transition-all group-hover:gap-2.5"
               style={{
-                color: locked ? "rgba(255,255,255,.58)" : "var(--world-accent)",
+                color:
+                  locked || unlocking
+                    ? "rgba(255,255,255,.58)"
+                    : "var(--world-accent)",
               }}
             >
-              {locked
-                ? (lockLabel ?? t("session.levelLocked", "Locked"))
-                : completed
-                  ? t("session.levelReplay", "Play again")
-                  : t("session.enter", "Enter")}
-              {locked ? (
+              {unlocking
+                ? t("session.levelUnlocking", "Unlocking")
+                : locked
+                  ? (lockLabel ?? t("session.levelLocked", "Locked"))
+                  : completed
+                    ? t("session.levelReplay", "Play again")
+                    : t("session.enter", "Enter")}
+              {locked || unlocking ? (
                 <LockKeyhole className="w-3 h-3" />
               ) : (
                 <ArrowRight className="w-3 h-3" />
@@ -234,5 +254,46 @@ export function WorldCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function LevelLockOverlay({ unlocking }: { unlocking: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="level-lock-overlay pointer-events-none absolute inset-0 z-20 overflow-hidden"
+      data-state={unlocking ? "unlocking" : "locked"}
+    >
+      <ChainTrack variant="a" />
+      <ChainTrack variant="b" />
+      <div className="level-lock-flash" />
+      <div className="level-lock-seal">
+        <span className="level-lock-seal-ring">
+          <LockKeyhole className="h-7 w-7" strokeWidth={1.7} />
+        </span>
+      </div>
+      <span className="level-lock-spark level-lock-spark-a" />
+      <span className="level-lock-spark level-lock-spark-b" />
+      <span className="level-lock-spark level-lock-spark-c" />
+      <span className="level-lock-spark level-lock-spark-d" />
+    </div>
+  );
+}
+
+function ChainTrack({ variant }: { variant: "a" | "b" }) {
+  return (
+    <div className={`level-chain level-chain-${variant}`}>
+      <span className="level-chain-half level-chain-half-start">
+        {CHAIN_HALF_LINKS.map((index) => (
+          <Link2 key={index} className="level-chain-link" strokeWidth={2.25} />
+        ))}
+      </span>
+      <span className="level-chain-joint" />
+      <span className="level-chain-half level-chain-half-end">
+        {CHAIN_HALF_LINKS.map((index) => (
+          <Link2 key={index} className="level-chain-link" strokeWidth={2.25} />
+        ))}
+      </span>
+    </div>
   );
 }

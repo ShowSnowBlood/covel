@@ -29,6 +29,7 @@ import { useSession } from "@/stores/session-store.js";
 import {
   completeFrostFoxLevel,
   fetchFrostFoxProgression,
+  FROSTFOX_RECENT_UNLOCK_STORAGE_KEY,
   updateSession,
   type FrostFoxProgressionStatus,
   type SessionRecord,
@@ -133,6 +134,13 @@ export function GameView({ session }: GameViewProps) {
     try {
       const next = await completeFrostFoxLevel(world!.id);
       setLevelProgression(next);
+      if (next.completedLevel < next.totalLevels) {
+        sessionStorage.setItem(
+          FROSTFOX_RECENT_UNLOCK_STORAGE_KEY,
+          String(next.unlockedLevel),
+        );
+      }
+
       try {
         await updateSession(session.id, { status: "ended" });
       } catch {

@@ -1,3 +1,5 @@
+import { FROSTFOX_LEVEL_COUNT } from "@covel/shared";
+
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.js";
@@ -93,6 +95,17 @@ export function WorldSelectScreen({
     useState<LevelProgressionMode>("loading");
   const [progression, setProgression] =
     useState<api.FrostFoxProgressionStatus | null>(null);
+  const [unlockingLevel, setUnlockingLevel] = useState<number | null>(() => {
+    const stored = Number.parseInt(
+      sessionStorage.getItem(api.FROSTFOX_RECENT_UNLOCK_STORAGE_KEY) ?? "",
+      10,
+    );
+    return Number.isInteger(stored) &&
+      stored >= 1 &&
+      stored <= FROSTFOX_LEVEL_COUNT
+      ? stored
+      : null;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +134,20 @@ export function WorldSelectScreen({
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (progressionMode !== "ready" || unlockingLevel === null) return;
+    sessionStorage.removeItem(api.FROSTFOX_RECENT_UNLOCK_STORAGE_KEY);
+    if (
+      !progression ||
+      progression.unlockedLevel !== unlockingLevel ||
+      progression.completedLevel >= progression.totalLevels
+    ) {
+      setUnlockingLevel(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setUnlockingLevel(null), 1700);
+    return () => window.clearTimeout(timer);
+  }, [progression, progressionMode, unlockingLevel]);
 
   // Entering a world used to defer the actual navigation to
   // `requestAnimationFrame`, so the busy state could paint one frame first.
@@ -269,6 +296,7 @@ export function WorldSelectScreen({
         onOpenGenerator={() => setGeneratorOpen(true)}
         progressionMode={progressionMode}
         progression={progression}
+        unlockingLevel={unlockingLevel}
 
         onOpenSettings={() => onSettingsOpenChange(true)}
         onEnterWorld={handleEnterWorld}

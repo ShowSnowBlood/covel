@@ -122,6 +122,7 @@
     "levelCompleted": "已通关",
     "levelLocked": "未解锁",
     "levelAvailable": "可挑战",
+    "levelUnlocking": "锁链断裂中…",
     "levelReplay": "再次进入",
     "levelSignIn": "登录后解锁",
     "completePriorLevel": "请先通关第 {{level}} 关",
