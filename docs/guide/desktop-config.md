@@ -59,7 +59,7 @@ max_size_mb = 10
 max_files   = 10
 ```
 
-手动改完要重启 Covel 生效；在 **设置 → 桌面 → 网络代理** 保存则会立即热应用。`direct` 不走代理，`system` 跟随 Electron/Windows 检测到的系统代理，`http` 接受 `http://` / `https://` 地址，`socks` 接受 `socks://` / `socks5://` 地址；省略协议时分别补为 `http://` 与 `socks5://`。代理 URL 可带 `user:password@host`，因此配置文件会收紧为 `0600`。
+手动改完要重启 Covel 生效；在 **设置 → 桌面 → 网络代理** 保存则会立即热应用。`direct` 不走代理，`system` 针对每个目标 URL 动态采用 Electron/Chromium 返回的系统规则和有序 fallback，`http` 接受 `http://` / `https://` 地址，`socks` 接受 `socks://` / `socks5://` 地址；省略协议时分别补为 `http://` 与 `socks5://`。代理 URL 可带 `user:password@host`，因此配置文件会收紧为 `0600`。
 
 代理覆盖框架拥有的核心 LLM 请求与“从 GitHub 更新”模型数据库请求。第三方插件的 `fetchWithRetry` 保持直连和严格 DNS/SSRF pinning，避免代理侧远程 DNS 绕过插件网络边界。
 

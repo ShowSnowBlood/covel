@@ -30,7 +30,7 @@ Schema：`packages/ai-provider/src/config/llm-schema.ts`。
 4. **Per-runtime 覆盖** — `sessions.runtime_model_overrides`（runtimeId → slot 名）先于 `manifest.model` 与 gateway 默认（`packages/runtime/src/agent-loop/agent-loop-policy.ts`；请求级 `modelOverride` 只对 `outputKind: story` 的 runtime 优先于它）。
 5. **Per-request 覆盖** — 前端经 `X-Slot-Config` / `X-Provider-Keys` header 注入的自定义 preset 与 key 覆盖同名配置（`middleware/per-request-llm.ts`）。
 
-模型能力（模态 / 特性 / 上限 / 计价）自动检测优先级：前端 localStorage 覆盖 → `llm.toml` 手动字段 → 内置模型资料 → LiteLLM DB（`pnpm --filter @covel/ai-provider update-model-db`）→ 协议默认。
+模型能力（模态 / 特性 / 上限 / 计价）自动检测优先级：前端 localStorage 覆盖 → `llm.toml` 手动字段 → 内置模型资料 → 版本化 LiteLLM 快照 → 协议默认。仓库快照由维护者通过 `pnpm --filter @covel/ai-provider update-model-db` 从固定 commit 生成；设置页的手动刷新会把较新数据写入用户配置目录，并在后续启动时优先于内置快照加载。
 
 ## 服务商与模型 ID
 

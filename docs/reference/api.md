@@ -513,7 +513,7 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 | GET  | `/api/model-db/lookup?model=xxx&provider=yyy&protocol=zzz` | 查找模型能力、匹配来源和价格性质         |
 | POST | `/api/model-db/refresh`                                    | 刷新模型数据库；hosted 需 operator token |
 
-`/api/model-db/lookup` 将 `model` 视为不透明 ID。响应中的 `matchedModelId`、`matchKind` 和 `candidates` 只解释能力资料如何匹配，不会改写实际请求 ID；`source` 为 `known`、`model-database` 或 `protocol-default`。`pricingKind=reference` 表示通过聚合服务商匹配到的是上游模型参考价，实际账单可能不同。`reasoning` 返回按上游模型家族识别的思考强度档位、默认值和家族名称，供生成参数界面使用。
+`POST /api/model-db/refresh` 在线获取 LiteLLM 最新数据，并在桌面/自部署环境中写入用户配置目录；该用户缓存会在后续启动时优先于安装包内的固定快照加载。`/api/model-db/lookup` 将 `model` 视为不透明 ID。响应中的 `matchedModelId`、`matchKind` 和 `candidates` 只解释能力资料如何匹配，不会改写实际请求 ID；`source` 为 `known`、`model-database` 或 `protocol-default`。`pricingKind=reference` 表示通过聚合服务商匹配到的是上游模型参考价，实际账单可能不同。`reasoning` 返回按上游模型家族识别的思考强度档位、默认值和家族名称，供生成参数界面使用。
 
 ### Trace 调试
 
