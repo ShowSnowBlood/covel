@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Search, Settings2 } from "lucide-react";
+import {
+  Search,
+  Settings2,
+  Sliders,
+  Sparkles,
+  Cpu,
+  Layers,
+  Palette,
+  User,
+  Database,
+  Monitor,
+  Key,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,16 +41,52 @@ import { PackagesPane } from "./panes/PackagesPane.js";
 import { AppearancePane } from "./panes/AppearancePane.js";
 import { OperatorAccessPane } from "./panes/OperatorAccessPane.js";
 import { FrostFoxAccountPane } from "./panes/FrostFoxAccountPane.js";
+import { cn } from "@/lib/utils.js";
+import { ShinyText } from "@/components/reactbits/index.js";
 
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Deep-link target — either a nav node id ("llm.slots") or a setting key. */
   initialKey?: string;
-  /** Restrict the dialog to one purpose-built pane (used by the game launcher). */
+  /**
+   * When set, restricts the view to only the tree rooted at this node (e.g.
+   * `"llm.providers"` renders just that pane without the full sidebar nav).
+   */
   focusNode?: string;
 }
 
+function getNodeIcon(id: string) {
+  switch (id) {
+    case "general":
+      return Sliders;
+    case "appearance":
+      return Palette;
+    case "account":
+      return User;
+    case "llm":
+    case "llm.slots":
+      return Cpu;
+    case "llm.providers":
+    case "llm.keys":
+    case "llm.presets":
+      return Key;
+    case "plugin":
+    case "packages":
+      return Layers;
+    case "data":
+      return Database;
+    case "desktop":
+      return Monitor;
+    default:
+      return Sparkles;
+  }
+}
+
+/**
+ * SwitchPage Settings Dialog
+ * Designed with glassmorphism, floating item pills, search filtering,
+ * and HeroUI styling.
+ */
 export function SettingsDialog({
   open,
   onOpenChange,
@@ -62,8 +110,6 @@ export function SettingsDialog({
   const tree = useMemo(
     () =>
       buildNavTree(store, { includeDesktop: desktop, locale: i18n.language }),
-    // `open` included so the tree rebuilds when dialog opens and plugins
-    // registered new entries since last render.
     [store, desktop, i18n.language, open, storeRevision],
   );
   const visibleTree = useMemo(
@@ -115,84 +161,107 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] p-0 gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-5 pb-4 border-b border-[var(--rule-color)]">
-          <DialogTitle className="flex items-baseline gap-3">
-            <span className="ui-meta text-[10px] text-muted-foreground">
-              § SETTINGS
-            </span>
-            <span className="ui-title text-base font-semibold tracking-tight">
-              {focusNode === "llm.providers"
-                ? t("settings.providerSettingsTitle")
-                : t("settings.title")}
-            </span>
-            <Settings2 className="w-3.5 h-3.5 ml-auto opacity-50" />
+      <DialogContent className="max-w-4xl h-[82vh] p-0 gap-0 flex flex-col rounded-3xl border border-white/15 bg-zinc-950/90 shadow-2xl backdrop-blur-2xl overflow-hidden text-foreground">
+        {/* SwitchPage Dialog Header */}
+        <DialogHeader className="px-6 py-4.5 border-b border-border/80 bg-card/40 flex-row items-center justify-between space-y-0">
+          <DialogTitle className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+              <Settings2 className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="ui-eyebrow text-[10px] text-muted-foreground font-mono tracking-widest block">
+                § SETTINGS
+              </span>
+              <span className="text-base font-semibold tracking-tight text-foreground">
+                <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.8)">
+                  {focusNode === "llm.providers"
+                    ? t("settings.providerSettingsTitle")
+                    : t("settings.title")}
+                </ShinyText>
+              </span>
+            </div>
           </DialogTitle>
           <DialogDescription className="sr-only">
             {t("settings.title")}
           </DialogDescription>
         </DialogHeader>
+
+        {/* SwitchPage Body */}
         <div className="flex-1 flex overflow-hidden">
           {!focusNode && (
-            <aside
-              className="w-56 shrink-0 border-r border-[var(--rule-color)] flex flex-col"
-              style={{ background: "var(--surface-rail)" }}
-            >
-              <div className="p-3 border-b border-[var(--rule-color)] flex items-center gap-2">
-                <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t("settings.searchPlaceholder")}
-                  className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground min-w-0"
-                />
+            <aside className="w-60 shrink-0 border-r border-border/80 bg-card/30 flex flex-col">
+              {/* Search Box */}
+              <div className="p-3.5 border-b border-border/60">
+                <div className="relative flex items-center rounded-xl border border-border/80 bg-background/50 px-3 py-1.5 backdrop-blur-xs transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
+                  <Search className="w-3.5 h-3.5 text-muted-foreground mr-2 shrink-0" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("settings.searchPlaceholder")}
+                    className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground min-w-0"
+                  />
+                </div>
               </div>
-              <nav className="flex-1 overflow-y-auto py-2 ui-scroll">
+
+              {/* Sidebar Switch Navigation Pills */}
+              <nav className="flex-1 overflow-y-auto p-2.5 space-y-1 ui-scroll">
                 {filtered.map((node) => {
                   const selectable = isSelectable(node);
-                  const indent = node.parentId ? "pl-9 " : "pl-4 ";
                   const isHeader = node.kind === "group" && !selectable;
                   const isSelected = selected === node.id;
+                  const Icon = getNodeIcon(node.id);
+
+                  if (isHeader) {
+                    return (
+                      <div
+                        key={node.id}
+                        className="ui-eyebrow text-[10px] text-muted-foreground px-3 pt-3.5 pb-1 font-mono tracking-wider"
+                      >
+                        {node.label}
+                      </div>
+                    );
+                  }
+
                   return (
                     <button
                       key={node.id}
                       type="button"
-                      disabled={isHeader}
                       onClick={() => setSelected(node.id)}
-                      className={
-                        "w-full text-left pr-4 py-1.5 text-xs transition-colors relative " +
-                        indent +
-                        (isHeader
-                          ? "ui-meta text-[10px] text-muted-foreground pt-4 pb-1"
-                          : isSelected
-                            ? "text-foreground font-medium"
-                            : "text-muted-foreground hover:text-foreground")
-                      }
-                    >
-                      {isSelected && !isHeader && (
-                        <span
-                          aria-hidden
-                          className="absolute left-0 top-0 bottom-0 w-[3px]"
-                          style={{ background: "var(--accent-primary)" }}
-                        />
+                      className={cn(
+                        "group relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 cursor-pointer select-none",
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25 font-semibold"
+                          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground active:scale-[0.98]",
                       )}
-                      {node.label}
+                    >
+                      <Icon
+                        className={cn(
+                          "w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110",
+                          isSelected ? "text-primary-foreground" : "text-muted-foreground",
+                        )}
+                      />
+                      <span className="truncate">{node.label}</span>
                     </button>
                   );
                 })}
+
                 {filtered.length === 0 && (
-                  <div className="px-4 py-2 text-xs text-muted-foreground">
+                  <div className="px-4 py-6 text-center text-xs text-muted-foreground">
                     {t("settings.noResults", { query })}
                   </div>
                 )}
               </nav>
             </aside>
           )}
+
+          {/* SwitchPage Content Area */}
           <section
             ref={contentRef}
-            className="flex-1 overflow-y-auto p-6 ui-scroll"
+            className="flex-1 overflow-y-auto p-6 md:p-8 ui-scroll bg-background/40"
           >
-            {renderPane(selectedNode, t)}
+            <div className="max-w-2xl mx-auto animate-in fade-in-0 duration-300">
+              {renderPane(selectedNode, t)}
+            </div>
           </section>
         </div>
       </DialogContent>

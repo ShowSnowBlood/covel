@@ -4,26 +4,25 @@
    ───────────────────────────────────────────────────────────────── */
 
 html[data-theme="paper"] {
-  --color-background: oklch(96.5% 0.012 80);
-  --color-foreground: oklch(20% 0.018 60);
-  --color-card: oklch(98.2% 0.008 80);
-  --color-card-foreground: oklch(20% 0.018 60);
-  --color-popover: oklch(98.5% 0.006 80);
-  --color-popover-foreground: oklch(20% 0.018 60);
-  --color-primary: oklch(45% 0.13 35);
-  --color-primary-foreground: oklch(98% 0.005 90);
-  --color-secondary: oklch(92% 0.014 80);
-  --color-secondary-foreground: oklch(25% 0.02 60);
-  --color-muted: oklch(93% 0.012 80);
-  --color-muted-foreground: oklch(46% 0.018 60);
-  --color-accent: oklch(82% 0.085 60);
-  --color-accent-foreground: oklch(22% 0.04 35);
-  --color-destructive: oklch(54% 0.18 25);
-  --color-destructive-foreground: oklch(98% 0.005 90);
-  --color-border: oklch(85% 0.014 75);
-  --color-input: oklch(85% 0.014 75);
-  --color-ring: oklch(45% 0.13 35 / 0.45);
-
+  --color-background: oklch(98.5% 0.002 260);
+  --color-foreground: oklch(18% 0.006 260);
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(18% 0.006 260);
+  --color-popover: oklch(100% 0 0);
+  --color-popover-foreground: oklch(18% 0.006 260);
+  --color-primary: oklch(20% 0.01 260);
+  --color-primary-foreground: oklch(99% 0 0);
+  --color-secondary: oklch(94.5% 0.004 260);
+  --color-secondary-foreground: oklch(24% 0.008 260);
+  --color-muted: oklch(95% 0.004 260);
+  --color-muted-foreground: oklch(48% 0.01 260);
+  --color-accent: oklch(93.5% 0.005 260);
+  --color-accent-foreground: oklch(18% 0.006 260);
+  --color-destructive: oklch(58% 0.22 25);
+  --color-destructive-foreground: oklch(99% 0 0);
+  --color-border: oklch(89% 0.005 260);
+  --color-input: oklch(89% 0.005 260);
+  --color-ring: oklch(20% 0.01 260 / 0.3);
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -150,39 +149,40 @@ html[data-theme="paper"] .ui-rule {
 /* ── Dark scheme ─────────────────────────────────────────────── */
 html.dark[data-theme="paper"],
 html[data-theme="paper"].dark {
-  --color-background: oklch(15% 0.012 60);
-  --color-foreground: oklch(91% 0.012 80);
-  --color-card: oklch(17% 0.014 60);
-  --color-card-foreground: oklch(91% 0.012 80);
-  --color-popover: oklch(17% 0.014 60);
-  --color-popover-foreground: oklch(91% 0.012 80);
-  --color-primary: oklch(72% 0.12 75);
-  --color-primary-foreground: oklch(15% 0.012 60);
-  --color-secondary: oklch(20% 0.016 60);
-  --color-secondary-foreground: oklch(85% 0.012 80);
-  --color-muted: oklch(20% 0.016 60);
-  --color-muted-foreground: oklch(58% 0.018 60);
-  --color-accent: oklch(72% 0.12 75);
-  --color-accent-foreground: oklch(15% 0.012 60);
-  --color-border: oklch(25% 0.018 60);
-  --color-input: oklch(25% 0.018 60);
-  --color-ring: oklch(72% 0.12 75 / 0.5);
+  --color-background: oklch(12% 0.006 260);
+  --color-foreground: oklch(96% 0.004 260);
+  --color-card: oklch(15.5% 0.008 260);
+  --color-card-foreground: oklch(96% 0.004 260);
+  --color-popover: oklch(15.5% 0.008 260);
+  --color-popover-foreground: oklch(96% 0.004 260);
+  --color-primary: oklch(98% 0.002 260);
+  --color-primary-foreground: oklch(12% 0.006 260);
+  --color-secondary: oklch(20% 0.008 260);
+  --color-secondary-foreground: oklch(92% 0.006 260);
+  --color-muted: oklch(18% 0.008 260);
+  --color-muted-foreground: oklch(65% 0.01 260);
+  --color-accent: oklch(22% 0.01 260);
+  --color-accent-foreground: oklch(98% 0 0);
+  --color-destructive: oklch(62% 0.22 25);
+  --color-destructive-foreground: oklch(98% 0 0);
+  --color-border: oklch(24% 0.008 260);
+  --color-input: oklch(24% 0.008 260);
+  --color-ring: oklch(96% 0.004 260 / 0.35);
 
-  --surface-page: oklch(13% 0.01 60);
-  --surface-rail: oklch(15% 0.012 60);
-  --surface-inset: oklch(18% 0.014 60);
-  --surface-elevated: oklch(20% 0.016 60);
-  --surface-dialog: oklch(20% 0.016 60);
+  --surface-page: oklch(11% 0.005 260);
+  --surface-rail: oklch(13.5% 0.006 260);
+  --surface-inset: oklch(16% 0.008 260);
+  --surface-elevated: oklch(17.5% 0.009 260);
+  --surface-dialog: oklch(17.5% 0.009 260);
   --surface-player: color-mix(in oklab, var(--accent-primary) 8%, transparent);
 
-  --rule-color: oklch(28% 0.018 60);
-  --rule-strong-color: oklch(60% 0.02 60);
+  --rule-color: oklch(24% 0.008 260);
+  --rule-strong-color: oklch(65% 0.01 260);
 
-  --accent-primary: oklch(72% 0.12 75);
-  --accent-secondary: oklch(70% 0.1 220);
+  --accent-primary: oklch(96% 0.004 260);
+  --accent-secondary: oklch(76% 0.12 210);
   --accent-warning: oklch(78% 0.16 80);
-  --accent-success: oklch(70% 0.13 145);
-
+  --accent-success: oklch(68% 0.16 150);
   --ambience-image:
     radial-gradient(
       ellipse at 80% -10%,

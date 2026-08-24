@@ -47,7 +47,7 @@ import {
   defaultSelectedPluginIdsForWorld,
   isLockedCorePackage,
 } from "./session-prep/plugin-selection-helpers.js";
-
+import { ShinyText, Magnet, StarBorder } from "@/components/reactbits/index.js";
 export { defaultSelectedPluginIdsForWorld, isLockedCorePackage };
 
 export function SessionPrepScreen({
@@ -238,18 +238,19 @@ export function SessionPrepScreen({
       <ScrollArea className="w-full h-full">
         <div className="mx-auto max-w-6xl px-4 md:px-8 py-5 md:py-8">
           <header
-            className="relative mb-6 overflow-hidden rounded-[var(--radius-card)] border border-border bg-card"
+            className="relative mb-8 overflow-hidden rounded-3xl border border-border/80 bg-card shadow-xl"
             style={{ "--world-accent": visual.accent } as CSSProperties}
           >
             <img
               src={visual.image}
               alt=""
               aria-hidden="true"
-              width={1536}
-              height={1024}
+              width={3840}
+              height={2160}
               loading="eager"
               fetchPriority="high"
-              className="absolute inset-0 h-full w-full object-cover"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover scale-[1.01] transition-transform duration-700"
               draggable={false}
             />
             <div
@@ -257,62 +258,63 @@ export function SessionPrepScreen({
               className="absolute inset-0"
               style={{
                 background:
-                  "linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.58) 48%, rgba(0,0,0,.22) 100%)",
+                  "linear-gradient(90deg, rgba(9,9,11,0.88) 0%, rgba(9,9,11,0.65) 48%, rgba(9,9,11,0.3) 100%), linear-gradient(180deg, rgba(9,9,11,0.3) 0%, rgba(9,9,11,0.85) 100%)",
               }}
             />
-            <div className="relative z-10 flex min-h-[236px] md:min-h-[252px] flex-col justify-between p-5 md:p-7 text-white">
+            <div className="relative z-10 flex min-h-[250px] md:min-h-[270px] flex-col justify-between p-6 md:p-8 text-white">
               <div className="flex items-center justify-between gap-4">
                 <Button
-                  variant="ghost"
+                  variant="bordered"
                   size="sm"
-                  className="h-8 border border-white/12 bg-black/18 px-3 text-white/78 hover:bg-white/10 hover:text-white"
+                  radius="full"
+                  className="h-9 border-white/20 bg-black/40 px-4 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
                   onClick={onBack}
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="w-4 h-4 mr-1.5" />
                   {t("session.breadcrumbWorldSelect", "Select World")}
                 </Button>
-                <Button
-                  size="sm"
-                  className="h-9 shrink-0 px-5 font-bold uppercase tracking-widest"
-                  style={{
-                    background: "var(--world-accent)",
-                    color: "black",
-                  }}
-                  disabled={isStarting}
-                  onClick={() => void handleStart()}
-                >
-                  {isStarting ? (
-                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  ) : (
-                    <Play className="w-4 h-4 mr-1.5" />
-                  )}
-                  {isStarting
-                    ? t("session.startingGame", "Creating…")
-                    : t("session.startGame", "Start Game")}
-                </Button>
+                <Magnet padding={50} magnetStrength={3}>
+                  <Button
+                    size="default"
+                    radius="full"
+                    className="h-10 px-6 font-bold uppercase tracking-wider text-zinc-950 bg-white hover:bg-zinc-100 shadow-lg shadow-black/40 hover:scale-105 active:scale-95 transition-all"
+                    disabled={isStarting}
+                    onClick={() => void handleStart()}
+                  >
+                    {isStarting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 mr-2 fill-current" />
+                    )}
+                    {isStarting
+                      ? t("session.startingGame", "Creating…")
+                      : t("session.startGame", "Start Game")}
+                  </Button>
+                </Magnet>
               </div>
 
-              <div className="max-w-2xl space-y-4">
+              <div className="max-w-2xl space-y-3">
                 <SessionBreadcrumb
                   step="prep"
                   worldName={text(world.name)}
                   onGoWorldSelect={onBack}
                 />
                 <div>
-                  <p className="ui-eyebrow mb-3 text-white/58">
+                  <p className="ui-eyebrow mb-2 text-white/60 font-mono tracking-wider">
                     {t("session.preparation", "Session Setup")}
                   </p>
-                  <h1 className="ui-title text-4xl md:text-6xl leading-[.95] text-white">
-                    {text(world.name)}
+                  <h1 className="ui-title text-3xl md:text-5xl font-bold leading-[1.02] text-white">
+                    <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.85)">
+                      {text(world.name)}
+                    </ShinyText>
                   </h1>
-                  <p className="mt-4 max-w-xl text-sm md:text-base leading-relaxed text-white/72">
+                  <p className="mt-3 max-w-xl text-sm md:text-base leading-relaxed text-zinc-300 font-light">
                     {text(world.description)}
                   </p>
                 </div>
               </div>
             </div>
           </header>
-
           <div className="grid gap-5 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-start">
             <section className="min-w-0 space-y-4">
               <WorldInfoCard

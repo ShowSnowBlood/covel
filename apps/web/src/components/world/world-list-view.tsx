@@ -126,93 +126,33 @@ export function WorldListView({
     <ScrollArea className="w-full h-full">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-10 py-5 md:py-8">
         {/* Editorial header */}
-        <header className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-8 items-end mb-7 md:mb-9">
-          <div className="md:col-span-7">
-            <p className="ui-eyebrow text-muted-foreground mb-2.5">
-              {t(
-                "session.worldsHeaderEyebrow",
-                `${worlds.length} worlds available`,
-                {
-                  count: worlds.length,
-                },
-              )}
-            </p>
-            <h1 className="font-display font-bold tracking-tight leading-[0.95] text-[clamp(2.25rem,5.4vw,4.25rem)] text-foreground">
-              <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.7)">
-                {t("session.selectWorld", "Choose a world")}
-              </ShinyText>
-            </h1>
-            <p className="mt-4 text-sm md:text-base text-muted-foreground font-light leading-relaxed max-w-xl">
-              {t(
-                "session.worldSelectDesc",
-                "Each world is a self-contained setting with its own tone, characters, and ruleset.",
-              )}
-            </p>
-          </div>
-
-          {/* Compact action rail keeps creation and setup nearby without pushing worlds down. */}
-          <aside className="md:col-span-5 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-2.5">
-            <SpotlightCard
-              spotlightColor="rgba(var(--color-primary), 0.15)"
-              className="p-0 border-primary/25 bg-card/80 hover:border-primary/55"
-            >
-              <button
-                type="button"
-                onClick={onOpenGenerator}
-                className="group relative min-h-[92px] w-full p-3 sm:p-4 text-left transition-all cursor-pointer"
-              >
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wand2 className="w-4 h-4 text-primary" />
-                    <span className="ui-eyebrow text-primary font-semibold">
-                      {t("world.aiCreate", "AI generate")}
-                    </span>
-                  </div>
-                  <p className="font-display text-[13px] sm:text-sm font-semibold leading-snug line-clamp-2">
-                    {t(
-                      "session.aiCreateTeaser",
-                      "Spin up a brand new world from a one-line idea.",
-                    )}
-                  </p>
-                  <p className="mt-3 text-xs text-primary inline-flex items-center gap-1.5 group-hover:gap-2.5 transition-all font-medium">
-                    {t("session.aiCreateAction", "Describe your idea")}
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </p>
-                </div>
-              </button>
-            </SpotlightCard>
-
-            <SpotlightCard
-              spotlightColor="rgba(255, 255, 255, 0.08)"
-              className="p-0 border-border bg-card/70 hover:border-primary/40 hover:bg-muted/30"
-            >
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="group flex min-h-[92px] w-full items-center justify-between p-3 sm:p-4 text-left transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <KeyRound className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[13px] sm:text-sm font-medium leading-snug line-clamp-2 text-foreground">
-                      {t("session.configureKeys", "API keys & presets")}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground/80 truncate">
-                      {primarySlotLabel ??
-                        t("session.noModelsConfigured", "No model configured")}
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
-            </SpotlightCard>
-          </aside>
+        <header className="mb-8 md:mb-10 text-center max-w-2xl mx-auto">
+          <p className="ui-eyebrow text-muted-foreground mb-2.5">
+            {t(
+              "session.worldsHeaderEyebrow",
+              `${worlds.length} worlds available`,
+              {
+                count: worlds.length,
+              },
+            )}
+          </p>
+          <h1 className="font-display font-bold tracking-tight leading-[0.95] text-[clamp(2.5rem,6vw,4.5rem)] text-foreground">
+            <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.8)">
+              {t("session.selectWorld", "Choose a world")}
+            </ShinyText>
+          </h1>
+          <p className="mt-4 text-sm md:text-base text-muted-foreground font-light leading-relaxed">
+            {t(
+              "session.worldSelectDesc",
+              "Each world is a self-contained setting with its own tone, characters, and ruleset.",
+            )}
+          </p>
         </header>
 
         {campaignEnabled && (
           <section
             aria-label={t("session.levelProgress", "Level progress")}
-            className="mb-5 overflow-hidden rounded-[var(--radius-card)] border border-border bg-card/72"
+            className="mb-7 overflow-hidden rounded-2xl border border-border/80 bg-card/75 backdrop-blur-md shadow-sm"
           >
             <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div>

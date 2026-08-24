@@ -77,9 +77,9 @@ function RootLayout() {
   // Active state for the primary nav. The 5 tabs map to either real routes
   // (世界 / 会话 / 调试) or in-page panel toggles (插件 / 图像) so the active
   // computation has to merge URL state with sub-views.
-  type NavId = "world" | "session" | "plugins" | "images" | "debug";
+  type NavId = "home" | "world" | "session" | "plugins" | "images";
   const activeNav: NavId | null = (() => {
-    if (isDebugRoute) return "debug";
+    if (isHome) return "home";
     if (isSessionRoute) {
       // World-select view (no session) implicitly maps to 世界
       if (!hasSession) return "world";
@@ -88,6 +88,7 @@ function RootLayout() {
     return null;
   })();
 
+  const goHome = () => navigate({ to: "/" });
   const goWorld = () => {
     if (sessionState.session) backToWorldSelect();
     navigate({ to: "/session", search: {} });
@@ -101,7 +102,6 @@ function RootLayout() {
     navigate({ to: "/session", search: sessionSearch });
     emitNavEvent("open-images");
   };
-  const goDebug = () => navigate({ to: "/debug", search: navSearch });
 
   const navItems: Array<{
     id: NavId;
@@ -109,26 +109,26 @@ function RootLayout() {
     onClick: () => void;
     disabled?: boolean;
   }> = [
-    { id: "world", label: t("nav.world"), onClick: goWorld },
+    { id: "home", label: t("nav.home", "首页"), onClick: goHome },
+    { id: "world", label: t("nav.world", "世界"), onClick: goWorld },
     {
       id: "session",
-      label: t("nav.session"),
+      label: t("nav.session", "会话"),
       onClick: goSession,
       disabled: !hasSession,
     },
     {
       id: "plugins",
-      label: t("nav.plugins"),
+      label: t("nav.plugins", "插件"),
       onClick: goPlugins,
       disabled: !hasSession,
     },
     {
       id: "images",
-      label: t("nav.images"),
+      label: t("nav.images", "图像"),
       onClick: goImages,
       disabled: !hasSession,
     },
-    { id: "debug", label: t("nav.debug"), onClick: goDebug },
   ];
 
   // Electron hides the native title bar so the in-app header can follow the
@@ -157,20 +157,21 @@ function RootLayout() {
           {!isHome && (
             <Link
               to="/"
-              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ui-title flex items-center gap-2 tracking-tight pointer-events-auto ${isSession ? "text-lg" : "text-2xl"}`}
+              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ui-title flex items-center gap-2.5 tracking-tight pointer-events-auto transition-transform hover:scale-105 ${isSession ? "text-base" : "text-xl font-bold"}`}
               style={isElectron ? noDragStyle : undefined}
             >
               <img
                 src="/icon.png"
                 alt=""
                 aria-hidden="true"
-                className={`rounded-md object-cover ${isSession ? "h-6 w-6" : "h-8 w-8"}`}
+                className={`rounded-lg object-cover shadow-sm ${isSession ? "h-6 w-6" : "h-7 w-7"}`}
                 draggable={false}
               />
-              <span>Covel</span>
+              <span className="font-display font-bold tracking-tight text-foreground">
+                FrostFox
+              </span>
             </Link>
           )}
-
           <div
             className={`w-full flex h-full items-center justify-between ${isMacDesktop ? "pl-[88px] pr-4 md:pr-6" : "px-4 md:px-6"}`}
           >
@@ -313,17 +314,17 @@ function RootLayout() {
               className={`w-full px-4 md:px-6 flex items-center justify-between ${isSession ? "gap-2" : "flex-col md:flex-row gap-6"}`}
             >
               <div
-                className={`ui-title flex items-center gap-2 ${isSession ? "text-xs" : "text-base"}`}
+                className={`ui-title flex items-center gap-2 font-medium ${isSession ? "text-xs" : "text-sm"}`}
               >
                 <span
-                  className={`rounded-full border border-primary/45 ${isSession ? "h-2 w-2" : "h-3 w-3"}`}
+                  className={`rounded-full border border-primary/50 bg-primary/20 ${isSession ? "h-2 w-2" : "h-2.5 w-2.5"}`}
                 ></span>
-                <span>Covel Studio</span>
+                <span>FrostFox Studio</span>
               </div>
               <div
                 className={`ui-eyebrow text-muted-foreground ${isSession ? "text-[10px]" : "text-xs"}`}
               >
-                &copy; {new Date().getFullYear()} Covel Framework.
+                &copy; {new Date().getFullYear()} FrostFox Framework.
               </div>
             </div>
           </footer>

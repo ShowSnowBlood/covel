@@ -3,16 +3,14 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Card — default renders as a quiet "section" frame: hairline border on
- * top + bottom, transparent background, no shadow. Acts as a structural
- * separator rather than a glossy card. Pass `className="ui-frame"` for the
- * legacy enclosed look.
+ * Card — Modern HeroUI-inspired floating card with rounded corners,
+ * subtle border, backdrop blur, and gentle elevation.
  */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "ui-card-surface text-card-foreground border-y border-[var(--rule-color)] bg-transparent",
+        "rounded-2xl border border-border/80 bg-card/80 text-card-foreground shadow-sm backdrop-blur-md transition-all duration-200 hover:border-border hover:shadow-md",
         className,
       )}
       {...props}
@@ -23,7 +21,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex flex-col space-y-1.5 px-5 py-4", className)}
+      className={cn("flex flex-col space-y-1.5 p-5 sm:p-6", className)}
       {...props}
     />
   );
@@ -33,7 +31,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
   return (
     <h3
       className={cn(
-        "font-display font-semibold leading-none tracking-tight ui-title",
+        "font-display text-lg font-semibold leading-tight tracking-tight text-foreground",
         className,
       )}
       {...props}
@@ -43,18 +41,18 @@ function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
 
 function CardDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p className={cn("text-xs leading-relaxed text-muted-foreground", className)} {...props} />
   );
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("px-5 pb-5 pt-0", className)} {...props} />;
+  return <div className={cn("p-5 pt-0 sm:p-6 sm:pt-0", className)} {...props} />;
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex items-center px-5 pb-5 pt-0", className)}
+      className={cn("flex items-center p-5 pt-0 sm:p-6 sm:pt-0", className)}
       {...props}
     />
   );
