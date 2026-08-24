@@ -5,7 +5,6 @@
   },
   "home": {
     "startPlaying": "开始游玩",
-    "viewRepository": "查看仓库",
     "heroEyebrow": "v0.1.0 · 插件式文字 RPG 框架",
     "heroLine1": "构建世界，",
     "heroLine2": "运行回合。",
