@@ -172,6 +172,7 @@ describe("bundled plugin dataSchemas", () => {
       "character-presence/assets",
       "character-presence/presence",
       "core-quest/quests",
+      "faction-reputation/reputation",
       "inventory/items",
       "living-world-rules/rules",
       "scene-stage/assets",
