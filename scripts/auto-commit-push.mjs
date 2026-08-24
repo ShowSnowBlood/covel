@@ -42,7 +42,41 @@ function git(args, options = {}) {
     encoding: "utf8",
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
   });
+
   return typeof output === "string" ? output.trim() : "";
+}
+function acquireProcessLock() {
+  const gitDir = path.resolve(repoRoot, git(["rev-parse", "--git-dir"]));
+  const lockPath = path.join(gitDir, "covel-auto-commit.lock");
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      fs.writeFileSync(lockPath, `${process.pid}\n`, { flag: "wx" });
+      return lockPath;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      const ownerPid = Number(fs.readFileSync(lockPath, "utf8").trim());
+      try {
+        process.kill(ownerPid, 0);
+        log(`已有监测任务运行（PID ${ownerPid}）`);
+        process.exit(0);
+      } catch {
+        fs.rmSync(lockPath, { force: true });
+      }
+    }
+  }
+
+  throw new Error("无法获取自动提交进程锁");
+}
+
+function releaseProcessLock(lockPath) {
+  try {
+    if (Number(fs.readFileSync(lockPath, "utf8").trim()) === process.pid) {
+      fs.rmSync(lockPath, { force: true });
+    }
+  } catch {
+    // The lock was already removed.
+  }
 }
 
 function log(message) {
@@ -140,32 +174,51 @@ function commitSubject(files) {
 }
 
 function push(branch) {
-  const configuredRemote = git([
-    "config",
-    "--get",
-    `branch.${branch}.remote`,
-  ]);
-  const remote = configuredRemote && configuredRemote !== "." ? configuredRemote : "origin";
-  git(["push", remote, `HEAD:refs/heads/${branch}`], { stdio: "inherit" });
+  let remote = "origin";
+  try {
+    const configuredRemote = git([
+      "config",
+      "--get",
+      `branch.${branch}.remote`,
+    ]);
+    if (configuredRemote && configuredRemote !== ".") remote = configuredRemote;
+  } catch {
+    // A branch without an upstream is published to origin below.
+  }
+  git(["push", "--set-upstream", remote, `HEAD:refs/heads/${branch}`], {
+    stdio: "inherit",
+  });
   log(`已推送到 ${remote}/${branch}`);
 }
+function hasUnpushedCommits() {
+  try {
+    return Number(git(["rev-list", "--count", "@{upstream}..HEAD"])) > 0;
+  } catch {
+    return true;
+  }
+}
+
 
 function runCycle() {
   if (running) {
     pending = true;
-    return;
+    return true;
   }
 
   running = true;
   pending = false;
   try {
     const files = changedFiles();
-    if (files.length === 0) return;
-    assertSafeChanges();
     const branch = currentBranch();
+    if (files.length === 0) {
+      if (hasUnpushedCommits()) push(branch);
+      return true;
+    }
+
+    assertSafeChanges();
     git(["add", "--all", "--", "."]);
     if (!git(["diff", "--cached", "--name-only"])) {
-      return;
+      return true;
     }
     assertDiffClean();
 
@@ -179,18 +232,20 @@ function runCycle() {
     ], { stdio: "inherit" });
     log(`已提交：${subject}`);
     push(branch);
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    warn(`${message}；保留本地提交，稍后重试推送`);
-    if (retryTimer === null) {
+    warn(`${message}；本地状态保持不变，稍后重试`);
+    if (!once && retryTimer === null) {
       retryTimer = setTimeout(() => {
         retryTimer = null;
         runCycle();
       }, retryPeriodMs);
     }
+    return false;
   } finally {
     running = false;
-    if (pending) schedule();
+    if (!once && pending) schedule();
   }
 }
 
@@ -206,12 +261,15 @@ function stop() {
   if (timer !== null) clearTimeout(timer);
   if (retryTimer !== null) clearTimeout(retryTimer);
   watcher?.close();
+  releaseProcessLock(processLockPath);
   process.exit(0);
 }
 
+const processLockPath = acquireProcessLock();
+process.on("exit", () => releaseProcessLock(processLockPath));
+
 if (once) {
-  runCycle();
-  process.exit(0);
+  process.exit(runCycle() ? 0 : 1);
 }
 
 try {
