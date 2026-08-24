@@ -19,7 +19,7 @@ import type { WorldRecord } from "@/services/api.js";
 
 const WORLDS = [
   {
-    id: "haruka-academy",
+    id: "cloudmere",
     name: "遥风学园",
     description: "一所海边私立高中",
   } as WorldRecord,
@@ -57,7 +57,7 @@ describe("world select — entering a world", () => {
 
     fireEvent.click(screen.getByText("遥风学园"));
 
-    expect(onSelectWorld).toHaveBeenCalledWith("haruka-academy");
+    expect(onSelectWorld).toHaveBeenCalledWith("cloudmere");
   });
 
   it("releases the busy lock when the navigation does not take", () => {

@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { BalatroTransition } from "@/components/visual-effects/balatro-transition.js";
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
 import { worldVisualForId } from "@/lib/world-visuals.js";
@@ -12,6 +13,8 @@ import { SettingsDialog } from "@/settings/SettingsDialog.js";
 const AUTO_LOGIN_ATTEMPT_KEY = "covel:frostfox:auto-login-attempted";
 const DEFAULT_MARKET_URL = "https://market.dstopology.com";
 const HOME_TRANSITION_MS = 1_280;
+const HOME_PRIMARY_ACTION_CLASS =
+  "group h-14 w-full rounded-[10px] border border-[#e4ce8c] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] transition-colors hover:border-[#102428] hover:bg-[#102428] hover:text-[#f0dda2]";
 type LoginState = "checking" | "redirecting" | "ready" | "failed";
 
 export function GameHome() {
@@ -82,16 +85,10 @@ export function GameHome() {
   const currentWorldVisual = worldVisualForId(currentWorldId);
   const homeCover =
     currentWorldVisual?.image ?? "/visuals/backgrounds/moonveil-home-2k.webp";
-  const transitionImage = `/visuals/transitions/${currentWorldId ?? "mistport"}-enter.webp`;
   const requiresLogin = Boolean(status?.enabled && !status.authenticated);
   const loginPending =
     loginState === "checking" || loginState === "redirecting";
   const marketUrl = status?.routerBaseUrl ?? DEFAULT_MARKET_URL;
-
-  useEffect(() => {
-    const image = new Image();
-    image.src = transitionImage;
-  }, [transitionImage]);
 
   function retryLogin() {
     sessionStorage.removeItem(AUTO_LOGIN_ATTEMPT_KEY);
@@ -169,7 +166,7 @@ export function GameHome() {
                 className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914]"
               >
                 <FantasyGateIcon className="mr-2 h-5 w-5" />
-                {t("home.autoLogin", "正在自动登录…")}
+                {t("home.autoLogin")}
               </Button>
             ) : requiresLogin || loginState === "failed" ? (
               <div
@@ -180,13 +177,10 @@ export function GameHome() {
                   <FantasyGateIcon className="mt-0.5 h-6 w-6 shrink-0 text-[#e4ce8c]" />
                   <div>
                     <p className="text-sm font-semibold text-[#f4f0e5]">
-                      {t("home.mainLoginRequired", "请先登录霜狐主站")}
+                      {t("home.mainLoginRequired")}
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-[#f4f0e5]/68">
-                      {t(
-                        "home.mainLoginRequiredBody",
-                        "自动登录未完成。请先在主站登录账号，再返回重新连接。",
-                      )}
+                      {t("home.mainLoginRequiredBody")}
                     </p>
                   </div>
                 </div>
@@ -199,14 +193,14 @@ export function GameHome() {
                     className="group inline-flex h-11 items-center justify-center rounded-[9px] bg-[#e4ce8c] px-4 text-xs font-semibold text-[#191914] transition-colors hover:bg-[#102428] hover:text-[#f0dda2]"
                   >
                     <FantasyGateIcon className="mr-2 h-4 w-4 text-current" />
-                    {t("home.openMainSite", "前往霜狐主站登录")}
+                    {t("home.openMainSite")}
                   </a>
                   <button
                     type="button"
                     onClick={retryLogin}
                     className="h-10 rounded-[9px] border border-[#eee5ca]/35 text-xs font-medium text-[#f4f0e5]/78 transition-colors hover:border-[#e4ce8c] hover:text-[#e4ce8c]"
                   >
-                    {t("home.retryAutoLogin", "我已登录，重新连接")}
+                    {t("home.retryAutoLogin")}
                   </button>
                 </div>
               </div>
@@ -215,11 +209,11 @@ export function GameHome() {
                 size="lg"
                 onClick={handleStartGame}
                 disabled={transitioning}
-                className="group h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] transition-colors hover:bg-[#102428] hover:text-[#f0dda2]"
+                className={HOME_PRIMARY_ACTION_CLASS}
               >
                 <FantasyGateIcon className="mr-2 h-5 w-5 text-current" />
                 {transitioning
-                  ? t("home.enteringWorld", "正在进入世界…")
+                  ? t("home.enteringWorld")
                   : t("home.startPlaying")}
               </Button>
             )}
@@ -227,10 +221,9 @@ export function GameHome() {
             {!loginPending && !requiresLogin && loginState !== "failed" && (
               <Button
                 size="lg"
-                variant="outline"
                 onClick={() => settings.openWithKey("llm.providers")}
                 disabled={transitioning}
-                className="group h-14 w-full rounded-[10px] border border-[#e4ce8c] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] transition-colors hover:border-[#102428] hover:bg-[#102428] hover:text-[#f0dda2]"
+                className={HOME_PRIMARY_ACTION_CLASS}
               >
                 <FantasySettingsIcon className="mr-2 h-5 w-5 text-current" />
                 {t("home.openSettings")}
@@ -246,16 +239,18 @@ export function GameHome() {
           role="status"
           aria-live="polite"
         >
-          <img
-            src={transitionImage}
-            alt=""
+          <BalatroTransition />
+          <div
             aria-hidden="true"
-            width={1280}
-            height={720}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(2,8,9,.16)_46%,rgba(2,8,9,.68)_100%)]"
           />
+          <div className="absolute inset-x-0 bottom-[12vh] flex justify-center px-6">
+            <span className="border-y border-[#ead99e]/45 bg-[#061113]/62 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.34em] text-[#f4e4aa] backdrop-blur-sm">
+              {t("home.enteringWorld")}
+            </span>
+          </div>
           <span className="sr-only">
-            {t("home.enteringWorld", "正在进入世界…")}
+            {t("home.enteringWorld")}
           </span>
         </div>
       )}

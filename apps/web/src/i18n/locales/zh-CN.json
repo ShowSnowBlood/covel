@@ -118,6 +118,7 @@
     "levelNumber": "第 {{level}} 关",
     "levelProgress": "闯关进度",
     "campaignRoute": "连续闯关",
+    "otherWorlds": "其他世界",
     "levelProgressLoading": "正在读取闯关进度…",
     "levelAccountRequired": "登录账号后开始闯关并保存进度。",
     "levelProgressError": "暂时无法读取进度，请稍后重试。",

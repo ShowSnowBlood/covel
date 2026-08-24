@@ -16,6 +16,10 @@ import { Button } from "@/components/ui/button.js";
 import { ScrollArea } from "@/components/ui/scroll-area.js";
 import type { WorldRecord } from "@/services/api.js";
 import { WorldCard } from "@/components/world/world-card.js";
+import {
+  LevelAccordionGallery,
+  type LevelAccordionItem,
+} from "@/components/world/level-accordion-gallery.js";
 import type { FrostFoxProgressionStatus } from "@/services/api.js";
 
 export type LevelProgressionMode =
@@ -84,6 +88,39 @@ export function WorldListView({
     : worlds;
   const completedLevel = progression?.completedLevel ?? 0;
   const unlockedLevel = progression?.unlockedLevel ?? 0;
+  const campaignWorlds = campaignEnabled
+    ? orderedWorlds.filter((world) => frostFoxLevelForWorld(world.id) !== null)
+    : [];
+  const freePlayWorlds = campaignEnabled
+    ? orderedWorlds.filter((world) => frostFoxLevelForWorld(world.id) === null)
+    : orderedWorlds;
+  const campaignItems: LevelAccordionItem[] = campaignWorlds.map((world) => {
+    const levelNumber = frostFoxLevelForWorld(world.id)!;
+    return {
+      world,
+      levelNumber,
+      completed: levelNumber <= completedLevel,
+      locked: progressionMode !== "ready" || levelNumber > unlockedLevel,
+      unlocking: progressionMode === "ready" && levelNumber === unlockingLevel,
+      lockLabel:
+        progressionMode === "account-required"
+          ? t("session.levelSignIn", "Sign in to unlock")
+          : progressionMode === "loading"
+            ? t("session.levelProgressLoading", "Loading progress…")
+            : progressionMode === "error"
+              ? t("session.levelProgressUnavailable", "Progress unavailable")
+              : t("session.completePriorLevel", {
+                  level: levelNumber - 1,
+                  defaultValue: "Clear level {{level}} first",
+                }),
+      isEntering: enteringWorldId === world.id,
+      dimmed: enteringWorldId !== null && enteringWorldId !== world.id,
+    };
+  });
+  const activeCampaignIndex = Math.max(
+    campaignItems.findIndex((item) => item.levelNumber === unlockedLevel),
+    Math.min(completedLevel, Math.max(campaignItems.length - 1, 0)),
+  );
 
   return (
     <ScrollArea className="w-full h-full">
@@ -204,7 +241,7 @@ export function WorldListView({
               </div>
               {progressionMode === "account-required" ? (
                 <Button size="sm" onClick={onConnectAccount}>
-                  {t("account.connectAction", "Connect account")}
+                  {t("account.loginAction")}
                 </Button>
               ) : progressionMode === "ready" ? (
                 <p className="ui-meta tabular-nums text-foreground">
@@ -260,70 +297,54 @@ export function WorldListView({
           </section>
         )}
 
-        {/* World list — cover-led plates with the same action surface. */}
-        {orderedWorlds.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-            {orderedWorlds.map((world, index) => {
-              const isEntering = enteringWorldId === world.id;
-              const dimmed = enteringWorldId !== null && !isEntering;
-              const levelNumber = campaignEnabled
-                ? (frostFoxLevelForWorld(world.id) ?? undefined)
-                : undefined;
-              const completed =
-                levelNumber !== undefined && levelNumber <= completedLevel;
-              const locked =
-                levelNumber !== undefined &&
-                (progressionMode !== "ready" || levelNumber > unlockedLevel);
-              const unlocking =
-                progressionMode === "ready" &&
-                levelNumber !== undefined &&
-                levelNumber === unlockingLevel;
-
-              const lockLabel =
+        {campaignItems.length > 0 && (
+          <section aria-label={t("session.selectWorld", "Choose a world")}>
+            <LevelAccordionGallery
+              items={campaignItems}
+              defaultIndex={activeCampaignIndex}
+              t={t}
+              onEnter={onEnterWorld}
+              onLocked={
                 progressionMode === "account-required"
-                  ? t("session.levelSignIn", "Sign in to unlock")
-                  : progressionMode === "loading"
-                    ? t("session.levelProgressLoading", "Loading progress…")
-                    : progressionMode === "error"
-                      ? t(
-                          "session.levelProgressUnavailable",
-                          "Progress unavailable",
-                        )
-                      : levelNumber !== undefined
-                        ? t("session.completePriorLevel", {
-                            level: levelNumber - 1,
-                            defaultValue: "Clear level {{level}} first",
-                          })
-                        : undefined;
+                  ? onConnectAccount
+                  : undefined
+              }
+              onViewDetails={onViewDetails}
+              onDelete={onDeleteWorld}
+            />
+          </section>
+        )}
 
-              return (
-                <WorldCard
-                  key={world.id}
-                  world={world}
-                  index={index}
-                  isEntering={isEntering}
-                  dimmed={dimmed}
-                  storageLabel={storageLabel(world)}
-                  levelNumber={levelNumber}
-                  locked={locked}
-                  completed={completed}
-                  lockLabel={lockLabel}
-                  unlocking={unlocking}
-
-                  t={t}
-                  onEnter={onEnterWorld}
-                  onLocked={
-                    progressionMode === "account-required"
-                      ? onConnectAccount
-                      : undefined
-                  }
-
-                  onViewDetails={onViewDetails}
-                  onDelete={onDeleteWorld}
-                />
-              );
-            })}
-          </div>
+        {freePlayWorlds.length > 0 && (
+          <section className={campaignItems.length > 0 ? "mt-8" : ""}>
+            {campaignItems.length > 0 && (
+              <div className="mb-4 flex items-center gap-3">
+                <span className="ui-eyebrow text-muted-foreground">
+                  {t("session.otherWorlds", "Other worlds")}
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 md:gap-5">
+              {freePlayWorlds.map((world, index) => {
+                const isEntering = enteringWorldId === world.id;
+                return (
+                  <WorldCard
+                    key={world.id}
+                    world={world}
+                    index={index}
+                    isEntering={isEntering}
+                    dimmed={enteringWorldId !== null && !isEntering}
+                    storageLabel={storageLabel(world)}
+                    t={t}
+                    onEnter={onEnterWorld}
+                    onViewDetails={onViewDetails}
+                    onDelete={onDeleteWorld}
+                  />
+                );
+              })}
+            </div>
+          </section>
         )}
 
         {orderedWorlds.length === 0 && (

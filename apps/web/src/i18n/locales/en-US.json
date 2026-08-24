@@ -118,6 +118,7 @@
     "levelNumber": "LEVEL {{level}}",
     "levelProgress": "Level progress",
     "campaignRoute": "Campaign route",
+    "otherWorlds": "Other worlds",
     "levelProgressLoading": "Loading progress…",
     "levelAccountRequired": "Sign in to start and save your progress.",
     "levelProgressError": "Progress is unavailable. Try again shortly.",

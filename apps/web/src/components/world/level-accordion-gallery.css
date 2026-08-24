@@ -1,0 +1,367 @@
+/*
+ * Adapted from React Bits Accordion Gallery by David Haz.
+ * Copyright (c) 2026 David Haz. MIT + Commons Clause License Condition v1.0.
+ * Source: https://reactbits.dev/components/accordion-gallery
+ */
+
+.level-accordion-gallery {
+  display: flex;
+  width: 100%;
+  height: clamp(390px, 52vh, 540px);
+  gap: 10px;
+  perspective: 1400px;
+  perspective-origin: 50% 50%;
+}
+
+.level-accordion-panel {
+  --level-accent: var(--accent-primary);
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--level-accent) 24%, var(--rule-color));
+  border-radius: var(--radius-card);
+  background: #071013;
+  box-shadow: 0 20px 54px -38px rgba(0, 0, 0, 0.88);
+  transform-style: preserve-3d;
+  transform-origin: center;
+  will-change: flex-grow, transform;
+  transition:
+    border-color 180ms ease,
+    opacity 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.level-accordion-panel:hover,
+.level-accordion-panel-active {
+  border-color: color-mix(in oklab, var(--level-accent) 72%, white 8%);
+}
+
+.level-accordion-panel-active {
+  box-shadow: 0 26px 78px -42px
+    color-mix(in oklab, var(--level-accent) 62%, transparent);
+}
+
+.level-accordion-trigger {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: white;
+  text-align: left;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.level-accordion-trigger:disabled {
+  cursor: wait;
+}
+
+.level-accordion-trigger:focus-visible {
+  outline: 2px solid var(--level-accent);
+  outline-offset: -3px;
+}
+
+.level-accordion-media {
+  position: absolute;
+  inset: -3%;
+  display: block;
+  will-change: transform;
+}
+
+.level-accordion-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.level-accordion-panel-locked .level-accordion-media,
+.level-accordion-panel-unlocking .level-accordion-media {
+  filter: grayscale(0.82) saturate(0.45) brightness(0.66);
+}
+
+.level-accordion-panel-unlocking .level-accordion-media {
+  animation: level-accordion-reveal 1.4s ease-out both;
+}
+
+.level-accordion-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(2, 7, 8, 0.32) 0%,
+      rgba(2, 7, 8, 0.04) 28%,
+      rgba(2, 7, 8, 0.26) 53%,
+      rgba(2, 7, 8, 0.9) 100%
+    ),
+    linear-gradient(90deg, rgba(2, 7, 8, 0.48) 0%, transparent 62%);
+}
+
+.level-accordion-panel:not(.level-accordion-panel-active)
+  .level-accordion-wash {
+  background: rgba(2, 7, 8, 0.48);
+}
+
+.level-accordion-index {
+  position: absolute;
+  right: 14px;
+  top: 10px;
+  color: rgba(255, 255, 255, 0.14);
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 6vw, 6rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  transition: color 180ms ease;
+}
+
+.level-accordion-panel-active .level-accordion-index {
+  color: color-mix(in oklab, var(--level-accent) 28%, transparent);
+}
+
+.level-accordion-topline {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.level-accordion-level {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+}
+
+.level-accordion-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 5px 7px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(2, 7, 8, 0.46);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.level-accordion-status svg {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+}
+
+.level-accordion-content {
+  position: absolute;
+  z-index: 2;
+  left: clamp(20px, 3vw, 38px);
+  right: clamp(20px, 3vw, 38px);
+  bottom: clamp(22px, 4vw, 42px);
+  display: flex;
+  max-width: 38rem;
+  flex-direction: column;
+  align-items: flex-start;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.level-accordion-panel-active .level-accordion-content {
+  visibility: visible;
+  opacity: 1;
+}
+
+.level-accordion-title {
+  display: block;
+  color: #fffdf5;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.5vw, 4.75rem);
+  font-weight: 700;
+  line-height: 0.96;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.55);
+}
+
+.level-accordion-description {
+  display: -webkit-box;
+  max-width: 56ch;
+  margin-top: 14px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  line-height: 1.65;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.72);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.level-accordion-enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  border-top: 1px solid
+    color-mix(in oklab, var(--level-accent) 54%, transparent);
+  padding-top: 10px;
+  color: color-mix(in oklab, var(--level-accent) 86%, white 20%);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.level-accordion-enter svg {
+  width: 13px;
+  height: 13px;
+}
+
+.level-accordion-tools {
+  position: absolute;
+  z-index: 4;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  gap: 6px;
+}
+
+.level-accordion-tools button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(2, 7, 8, 0.5);
+  backdrop-filter: blur(8px);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.level-accordion-tools button:hover,
+.level-accordion-tools button:focus-visible {
+  border-color: color-mix(in oklab, var(--level-accent) 62%, white 12%);
+  color: white;
+  background: rgba(2, 7, 8, 0.72);
+  outline: none;
+}
+
+.level-accordion-tools svg {
+  width: 14px;
+  height: 14px;
+}
+
+.level-accordion-panel-locked::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.1;
+  background: repeating-linear-gradient(
+    -35deg,
+    transparent 0,
+    transparent 16px,
+    rgba(255, 255, 255, 0.22) 17px,
+    transparent 18px
+  );
+}
+
+@keyframes level-accordion-reveal {
+  0% {
+    filter: grayscale(1) saturate(0.25) brightness(0.5);
+  }
+  58% {
+    filter: grayscale(0.12) saturate(1.2) brightness(1.16);
+  }
+  100% {
+    filter: grayscale(0) saturate(1) brightness(1);
+  }
+}
+
+@media (max-width: 767px) {
+  .level-accordion-gallery {
+    height: min(68vh, 650px);
+    min-height: 480px;
+    flex-direction: column;
+    perspective: none;
+  }
+
+  .level-accordion-panel {
+    min-height: 0;
+    transform: none !important;
+  }
+
+  .level-accordion-index {
+    right: 18px;
+    top: 8px;
+    font-size: 3.5rem;
+  }
+
+  .level-accordion-topline {
+    top: 14px;
+    left: 14px;
+    right: 14px;
+  }
+
+  .level-accordion-content {
+    left: 18px;
+    right: 18px;
+    bottom: 22px;
+  }
+
+  .level-accordion-title {
+    font-size: clamp(1.8rem, 8vw, 3rem);
+  }
+
+  .level-accordion-description {
+    margin-top: 9px;
+    font-size: 12px;
+    -webkit-line-clamp: 2;
+  }
+
+  .level-accordion-enter {
+    margin-top: 12px;
+  }
+
+  .level-accordion-tools {
+    right: 12px;
+    bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-accordion-panel,
+  .level-accordion-media {
+    will-change: auto;
+  }
+
+  .level-accordion-panel-unlocking .level-accordion-media {
+    animation: none;
+  }
+}
