@@ -42,7 +42,7 @@ export function WorldCard({
     <article
       aria-busy={isEntering}
       onClick={() => onEnter(world.id)}
-      className={`group relative min-h-[320px] md:min-h-[332px] cursor-pointer overflow-hidden rounded-[var(--radius-card)] border border-border bg-card transition-all hover:border-primary/40 ${
+      className={`group relative min-h-80 md:min-h-83 cursor-pointer overflow-hidden rounded-(--radius-card) border border-border bg-card transition-all hover:border-primary/40 ${
         isEntering ? "opacity-100" : ""
       } ${dimmed ? "opacity-30 pointer-events-none" : ""}`}
       style={
@@ -87,7 +87,7 @@ export function WorldCard({
         style={{ background: "var(--world-accent)" }}
       />
 
-      <div className="relative z-10 flex min-h-[320px] md:min-h-[332px] flex-col justify-between p-5 md:p-6 text-white">
+      <div className="relative z-10 flex min-h-80 md:min-h-83 flex-col justify-between p-5 md:p-6 text-white">
         <div className="flex items-start justify-between gap-4">
           <span className="ui-meta text-[10px] text-white/62 tabular-nums">
             № {String(index + 1).padStart(2, "0")} · {world.id}
@@ -101,14 +101,14 @@ export function WorldCard({
         </div>
 
         <div className="space-y-3.5">
-          <div className="max-w-[31rem] space-y-2.5">
+          <div className="max-w-124 space-y-2.5">
             <h2
               className="ui-title text-3xl md:text-[2.35rem] leading-[1.02] tracking-tight text-white transition-colors"
               style={isEntering ? { color: "var(--world-accent)" } : undefined}
             >
               {text(world.name)}
             </h2>
-            <p className="text-[14px] leading-relaxed text-white/76 line-clamp-3 break-words [overflow-wrap:anywhere]">
+            <p className="text-[14px] leading-relaxed text-white/76 line-clamp-3 wrap-break-word">
               {text(world.description)}
             </p>
           </div>
@@ -144,7 +144,7 @@ export function WorldCard({
                   type="button"
                   onClick={(e) => onDelete(e, world.id)}
                   aria-label={t("world.delete", "Delete world")}
-                  className="ui-btn ui-btn-quiet h-8 w-8 border-white/12 bg-black/12 p-0 text-white/72 hover:text-[var(--accent-danger)]"
+                  className="ui-btn ui-btn-quiet h-8 w-8 border-white/12 bg-black/12 p-0 text-white/72 hover:text-(--accent-danger)"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

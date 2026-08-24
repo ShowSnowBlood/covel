@@ -229,7 +229,7 @@ export function RightPanel({
         orientation="vertical"
       >
         <div
-          className="border-r border-[var(--rule-color)] shrink-0 w-12 overflow-hidden"
+          className="border-r border-(--rule-color) shrink-0 w-12 overflow-hidden"
           style={{
             background:
               "color-mix(in oklab, var(--surface-rail) 70%, var(--surface-page))",
@@ -258,7 +258,7 @@ export function RightPanel({
                   >
                     <span
                       aria-hidden
-                      className="absolute left-0 top-1 bottom-1 w-[2px] bg-transparent transition-colors group-data-[state=active]:bg-[var(--accent-primary)]"
+                      className="absolute left-0 top-1 bottom-1 w-0.5 bg-transparent transition-colors group-data-[state=active]:bg-(--accent-primary)"
                     />
                     <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1">
                       <ItemIcon className="w-4 h-4 shrink-0" />
@@ -274,7 +274,7 @@ export function RightPanel({
         </div>
         <ScrollArea className="flex-1 min-h-0 min-w-0">
           <TabsContent value="world" className="p-4 m-0 max-w-full">
-            <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-[var(--rule-color)] pb-3">
+            <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-(--rule-color) pb-3">
               <BookOpen className="w-4 h-4 shrink-0 text-muted-foreground" />
               <h3 className="ui-title text-sm font-semibold tracking-tight truncate">
                 {t("session.worldTab")}
@@ -283,7 +283,7 @@ export function RightPanel({
             <WorldDocumentPanel world={world} />
           </TabsContent>
           <TabsContent value="database" className="p-4 m-0 max-w-full">
-            <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-[var(--rule-color)] pb-3">
+            <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-(--rule-color) pb-3">
               <Database className="w-4 h-4 shrink-0 text-muted-foreground" />
               <h3 className="ui-title text-sm font-semibold tracking-tight truncate">
                 {t("session.database")}
@@ -308,7 +308,7 @@ export function RightPanel({
                 value={`plugin-${group.id}`}
                 className="p-4 m-0 max-w-full"
               >
-                <div className="mb-3 flex min-w-0 items-center gap-2 border-b border-[var(--rule-color)] pb-3">
+                <div className="mb-3 flex min-w-0 items-center gap-2 border-b border-(--rule-color) pb-3">
                   <GroupIcon className="w-4 h-4 shrink-0 text-muted-foreground" />
                   <h3 className="ui-title text-sm font-semibold tracking-tight truncate">
                     {group.label}
@@ -319,7 +319,7 @@ export function RightPanel({
                 {providerPlan.multiProvider && (
                   <div className="flex items-center gap-2 mb-2 ui-meta text-[10px] text-muted-foreground">
                     <span>{t("session.provider", "provider")}</span>
-                    <div className="flex items-center border border-[var(--rule-color)] rounded-[var(--radius-control)] overflow-hidden">
+                    <div className="flex items-center border border-(--rule-color) rounded-(--radius-control) overflow-hidden">
                       {providerPlan.providers.map((p) => {
                         const isActive =
                           p.pluginId === providerPlan.activeProviderId;
@@ -337,9 +337,9 @@ export function RightPanel({
                                 }));
                               }
                             }}
-                            className={`px-2 py-0.5 text-[10px] font-medium tracking-wider transition-colors max-w-[10rem] truncate ${
+                            className={`px-2 py-0.5 text-[10px] font-medium tracking-wider transition-colors max-w-40 truncate ${
                               isActive
-                                ? "bg-foreground text-[var(--surface-page)]"
+                                ? "bg-foreground text-(--surface-page)"
                                 : "text-muted-foreground hover:text-foreground"
                             }`}
                             title={p.pluginId}
@@ -362,7 +362,7 @@ export function RightPanel({
                 {(providerPlan.activeProviderSubs.length > 1 ||
                   (!providerPlan.multiProvider &&
                     group.subPanels.length > 1)) && (
-                  <div className="flex items-center gap-2 mb-3 border-b border-[var(--rule-color)] pb-2 flex-wrap">
+                  <div className="flex items-center gap-2 mb-3 border-b border-(--rule-color) pb-2 flex-wrap">
                     {(providerPlan.multiProvider
                       ? providerPlan.activeProviderSubs
                       : group.subPanels.map((sub, idx) => ({ sub, idx }))
@@ -381,14 +381,12 @@ export function RightPanel({
                           }
                           className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium border-b-2 -mb-px transition-colors ${
                             isActive
-                              ? "border-[var(--accent-primary)] text-foreground"
+                              ? "border-(--accent-primary) text-foreground"
                               : "border-transparent text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           <SubIcon className="w-3 h-3" />
-                          <span className="truncate max-w-[8rem]">
-                            {sub.label}
-                          </span>
+                          <span className="truncate max-w-32">{sub.label}</span>
                         </button>
                       );
                     })}

@@ -59,7 +59,7 @@ export const Textarea: ComponentRenderer = ({ element, bindings }) => {
         onChange={(e) => onChange(e.target.value)}
         className={clsx(
           inputBase,
-          "min-h-[160px] resize-y font-mono leading-relaxed",
+          "min-h-40 resize-y font-mono leading-relaxed",
         )}
       />
     </div>

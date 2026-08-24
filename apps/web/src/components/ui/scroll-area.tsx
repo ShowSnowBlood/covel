@@ -19,7 +19,7 @@ function ScrollArea({
         patterns inside the panel. Force the wrapper to `block` so flex children
         respect the viewport width and truncate correctly.
       */}
-      <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
+      <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:block!">
         {children}
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
@@ -38,8 +38,8 @@ function ScrollBar({
       orientation={orientation}
       className={cn(
         "flex touch-none select-none transition-opacity",
-        orientation === "vertical" && "h-full w-2 p-[2px]",
-        orientation === "horizontal" && "h-2 flex-col p-[2px]",
+        orientation === "vertical" && "h-full w-2 p-0.5",
+        orientation === "horizontal" && "h-2 flex-col p-0.5",
         className,
       )}
       {...props}

@@ -214,7 +214,7 @@ export const BranchReplyCandidates: ComponentRenderer = ({ element }) => {
             }
             disabled={!canInvokeRuntime || pendingAction !== null}
             aria-busy={pendingAction === "createCandidates" || undefined}
-            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-border px-2 py-1 text-[11px] text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1 rounded-(--radius-control) border border-border px-2 py-1 text-[11px] text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors"
           >
             <Icons.RefreshCw
               className={clsx(
@@ -260,14 +260,14 @@ export const BranchReplyCandidates: ComponentRenderer = ({ element }) => {
                 <button
                   type="button"
                   onClick={() => draftCandidate(candidate)}
-                  className="font-medium rounded-[var(--radius-control)] transition-all text-left inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] bg-transparent text-muted-foreground border border-dashed border-border hover:border-foreground/40 hover:text-foreground"
+                  className="font-medium rounded-(--radius-control) transition-all text-left inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] bg-transparent text-muted-foreground border border-dashed border-border hover:border-foreground/40 hover:text-foreground"
                 >
                   {draftLabel}
                 </button>
                 <button
                   type="button"
                   onClick={() => sendCandidate(candidate)}
-                  className="font-medium rounded-[var(--radius-control)] transition-all text-left inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] bg-transparent text-foreground border border-border hover:border-foreground/40 hover:bg-foreground/5"
+                  className="font-medium rounded-(--radius-control) transition-all text-left inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] bg-transparent text-foreground border border-border hover:border-foreground/40 hover:bg-foreground/5"
                 >
                   {sendLabel}
                 </button>
@@ -283,9 +283,9 @@ export const BranchReplyCandidates: ComponentRenderer = ({ element }) => {
                   disabled={!canInvokeRuntime || pendingAction !== null}
                   aria-busy={pendingAction === "acceptCandidate" || undefined}
                   className={clsx(
-                    "font-medium rounded-[var(--radius-control)] transition-all text-left inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] border",
+                    "font-medium rounded-(--radius-control) transition-all text-left inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] border",
                     accepted
-                      ? "bg-foreground text-[var(--surface-page)] border-foreground hover:bg-foreground/90"
+                      ? "bg-foreground text-(--surface-page) border-foreground hover:bg-foreground/90"
                       : "bg-transparent text-muted-foreground border-dashed border-border hover:border-foreground/40 hover:text-foreground",
                     pendingAction !== null && "opacity-70 cursor-progress",
                   )}

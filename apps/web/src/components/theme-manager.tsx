@@ -123,9 +123,7 @@ export function ThemeManagerWidget() {
         <div className="ui-band text-xs" data-tone={error ? "danger" : "info"}>
           <span
             className={
-              error
-                ? "text-[var(--accent-danger)]"
-                : "text-[var(--accent-secondary)]"
+              error ? "text-(--accent-danger)" : "text-(--accent-secondary)"
             }
           >
             {error ?? notice}
@@ -165,7 +163,7 @@ export function ThemeManagerWidget() {
         <div className="ui-frame p-3 space-y-2 text-xs text-muted-foreground">
           <p>{t("settings.themeImportHint")}</p>
           <pre
-            className="overflow-auto rounded-[var(--radius-control)] px-3 py-2 text-[11px] font-mono leading-relaxed"
+            className="overflow-auto rounded-(--radius-control) px-3 py-2 text-[11px] font-mono leading-relaxed"
             style={{ background: "var(--surface-page)" }}
           >
             {`html[data-theme="my-theme"] {
@@ -223,7 +221,7 @@ html[data-theme="my-theme"].dark {
               <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 {selected && (
                   <div
-                    className="flex items-center overflow-hidden rounded-[var(--radius-control)] border border-[var(--rule-color)]"
+                    className="flex items-center overflow-hidden rounded-(--radius-control) border border-(--rule-color)"
                     aria-label={t("settings.themeSchemeLabel")}
                   >
                     {(["light", "dark"] as const).map((nextScheme) => {
@@ -237,7 +235,7 @@ html[data-theme="my-theme"].dark {
                           className={
                             "h-7 rounded-none border-0 px-2 text-[11px] " +
                             (scheme === nextScheme
-                              ? "bg-foreground text-[var(--surface-page)]"
+                              ? "bg-foreground text-(--surface-page)"
                               : "text-muted-foreground")
                           }
                           onClick={() => void setScheme(nextScheme)}

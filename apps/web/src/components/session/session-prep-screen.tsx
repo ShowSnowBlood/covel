@@ -242,7 +242,7 @@ export function SessionPrepScreen({
       <ScrollArea className="w-full h-full">
         <div className="mx-auto max-w-6xl px-4 md:px-8 py-5 md:py-8">
           <header
-            className="relative mb-6 overflow-hidden rounded-[var(--radius-card)] border border-border bg-card"
+            className="relative mb-6 overflow-hidden rounded-(--radius-card) border border-border bg-card"
             style={{ "--world-accent": visual.accent } as CSSProperties}
           >
             <img
@@ -264,7 +264,7 @@ export function SessionPrepScreen({
                   "linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.58) 48%, rgba(0,0,0,.22) 100%)",
               }}
             />
-            <div className="relative z-10 flex min-h-[236px] md:min-h-[252px] flex-col justify-between p-5 md:p-7 text-white">
+            <div className="relative z-10 flex min-h-59 md:min-h-63 flex-col justify-between p-5 md:p-7 text-white">
               <div className="flex items-center justify-between gap-4">
                 <Button
                   variant="ghost"
@@ -319,7 +319,7 @@ export function SessionPrepScreen({
 
           {startError && (
             <div
-              className="mb-5 flex items-start gap-2 rounded-[var(--radius-card)] border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm"
+              className="mb-5 flex items-start gap-2 rounded-(--radius-card) border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm"
               role="alert"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
@@ -327,7 +327,7 @@ export function SessionPrepScreen({
                 <p className="font-medium text-destructive">
                   {t("session.startFailed", "Could not create session")}
                 </p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">
+                <p className="mt-1 wrap-break-word text-xs text-muted-foreground">
                   {startError}
                 </p>
               </div>

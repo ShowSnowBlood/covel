@@ -107,7 +107,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[80vh] p-0 gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-5 pb-4 border-b border-[var(--rule-color)]">
+        <DialogHeader className="px-6 pt-5 pb-4 border-b border-(--rule-color)">
           <DialogTitle className="flex items-baseline gap-3">
             <span className="ui-meta text-[10px] text-muted-foreground">
               § SETTINGS
@@ -123,10 +123,10 @@ export function SettingsDialog({
         </DialogHeader>
         <div className="flex-1 flex overflow-hidden">
           <aside
-            className="w-56 shrink-0 border-r border-[var(--rule-color)] flex flex-col"
+            className="w-56 shrink-0 border-r border-(--rule-color) flex flex-col"
             style={{ background: "var(--surface-rail)" }}
           >
-            <div className="p-3 border-b border-[var(--rule-color)] flex items-center gap-2">
+            <div className="p-3 border-b border-(--rule-color) flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               <input
                 value={query}
@@ -160,7 +160,7 @@ export function SettingsDialog({
                     {isSelected && !isHeader && (
                       <span
                         aria-hidden
-                        className="absolute left-0 top-0 bottom-0 w-[3px]"
+                        className="absolute left-0 top-0 bottom-0 w-0.75"
                         style={{ background: "var(--accent-primary)" }}
                       />
                     )}

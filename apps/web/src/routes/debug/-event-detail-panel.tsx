@@ -13,8 +13,8 @@ export function EventDetailPanel({
   const { t } = useTranslation();
 
   return (
-    <div className="w-80 flex-shrink-0 border-l border-border flex flex-col min-h-0 ui-rail">
-      <div className="px-3 py-2 border-b border-[var(--rule-color)] flex items-center justify-between">
+    <div className="w-80 shrink-0 border-l border-border flex flex-col min-h-0 ui-rail">
+      <div className="px-3 py-2 border-b border-(--rule-color) flex items-center justify-between">
         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           {t("debugger.eventDetail")}
         </h3>
