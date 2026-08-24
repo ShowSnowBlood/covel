@@ -138,6 +138,74 @@ describe("failed hydration", () => {
 });
 
 describe("concurrent writes", () => {
+  it("serialises full settings snapshots so an older save cannot win last", async () => {
+    let entries: Record<string, unknown> = {};
+    let saveCalls = 0;
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const adapter: SettingsBackendAdapter = {
+      async load() {
+        return {};
+      },
+      async save(next) {
+        saveCalls += 1;
+        if (saveCalls === 1) await firstGate;
+        entries = { ...next };
+      },
+      async loadSecrets() {
+        return {};
+      },
+      async saveSecrets() {},
+    };
+    const store = new SettingsStore(adapter);
+    await store.init();
+
+    const first = store.set("a.one", 1);
+    const second = store.set("a.two", 2);
+    await Promise.resolve();
+
+    expect(saveCalls).toBe(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(entries).toEqual({ "a.one": 1, "a.two": 2 });
+  });
+
+  it("serialises full secret snapshots", async () => {
+    let secrets: Record<string, string> = {};
+    let saveCalls = 0;
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const adapter: SettingsBackendAdapter = {
+      async load() {
+        return {};
+      },
+      async save() {},
+      async loadSecrets() {
+        return {};
+      },
+      async saveSecrets(next) {
+        saveCalls += 1;
+        if (saveCalls === 1) await firstGate;
+        secrets = { ...next };
+      },
+    };
+    const store = new SettingsStore(adapter);
+    await store.init();
+
+    const first = store.set("keys.deepseek", "key-a");
+    const second = store.set("keys.openai", "key-b");
+    await Promise.resolve();
+
+    expect(saveCalls).toBe(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(secrets).toEqual({ deepseek: "key-a", openai: "key-b" });
+  });
+
   it("does not let a failed write roll back a concurrent successful one", async () => {
     const adapter = createMemoryAdapter();
     const store = new SettingsStore(adapter);

@@ -9,7 +9,7 @@
  *   pnpm --filter @covel/ai-provider update-model-db
  */
 
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -304,6 +304,7 @@ async function main() {
     models,
   };
 
+  mkdirSync(dirname(OUTPUT_PATH), { recursive: true });
   writeFileSync(OUTPUT_PATH, JSON.stringify(db, null, 2), "utf-8");
 
   console.log(`Done! Written ${db.count} models to data/model-db.json`);

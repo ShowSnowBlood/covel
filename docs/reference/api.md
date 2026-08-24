@@ -547,6 +547,8 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 | PUT  | `/api/config/keys`             | 仅桌面：写入 `<covelHome>/keys.env`；body `{ provider: value }`                                                                                                     |
 | GET  | `/api/config/settings`         | 仅桌面：读取 `<covelHome>/settings.json`（unified SettingsStore）                                                                                                   |
 | PUT  | `/api/config/settings`         | 仅桌面：原子写 `settings.json`；body `{ entries: Record<string, unknown> }`                                                                                         |
+| GET  | `/api/config/proxy`            | 仅桌面：读取核心出站请求的代理模式与生效状态；返回 `{ mode, url?, effective, systemAvailable }`                                                                     |
+| PUT  | `/api/config/proxy`            | 仅桌面：写入并热应用代理；body `{ mode: "direct"                                                                                                                    | "system" | "http" | "socks", url? }`。HTTP/S 与 SOCKS5 地址支持 URL 内认证信息 |
 | PUT  | `/api/config/data-root`        | 仅桌面：改写 `config.toml` 的 `data_root` 行，需要重启服务器                                                                                                        |
 | POST | `/api/config/open-folder`      | 仅桌面：打开 config/data/logs 目录或 `llm.toml` / `keys.env`                                                                                                        |
 

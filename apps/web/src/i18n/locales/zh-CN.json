@@ -529,6 +529,9 @@
     "overrideApplied": "已覆盖",
     "modelDatabase": "模型数据库",
     "updateFromGitHub": "从 GitHub 更新",
+    "modelDbRefreshStarted": "已开始从 GitHub 更新模型数据库",
+    "modelDbRefreshSucceeded": "模型数据库更新完成，共 {{count}} 个模型",
+    "modelDbRefreshFailed": "模型数据库更新失败",
     "modelCount": "{{count}} 个模型 (LiteLLM)",
     "updatedAt": "更新于: {{date}}",
     "dbUnavailable": "数据库不可用",
@@ -641,6 +644,17 @@
       "reloadFailed": "重新加载失败"
     },
     "desktopDataLocations": "数据位置",
+    "desktopProxy": "网络代理",
+    "desktopProxyHint": "控制核心模型请求和模型数据库更新是否经过代理。",
+    "desktopProxyDirect": "不使用代理",
+    "desktopProxySystem": "跟随系统代理",
+    "desktopProxyHttp": "HTTP(S) 代理",
+    "desktopProxySocks": "SOCKS5 代理",
+    "desktopProxySystemDirect": "当前未检测到系统代理，将使用直连。",
+    "desktopProxySave": "保存并应用",
+    "desktopProxySaved": "代理设置已保存并立即生效",
+    "desktopProxyActive": "当前请求经过代理",
+    "desktopProxyInactive": "当前请求使用直连",
     "desktopDataConfig": "配置",
     "desktopDataData": "数据",
     "desktopDataDb": "数据库",
@@ -1043,6 +1057,21 @@
     "syncFailed": "无法将本局同步到服务器"
   },
   "error": {
+    "actionable": {
+      "auth": "认证失败，请检查 API 密钥。",
+      "forbidden": "服务商拒绝了请求，请检查账号权限。",
+      "notFound": "接口或模型不存在，请检查 API 地址和模型 ID。",
+      "rateLimited": "请求过于频繁，请检查额度和余额。",
+      "server": "服务商暂时不可用，请稍后重试。",
+      "timeout": "请求超时，请检查网络或代理。",
+      "network": "无法连接服务商，请检查网络或代理。",
+      "generic": "请求失败，可展开查看原始错误。",
+      "unknown": "请求失败，服务端未返回错误详情。",
+      "showDetail": "查看详情",
+      "hideDetail": "收起详情",
+      "copyDetail": "复制详情",
+      "copied": "已复制"
+    },
     "plugin": {
       "loadFailed": "插件加载失败"
     },

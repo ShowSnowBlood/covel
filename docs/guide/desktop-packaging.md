@@ -5,7 +5,7 @@ This document describes how to build signed, notarized Covel desktop artifacts. 
 ## One-off prep
 
 1. Install the Node toolchain and dependencies at the repo root (`pnpm install`).
-2. Stage resources: `pnpm --filter @covel/desktop build` (produces `apps/desktop/dist/`, `apps/desktop/staging/`).
+2. Stage resources: `pnpm --filter @covel/desktop build` (produces `apps/desktop/dist/`, `apps/desktop/staging/`). A clean checkout generates the LiteLLM model database first and verifies `node_modules/@covel/ai-provider/data/model-db.json` is present in staging, so releases never silently omit the baseline database.
 
 Running `pnpm --filter @covel/desktop dist` after that invokes electron-builder.
 

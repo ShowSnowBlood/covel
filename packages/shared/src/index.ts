@@ -30,6 +30,14 @@ export {
   providerKeyToId,
   toApiKeyEnvMap,
 } from "./utils/provider-keys.js";
+export {
+  BUILTIN_PROVIDER_CONNECTIONS,
+  getBuiltinProviderConnection,
+} from "./utils/provider-defaults.js";
+export type {
+  BuiltinProviderConnection,
+  BuiltinProviderProtocol,
+} from "./utils/provider-defaults.js";
 
 // ── Environment Registry ──────────────────────────────────────────
 export * from "./env/index.js";

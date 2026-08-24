@@ -221,6 +221,11 @@ const DEFAULT_CONFIG_TOML = `# Covel user config.
 [paths]
 # data_root = "/Volumes/External/covel-data"
 
+[network]
+# Outbound LLM/model-database requests: direct | system | http | socks
+proxy_mode = "direct"
+# proxy_url = "http://127.0.0.1:7890"
+
 [logging]
 # Rolling log files under <data_root>/logs/. Each file caps at max_size_mb;
 # max_files determines how many rotated files are kept before oldest is dropped.
@@ -241,10 +246,15 @@ export function ensureUserPaths(): ResolvedPaths {
   const cfgFile = configTomlPath();
   if (!fs.existsSync(cfgFile)) {
     try {
-      fs.writeFileSync(cfgFile, DEFAULT_CONFIG_TOML);
+      fs.writeFileSync(cfgFile, DEFAULT_CONFIG_TOML, { mode: 0o600 });
     } catch (err) {
       console.warn("[paths] Could not seed config.toml:", err);
     }
+  }
+  try {
+    fs.chmodSync(cfgFile, 0o600);
+  } catch (err) {
+    console.warn("[paths] Could not tighten config.toml permissions:", err);
   }
 
   const data = dataRoot();

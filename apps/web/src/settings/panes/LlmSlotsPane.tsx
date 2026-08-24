@@ -168,6 +168,7 @@ export function LlmSlotsPane() {
 
   const handleRefreshModelDb = async () => {
     setRefreshing(true);
+    emitToast("info", t("settings.modelDbRefreshStarted"));
     try {
       const result = await refreshModelDb();
       if (result.ok) {
@@ -176,9 +177,19 @@ export function LlmSlotsPane() {
           count: result.count,
           updatedAt: new Date().toISOString(),
         });
+        emitToast(
+          "success",
+          t("settings.modelDbRefreshSucceeded", { count: result.count ?? 0 }),
+        );
+      } else {
+        emitToast("error", t("settings.modelDbRefreshFailed"), result.error);
       }
-    } catch {
-      // silent
+    } catch (error) {
+      emitToast(
+        "error",
+        t("settings.modelDbRefreshFailed"),
+        error instanceof Error ? error.message : String(error),
+      );
     } finally {
       setRefreshing(false);
     }
@@ -526,48 +537,44 @@ export function LlmSlotsPane() {
         );
       })}
 
-      {isConfigured && (
-        <div className="border border-dashed border-border p-3 space-y-2 mt-2">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <Database className="w-3 h-3" />
-              {t("settings.modelDatabase")}
-            </h4>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 text-[10px] px-2"
-              disabled={refreshing}
-              onClick={handleRefreshModelDb}
-            >
-              {refreshing ? (
-                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-              ) : (
-                <RotateCw className="w-3 h-3 mr-1" />
-              )}
-              {t("settings.updateFromGitHub")}
-            </Button>
-          </div>
-          {modelDbInfo?.available ? (
-            <div className="text-[10px] text-muted-foreground space-y-0.5">
-              <div>
-                {t("settings.modelCount", { count: modelDbInfo.count })}
-              </div>
-              <div>
-                {t("settings.updatedAt", {
-                  date: modelDbInfo.updatedAt
-                    ? new Date(modelDbInfo.updatedAt).toLocaleDateString()
-                    : "?",
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="text-[10px] text-muted-foreground">
-              {t("settings.dbUnavailable")}
-            </div>
-          )}
+      <div className="border border-dashed border-border p-3 space-y-2 mt-2">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+            <Database className="w-3 h-3" />
+            {t("settings.modelDatabase")}
+          </h4>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 text-[10px] px-2"
+            disabled={refreshing}
+            onClick={handleRefreshModelDb}
+          >
+            {refreshing ? (
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+            ) : (
+              <RotateCw className="w-3 h-3 mr-1" />
+            )}
+            {t("settings.updateFromGitHub")}
+          </Button>
         </div>
-      )}
+        {modelDbInfo?.available ? (
+          <div className="text-[10px] text-muted-foreground space-y-0.5">
+            <div>{t("settings.modelCount", { count: modelDbInfo.count })}</div>
+            <div>
+              {t("settings.updatedAt", {
+                date: modelDbInfo.updatedAt
+                  ? new Date(modelDbInfo.updatedAt).toLocaleDateString()
+                  : "?",
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="text-[10px] text-muted-foreground">
+            {t("settings.dbUnavailable")}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.27] - 2026-08-24
+
+This release improves Windows desktop networking, model setup defaults, remote model-database refreshes, and the visibility of provider failures.
+
+### Added
+
+- **Desktop requests can use direct, system, HTTP(S), or SOCKS5 proxy modes.** The selected mode applies consistently to provider traffic and GitHub model-database updates, with the active route visible in settings.
+- **Provider failures now have actionable, expandable details.** Authentication, permission, quota, timeout, network, and upstream failures receive localized guidance while preserving the full original error for inspection and copying.
+
+### Changed
+
+- **The first provider model becomes both the story and plugin default.** A fresh setup can run plugin-backed tasks immediately without requiring a second manual slot assignment.
+- **GitHub model-database refreshes report progress and results.** Desktop refreshes go through the sidecar, update the bundled capability database safely, and surface start, success, and failure feedback.
+
+### Fixed
+
+- **Undici requests share one validated outbound-network dispatcher.** Windows proxy and DNS behaviour no longer depends on incompatible request-hook shapes, and local/private targets keep their safety checks.
+- **Settings and API-key snapshots persist in mutation order.** A slow older write can no longer finish last and erase a newer provider, model, or secret configuration.
+- **Provider and runtime errors remain readable at narrow widths.** Model metadata and connection tests use separate rows, failed runtime chips wrap cleanly, and corrected API keys invalidate stale authentication-test results.
+- **Plugin README validation ignores package-manager residue.** Ignored `node_modules`-only directories no longer create false missing-README failures.
+
 ## [0.0.26] - 2026-08-19
 
 This release rebuilds provider and model configuration around explicit connection profiles, capability-aware reasoning controls, and safer provider-specific request handling.

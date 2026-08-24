@@ -45,6 +45,13 @@
 # 默认：~/.covel/data
 # data_root = "/Volumes/External/covel-data"
 
+[network]
+# direct | system | http | socks
+proxy_mode = "direct"
+# HTTP(S) 示例：http://127.0.0.1:7890
+# SOCKS5 示例：socks5://127.0.0.1:7891
+proxy_url = ""
+
 [logging]
 # 单个日志文件上限（MB），超过后轮转
 max_size_mb = 10
@@ -52,7 +59,11 @@ max_size_mb = 10
 max_files   = 10
 ```
 
-改完要重启 Covel 生效。**改 `data_root` 不会搬旧数据** —— 新位置是空的，老数据与用户世界留在原处你自己处理。
+手动改完要重启 Covel 生效；在 **设置 → 桌面 → 网络代理** 保存则会立即热应用。`direct` 不走代理，`system` 跟随 Electron/Windows 检测到的系统代理，`http` 接受 `http://` / `https://` 地址，`socks` 接受 `socks://` / `socks5://` 地址；省略协议时分别补为 `http://` 与 `socks5://`。代理 URL 可带 `user:password@host`，因此配置文件会收紧为 `0600`。
+
+代理覆盖框架拥有的核心 LLM 请求与“从 GitHub 更新”模型数据库请求。第三方插件的 `fetchWithRetry` 保持直连和严格 DNS/SSRF pinning，避免代理侧远程 DNS 绕过插件网络边界。
+
+**改 `data_root` 不会搬旧数据** —— 新位置是空的，老数据与用户世界留在原处你自己处理。
 
 ## `~/.covel/keys.env`
 
@@ -83,7 +94,7 @@ server 会按 `*_API_KEY` 扫描所有条目注入 provider 运行时。Key 名 
 
 ## 桌面 REST 写接口的 token 门
 
-桌面版 sidecar 会在每次启动时生成一个一次性 bearer token，并以 `COVEL_DESKTOP_REST_TOKEN` 注入子进程环境。所有写接口（`PUT /api/config/keys`、`PUT /api/config/settings`、`PUT /api/config/data-root`、`POST /api/config/open-folder`）以及 `GET /api/config/settings`（返回完整 settings.json 内容）都会校验请求头 `Authorization: Bearer <token>`，缺失或不匹配返回 `401`。真正开放的只有 `GET /api/config/info` 和 `GET /api/config/keys`（仅返回 provider 列表，不含 key 值）。
+桌面版 sidecar 会在每次启动时生成一个一次性 bearer token，并以 `COVEL_DESKTOP_REST_TOKEN` 注入子进程环境。所有写接口（`PUT /api/config/keys`、`PUT /api/config/settings`、`PUT /api/config/proxy`、`PUT /api/config/data-root`、`POST /api/config/open-folder`）以及会返回本地配置的 `GET /api/config/settings` / `GET /api/config/proxy` 都会校验请求头 `Authorization: Bearer <token>`，缺失或不匹配返回 `401`。真正开放的只有 `GET /api/config/info` 和 `GET /api/config/keys`（仅返回 provider 列表，不含 key 值）。
 
 `GET /api/config/info` 的响应里增加了 `requiresAuth` 字段，前端据此决定是否需要附带 Authorization 头。Electron 渲染进程通过 `covel:get-info` IPC 拿到 `restToken` 字段，自动注入到所有写请求。开发模式下若未设置该 env，token 门不启用，纯 web tier 与 `pnpm dev:web` 流程保持原样。
 

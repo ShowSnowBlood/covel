@@ -327,7 +327,14 @@ const pluginDirs = fs
   .readdirSync(path.join(repoRoot, "plugins"), { withFileTypes: true })
   // `_`-prefixed dirs are non-plugin conventions (plugins/_archive holds
   // retired plugins; discovery and the workspace glob skip them too).
-  .filter((e) => e.isDirectory() && !e.name.startsWith("_"));
+  .filter((e) => e.isDirectory() && !e.name.startsWith("_"))
+  // A package manager can leave an ignored node_modules-only directory after
+  // a plugin is archived. Keep validating every directory with actual source
+  // content while excluding that non-package residue.
+  .filter((e) => {
+    const dir = path.join(repoRoot, "plugins", e.name);
+    return fs.readdirSync(dir).some((name) => name !== "node_modules");
+  });
 let pluginIssues = 0;
 let eventSchemaChecks = 0;
 for (const entry of pluginDirs) {

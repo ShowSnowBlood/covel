@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FolderOpen, Info } from "lucide-react";
 import {
@@ -12,7 +12,10 @@ import { Button } from "@/components/ui/button.js";
 import { SettingWidget } from "../widgets/index.js";
 import { useSettingsStore } from "../use-settings.js";
 import { useSession } from "@/stores/session-store.js";
-import { PingButton } from "@/components/shared/ping-button.js";
+import {
+  invalidateAllPingResults,
+  PingButton,
+} from "@/components/shared/ping-button.js";
 import { isDesktopApp, openLlmToml } from "@/lib/desktop-bridge.js";
 
 /**
@@ -50,32 +53,25 @@ export function LlmKeysPane({
   const { t } = useTranslation();
   const store = useSettingsStore();
   const { state } = useSession();
-  const subscribeToSecrets = useCallback(
-    (notify: () => void) =>
-      store.subscribeAll((_value, key) => {
-        if (key.startsWith("keys.")) notify();
-      }),
-    [store],
-  );
-  const getSecretsSnapshot = useCallback(
-    () =>
-      JSON.stringify(
-        Object.entries(store.snapshotSecrets())
-          .map(([provider, key]) => [provider, key.trim().length > 0] as const)
-          .sort(([left], [right]) => left.localeCompare(right)),
-      ),
-    [store],
-  );
-  useSyncExternalStore(
-    subscribeToSecrets,
-    getSecretsSnapshot,
-    getSecretsSnapshot,
-  );
 
   const isConfigured = state.llmConfig?.configured ?? false;
   const [priceMultipliers, setPriceMultipliersLocal] = useState<
     Record<string, number>
   >(() => getProviderPriceMultipliers());
+
+  // The key input subscribes to its own setting, but the configured badge and
+  // ping rows live in this parent. Refresh them after persistence and discard
+  // cached 401s so a corrected key can be tested immediately.
+  const [, setKeyRevision] = useState(0);
+  useEffect(
+    () =>
+      store.subscribeAll((_value, key) => {
+        if (!key.startsWith("keys.")) return;
+        invalidateAllPingResults();
+        setKeyRevision((revision) => revision + 1);
+      }),
+    [store],
+  );
 
   const keyEntries = store
     .listEntries()

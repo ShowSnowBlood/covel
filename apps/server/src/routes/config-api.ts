@@ -38,6 +38,16 @@ import {
 import { errorBody, readJsonBody } from "../api-error.js";
 import { parseEnvLines } from "../lib/env-file.js";
 import { makeDesktopRestTokenGuard } from "./privileged-auth.js";
+import {
+  configureOutboundProxy,
+  getOutboundProxyStatus,
+  normalizeOutboundProxyConfig,
+  type OutboundProxyMode,
+} from "@covel/ai-provider";
+import {
+  readStoredProxyConfig,
+  writeStoredProxyConfig,
+} from "../lib/proxy-config.js";
 
 export interface ConfigApiDeps {
   /** Mutable map shared with the gateway adapter. PUT handlers mutate in-place. */
@@ -47,6 +57,13 @@ export interface ConfigApiDeps {
 export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
   const app = new Hono();
   const requireToken = makeDesktopRestTokenGuard();
+  const initialCovelHome = resolveCovelHome();
+  configureOutboundProxy({
+    ...(initialCovelHome
+      ? readStoredProxyConfig(initialCovelHome)
+      : { mode: "direct" as const }),
+    systemProxyUrl: readRuntimeEnv().systemProxyUrl,
+  });
 
   app.get("/api/config/info", (c) => {
     const covelHome = resolveCovelHome();
@@ -209,6 +226,65 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
     // so an existing looser-permission file gets tightened (audit M1).
     chmodSync(file, 0o600);
     return c.json({ ok: true });
+  });
+
+  app.get("/api/config/proxy", requireToken, (c) => {
+    if (!resolveCovelHome()) {
+      return c.json(
+        errorBody("Proxy configuration is available only in desktop mode.", {
+          code: "proxy_config_unavailable",
+        }),
+        400,
+      );
+    }
+    return c.json(getOutboundProxyStatus());
+  });
+
+  app.put("/api/config/proxy", requireToken, async (c) => {
+    const covelHome = resolveCovelHome();
+    if (!covelHome) {
+      return c.json(
+        errorBody("Proxy configuration is available only in desktop mode.", {
+          code: "proxy_config_unavailable",
+        }),
+        400,
+      );
+    }
+    const parsed = await readJsonBody(c);
+    if (parsed instanceof Response) return parsed;
+    const body = parsed.body;
+    if (!body || typeof body !== "object") {
+      return c.json(
+        errorBody("Body must be { mode, url? }", {
+          code: "invalid_proxy_config",
+        }),
+        400,
+      );
+    }
+    try {
+      const rawMode = (body as { mode?: unknown }).mode;
+      if (typeof rawMode !== "string") {
+        throw new Error("Proxy mode is required.");
+      }
+      const config = normalizeOutboundProxyConfig({
+        mode: rawMode as OutboundProxyMode,
+        url: (body as { url?: string }).url,
+      });
+      writeStoredProxyConfig(covelHome, config);
+      return c.json(
+        configureOutboundProxy({
+          ...config,
+          systemProxyUrl: readRuntimeEnv().systemProxyUrl,
+        }),
+      );
+    } catch (error) {
+      return c.json(
+        errorBody(error instanceof Error ? error.message : String(error), {
+          code: "invalid_proxy_config",
+        }),
+        400,
+      );
+    }
   });
 
   // PUT /api/config/data-root — body: { path: string }

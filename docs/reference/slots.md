@@ -36,6 +36,8 @@ Schema：`packages/ai-provider/src/config/llm-schema.ts`。
 
 设置界面将连接信息和模型 ID 分开保存：一个服务商配置一组 `baseUrl`、协议、API 密钥和价格倍率，并可包含多个模型 ID。用途绑定只引用其中一个模型。请求时前端把该引用编译为兼容服务器的自定义 preset；preset 是内部传输结构，用户无需单独创建。
 
+首次手动创建服务商与模型时，若 `story` / `plugin` 尚未显式分配，设置页会把这两个用途同时绑定到该模型，保证叙事与插件任务都能立即运行。DeepSeek、OpenAI、Anthropic、DashScope 即使首次配置未填写 `baseUrl`，也会使用框架内置的官方端点与协议；用户填写的地址始终优先。
+
 模型 ID 是不透明字符串，发送请求时不会被裁剪或改写。例如服务商 `openai` 下的 `openai/gpt-5.6-sol` 和 `deepseek/deepseek-v4-flash` 会保持原样。能力查询按以下候选顺序匹配，匹配结果只用于显示能力和价格：
 
 1. 完整 ID；

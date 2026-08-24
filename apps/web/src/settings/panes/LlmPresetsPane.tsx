@@ -2,16 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, Plus, Search, Server, Upload } from "lucide-react";
 import {
+  getSlotConfig,
   getProviderProfiles,
   profilesFromLegacyPresets,
   setProviderProfiles,
+  setSlotConfig,
   upsertProviderModel,
   type ProviderModelProfile,
 } from "@/services/api.js";
+import { getBuiltinProviderConnection } from "@covel/shared";
 import { Button } from "@/components/ui/button.js";
 import { useSession } from "@/stores/session-store.js";
 import {
   buildProviderCatalog,
+  bindFirstProviderModel,
   EMPTY_PROVIDER_DRAFT,
   isLegacyPreset,
   normalizeProviderId,
@@ -79,21 +83,25 @@ export function LlmPresetsPane() {
   const addModels = (
     provider: Pick<ProviderCatalogEntry, "id" | "baseUrl" | "protocol">,
     rawIds: string,
-  ) => {
+  ): string | undefined => {
     const providerId = normalizeProviderId(provider.id);
-    if (!providerId) return;
+    if (!providerId) return undefined;
     const modelIds = parseModelIds(rawIds);
-    if (modelIds.length === 0) return;
+    if (modelIds.length === 0) return undefined;
     let nextProfiles = profiles;
+    let firstModelRef: string | undefined;
     for (const modelId of modelIds) {
-      nextProfiles = upsertProviderModel(nextProfiles, {
+      const result = upsertProviderModel(nextProfiles, {
         providerId,
         baseUrl: provider.baseUrl,
         protocol: provider.protocol,
         modelId,
-      }).profiles;
+      });
+      nextProfiles = result.profiles;
+      firstModelRef ??= result.modelRef;
     }
     commit(nextProfiles);
+    return firstModelRef;
   };
 
   const handleAddProvider = () => {
@@ -101,14 +109,28 @@ export function LlmPresetsPane() {
     if (!providerId || parseModelIds(providerDraft.modelIds).length === 0) {
       return;
     }
-    addModels(
+    const knownConnection = getBuiltinProviderConnection(providerId);
+    const baseUrl =
+      providerDraft.baseUrl.trim() || knownConnection?.baseUrl || "";
+    const protocol =
+      providerDraft.baseUrl.trim() || !knownConnection
+        ? providerDraft.protocol
+        : knownConnection.protocol;
+    const firstModelRef = addModels(
       {
         id: providerId,
-        baseUrl: providerDraft.baseUrl,
-        protocol: providerDraft.protocol,
+        baseUrl,
+        protocol,
       },
       providerDraft.modelIds,
     );
+    const currentSlots = getSlotConfig();
+    const nextSlots = bindFirstProviderModel(
+      currentSlots,
+      profiles,
+      firstModelRef,
+    );
+    if (nextSlots !== currentSlots) setSlotConfig(nextSlots);
     setSelectedProviderId(providerId);
     setProviderDraft(EMPTY_PROVIDER_DRAFT);
     setProviderDialogOpen(false);

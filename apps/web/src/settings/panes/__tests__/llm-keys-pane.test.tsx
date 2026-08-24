@@ -50,6 +50,7 @@ vi.mock("@/stores/session-store.js", () => ({
 
 vi.mock("../../widgets/index.js", () => ({ SettingWidget: () => null }));
 vi.mock("@/components/shared/ping-button.js", () => ({
+  invalidateAllPingResults: vi.fn(),
   PingButton: () => <span data-testid="ping" />,
 }));
 vi.mock("@/lib/desktop-bridge.js", () => ({
