@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -18,6 +18,17 @@ const ignoredPathParts = new Set([
   "release",
   "test-results",
 ]);
+const allowedEnvFiles = new Set([".env.example", ".env.llm.example"]);
+const sensitiveBasenames = new Set([
+  ".env",
+  "app.env",
+  "credentials.json",
+  "id_ed25519",
+  "id_rsa",
+  "secrets.json",
+]);
+const sensitiveExtensions = new Set([".key", ".p12", ".pem", ".pfx"]);
+const conflictCodes = new Set(["AA", "AU", "DD", "DU", "UA", "UD", "UU"]);
 
 let timer = null;
 let retryTimer = null;
@@ -45,6 +56,42 @@ function warn(message) {
 function isIgnoredPath(filePath) {
   if (!filePath) return false;
   return filePath.split(/[\\/]/u).some((part) => ignoredPathParts.has(part));
+}
+function assertSafeChanges() {
+  const status = git([
+    "status",
+    "--porcelain=v1",
+    "--untracked-files=all",
+  ]);
+
+  for (const line of status.split("\n")) {
+    if (!line) continue;
+    const code = line.slice(0, 2);
+    const filePath = line.slice(3).trim().replace(/^.* -> /u, "");
+    const basename = path.basename(filePath).toLowerCase();
+    const extension = path.extname(basename);
+
+    if (conflictCodes.has(code)) {
+      throw new Error(`检测到未解决冲突：${filePath}`);
+    }
+    if (
+      sensitiveBasenames.has(basename) ||
+      (basename.startsWith(".env.") && !allowedEnvFiles.has(basename)) ||
+      sensitiveExtensions.has(extension)
+    ) {
+      throw new Error(`拒绝自动提交敏感文件：${filePath}`);
+    }
+  }
+}
+
+function assertDiffClean() {
+  const result = spawnSync("git", ["diff", "--cached", "--check"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stdout || result.stderr || "差异格式检查失败").trim());
+  }
 }
 
 function changedFiles() {
@@ -93,13 +140,14 @@ function commitSubject(files) {
 }
 
 function push(branch) {
-  try {
-    git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
-    git(["push", "origin", `HEAD:${branch}`], { stdio: "inherit" });
-  } catch (error) {
-    git(["push", "--set-upstream", "origin", branch], { stdio: "inherit" });
-  }
-  log(`已推送到 origin/${branch}`);
+  const configuredRemote = git([
+    "config",
+    "--get",
+    `branch.${branch}.remote`,
+  ]);
+  const remote = configuredRemote && configuredRemote !== "." ? configuredRemote : "origin";
+  git(["push", remote, `HEAD:refs/heads/${branch}`], { stdio: "inherit" });
+  log(`已推送到 ${remote}/${branch}`);
 }
 
 function runCycle() {
@@ -113,12 +161,13 @@ function runCycle() {
   try {
     const files = changedFiles();
     if (files.length === 0) return;
-
+    assertSafeChanges();
     const branch = currentBranch();
     git(["add", "--all", "--", "."]);
     if (!git(["diff", "--cached", "--name-only"])) {
       return;
     }
+    assertDiffClean();
 
     const subject = commitSubject(files);
     git([
