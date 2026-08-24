@@ -12,27 +12,24 @@ import {
 import type { WorldRecord } from "@/services/api.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { worldVisual } from "@/lib/world-visuals.js";
+import { SpotlightCard, ShinyText } from "@/components/reactbits/index.js";
+
 const CHAIN_HALF_LINKS = [0, 1, 2, 3] as const;
 
 export interface WorldCardProps {
   world: WorldRecord;
-  /** Zero-based position in the list — drives the № label and eager loading. */
   index: number;
-  /** Whether this card is currently entering its world. */
   isEntering: boolean;
-  /** Whether another card is entering (dims and disables this one). */
   dimmed: boolean;
-  /** Resolved storage label (e.g. "Built-in", "Server file"). */
   storageLabel: string;
-  /** Sequential campaign level, or undefined for free-play worlds. */
   levelNumber?: number;
   locked?: boolean;
   completed?: boolean;
   lockLabel?: string;
-  /** Plays once when this level has just become available. */
   unlocking?: boolean;
 
   t: TFunction;
+
   onEnter: (worldId: string) => void;
   onLocked?: () => void;
 
@@ -41,8 +38,8 @@ export interface WorldCardProps {
 }
 
 /**
- * Single cover-led world plate in the world-select grid. Renders the cover
- * image, gradient overlays, title/description, tag chips, and the
+ * Single cover-led world plate in the world-select grid. Renders the 4K/2K cover
+ * image, React Bits cursor-spotlight overlay, title/description, tag chips, and the
  * view-details / delete / enter action surface.
  */
 export function WorldCard({
@@ -75,7 +72,7 @@ export function WorldCard({
         if (locked) onLocked?.();
         else onEnter(world.id);
       }}
-      className={`group relative min-h-[320px] md:min-h-[332px] overflow-hidden rounded-[var(--radius-card)] border border-border bg-card transition-all hover:border-primary/40 ${
+      className={`group relative min-h-[320px] md:min-h-[332px] overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl ${
         unlocking
           ? "cursor-wait"
           : locked
@@ -83,10 +80,9 @@ export function WorldCard({
               ? "cursor-pointer"
               : "cursor-not-allowed"
             : "cursor-pointer"
-      } ${isEntering ? "opacity-100" : ""} ${
+      } ${isEntering ? "opacity-100 scale-[1.01]" : ""} ${
         dimmed ? "opacity-30 pointer-events-none" : ""
       }`}
-
       style={
         {
           "--world-accent": visual.accent,
@@ -96,6 +92,7 @@ export function WorldCard({
         } as CSSProperties
       }
     >
+      {/* 4K/2K High-Definition World Background Artwork */}
       <img
         src={visual.image}
         alt=""
@@ -104,40 +101,46 @@ export function WorldCard({
         height={2160}
         loading={index < 2 ? "eager" : "lazy"}
         fetchPriority={index < 2 ? "high" : "auto"}
-        className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 ${
+        decoding="async"
+        className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-out ${
           locked || unlocking
             ? "scale-[1.01] grayscale opacity-55"
-            : "group-hover:scale-[1.025]"
+            : "group-hover:scale-[1.04]"
         } ${unlocking ? "level-cover-unlocking" : ""}`}
-
         draggable={false}
       />
+
+      {/* Cinematic Vignette Overlays */}
       <div
         aria-hidden="true"
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.42) 46%, rgba(0,0,0,.78) 100%)",
+            "linear-gradient(180deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.45) 46%, rgba(0,0,0,.85) 100%)",
         }}
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-75"
+        className="absolute inset-0 opacity-80"
         style={{
           background:
-            "linear-gradient(90deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.24) 58%, rgba(0,0,0,.18) 100%)",
+            "linear-gradient(90deg, rgba(0,0,0,.68) 0%, rgba(0,0,0,.3) 58%, rgba(0,0,0,.2) 100%)",
         }}
       />
+
+      {/* Top Accent Stripe with Glow */}
       <div
         aria-hidden
-        className="absolute left-0 top-0 h-1 w-24 transition-all group-hover:w-40"
+        className="absolute left-0 top-0 h-1 w-24 transition-all duration-300 group-hover:w-48 shadow-[0_0_12px_var(--world-accent)]"
         style={{ background: "var(--world-accent)" }}
       />
+
       {(locked || unlocking) && <LevelLockOverlay unlocking={unlocking} />}
 
+      {/* Content Layer */}
       <div className="relative z-10 flex min-h-[320px] md:min-h-[332px] flex-col justify-between p-5 md:p-6 text-white">
         <div className="flex items-start justify-between gap-4">
-          <span className="ui-meta text-[10px] text-white/62 tabular-nums">
+          <span className="ui-meta text-[10px] text-white/70 font-mono tracking-wider tabular-nums">
             {levelNumber
               ? t("session.levelNumber", {
                   level: levelNumber,
@@ -147,18 +150,18 @@ export function WorldCard({
           </span>
           {levelNumber ? (
             <span
-              className={`ui-tag inline-flex items-center gap-1.5 border-white/18 backdrop-blur-sm ${
+              className={`ui-tag inline-flex items-center gap-1.5 rounded-full border border-white/20 px-2.5 py-0.5 text-[11px] backdrop-blur-md transition-colors ${
                 completed
-                  ? "bg-emerald-950/55 text-emerald-200"
+                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/30"
                   : locked
-                    ? "bg-black/35 text-white/64"
-                    : "bg-white/12 text-white"
+                    ? "bg-black/40 text-white/70"
+                    : "bg-white/15 text-white"
               }`}
             >
               {completed ? (
-                <CheckCircle2 className="h-3 w-3" />
+                <CheckCircle2 className="h-3.5 w-3.5" />
               ) : locked ? (
-                <LockKeyhole className="h-3 w-3" />
+                <LockKeyhole className="h-3.5 w-3.5" />
               ) : null}
               {completed
                 ? t("session.levelCompleted", "Completed")
@@ -170,7 +173,7 @@ export function WorldCard({
             </span>
           ) : (
             <span
-              className="ui-tag border-white/18 bg-black/18 text-white/70 backdrop-blur-sm"
+              className="ui-tag rounded-full border border-white/20 bg-black/30 px-2.5 py-0.5 text-[11px] text-white/80 backdrop-blur-md"
               title={t("session.worldStorage", "World storage")}
             >
               {storageLabel}
@@ -179,14 +182,14 @@ export function WorldCard({
         </div>
 
         <div className="space-y-3.5">
-          <div className="max-w-[31rem] space-y-2.5">
+          <div className="max-w-[31rem] space-y-2">
             <h2
-              className="ui-title text-3xl md:text-[2.35rem] leading-[1.02] tracking-tight text-white transition-colors"
+              className="ui-title text-3xl md:text-[2.35rem] font-bold leading-[1.05] tracking-tight text-white transition-colors"
               style={isEntering ? { color: "var(--world-accent)" } : undefined}
             >
               {text(world.name)}
             </h2>
-            <p className="text-[14px] leading-relaxed text-white/76 line-clamp-3 break-words [overflow-wrap:anywhere]">
+            <p className="text-[14px] leading-relaxed text-white/80 line-clamp-3 break-words [overflow-wrap:anywhere]">
               {text(world.description)}
             </p>
           </div>
@@ -195,25 +198,25 @@ export function WorldCard({
             {(world.tags ?? []).slice(0, 5).map((tag) => (
               <span
                 key={tag}
-                className="ui-tag border-white/16 bg-black/20 text-white/62 backdrop-blur-sm"
+                className="ui-tag rounded-md border border-white/15 bg-black/30 px-2 py-0.5 text-[10px] text-white/75 backdrop-blur-md"
               >
                 {tag}
               </span>
             ))}
             {(world.tags?.length ?? 0) > 5 && (
-              <span className="ui-meta text-[10px] text-white/54 self-center">
+              <span className="ui-meta text-[10px] text-white/60 self-center">
                 +{(world.tags?.length ?? 0) - 5}
               </span>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-white/14 pt-3.5">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-3.5">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={(e) => onViewDetails(e, world.id)}
                 aria-label={t("world.viewDetails", "View details")}
-                className="ui-btn ui-btn-quiet h-8 w-8 border-white/12 bg-black/12 p-0 text-white/72 hover:bg-white/10 hover:text-white"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-black/25 text-white/80 backdrop-blur-md transition-all hover:bg-white/20 hover:text-white active:scale-95"
               >
                 <Eye className="w-3.5 h-3.5" />
               </button>
@@ -222,18 +225,18 @@ export function WorldCard({
                   type="button"
                   onClick={(e) => onDelete(e, world.id)}
                   aria-label={t("world.delete", "Delete world")}
-                  className="ui-btn ui-btn-quiet h-8 w-8 border-white/12 bg-black/12 p-0 text-white/72 hover:text-[var(--accent-danger)]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-black/25 text-white/80 backdrop-blur-md transition-all hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 active:scale-95"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
             <span
-              className="ui-meta inline-flex items-center gap-1.5 transition-all group-hover:gap-2.5"
+              className="ui-meta inline-flex items-center gap-1.5 font-medium transition-all group-hover:gap-2.5"
               style={{
                 color:
                   locked || unlocking
-                    ? "rgba(255,255,255,.58)"
+                    ? "rgba(255,255,255,.65)"
                     : "var(--world-accent)",
               }}
             >
@@ -245,9 +248,9 @@ export function WorldCard({
                     ? t("session.levelReplay", "Play again")
                     : t("session.enter", "Enter")}
               {locked || unlocking ? (
-                <LockKeyhole className="w-3 h-3" />
+                <LockKeyhole className="w-3.5 h-3.5" />
               ) : (
-                <ArrowRight className="w-3 h-3" />
+                <ArrowRight className="w-3.5 h-3.5" />
               )}
             </span>
           </div>
@@ -261,21 +264,21 @@ function LevelLockOverlay({ unlocking }: { unlocking: boolean }) {
   return (
     <div
       aria-hidden="true"
-      className="level-lock-overlay pointer-events-none absolute inset-0 z-20 overflow-hidden"
       data-state={unlocking ? "unlocking" : "locked"}
+      className="level-lock-overlay pointer-events-none absolute inset-0 z-20 overflow-hidden"
     >
       <ChainTrack variant="a" />
       <ChainTrack variant="b" />
-      <div className="level-lock-flash" />
       <div className="level-lock-seal">
-        <span className="level-lock-seal-ring">
-          <LockKeyhole className="h-7 w-7" strokeWidth={1.7} />
-        </span>
+        <div className="level-lock-seal-ring">
+          <LockKeyhole className="h-5 w-5" />
+        </div>
       </div>
-      <span className="level-lock-spark level-lock-spark-a" />
-      <span className="level-lock-spark level-lock-spark-b" />
-      <span className="level-lock-spark level-lock-spark-c" />
-      <span className="level-lock-spark level-lock-spark-d" />
+      <div className="level-lock-flash" />
+      <div className="level-lock-spark level-lock-spark-a" />
+      <div className="level-lock-spark level-lock-spark-b" />
+      <div className="level-lock-spark level-lock-spark-c" />
+      <div className="level-lock-spark level-lock-spark-d" />
     </div>
   );
 }
@@ -283,17 +286,34 @@ function LevelLockOverlay({ unlocking }: { unlocking: boolean }) {
 function ChainTrack({ variant }: { variant: "a" | "b" }) {
   return (
     <div className={`level-chain level-chain-${variant}`}>
-      <span className="level-chain-half level-chain-half-start">
-        {CHAIN_HALF_LINKS.map((index) => (
-          <Link2 key={index} className="level-chain-link" strokeWidth={2.25} />
+      <div className="level-chain-half level-chain-half-start">
+        {CHAIN_HALF_LINKS.map((key) => (
+          <ChainLink key={`start-${key}`} />
         ))}
-      </span>
-      <span className="level-chain-joint" />
-      <span className="level-chain-half level-chain-half-end">
-        {CHAIN_HALF_LINKS.map((index) => (
-          <Link2 key={index} className="level-chain-link" strokeWidth={2.25} />
+      </div>
+      <div className="level-chain-joint" />
+      <div className="level-chain-half level-chain-half-end">
+        {CHAIN_HALF_LINKS.map((key) => (
+          <ChainLink key={`end-${key}`} />
         ))}
-      </span>
+      </div>
     </div>
+  );
+}
+
+function ChainLink() {
+  return (
+    <svg viewBox="0 0 44 44" fill="none" className="level-chain-link">
+      <rect
+        x="6"
+        y="12"
+        width="32"
+        height="20"
+        rx="10"
+        strokeWidth="3.2"
+        stroke="currentColor"
+      />
+      <circle cx="22" cy="22" r="3.2" fill="currentColor" />
+    </svg>
   );
 }

@@ -19,6 +19,7 @@ import {
 import { text } from "@/components/world/editor-helpers.js";
 import { worldVisual } from "@/lib/world-visuals.js";
 import type { WorldRecord } from "@/services/api.js";
+import { ShinyText } from "@/components/reactbits/index.js";
 
 import "./level-accordion-gallery.css";
 
@@ -260,6 +261,8 @@ export function LevelAccordionGallery({
                   width={3840}
                   height={2160}
                   loading="eager"
+                  fetchPriority={active ? "high" : "auto"}
+                  decoding="async"
                   draggable={false}
                 />
               </span>
@@ -295,7 +298,13 @@ export function LevelAccordionGallery({
                 className="level-accordion-content"
               >
                 <span className="level-accordion-title">
-                  {text(item.world.name)}
+                  {active ? (
+                    <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.85)">
+                      {text(item.world.name)}
+                    </ShinyText>
+                  ) : (
+                    text(item.world.name)
+                  )}
                 </span>
                 <span className="level-accordion-description">
                   {text(item.world.description)}

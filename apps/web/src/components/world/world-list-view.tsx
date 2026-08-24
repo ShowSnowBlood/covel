@@ -21,7 +21,7 @@ import {
   type LevelAccordionItem,
 } from "@/components/world/level-accordion-gallery.js";
 import type { FrostFoxProgressionStatus } from "@/services/api.js";
-
+import { ShinyText, SpotlightCard, Magnet } from "@/components/reactbits/index.js";
 export type LevelProgressionMode =
   "loading" | "disabled" | "account-required" | "ready" | "error";
 
@@ -137,8 +137,10 @@ export function WorldListView({
                 },
               )}
             </p>
-            <h1 className="font-display font-bold tracking-tight leading-[0.95] text-[clamp(2.25rem,5.4vw,4.25rem)]">
-              {t("session.selectWorld", "Choose a world")}
+            <h1 className="font-display font-bold tracking-tight leading-[0.95] text-[clamp(2.25rem,5.4vw,4.25rem)] text-foreground">
+              <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.7)">
+                {t("session.selectWorld", "Choose a world")}
+              </ShinyText>
             </h1>
             <p className="mt-4 text-sm md:text-base text-muted-foreground font-light leading-relaxed max-w-xl">
               {t(
@@ -150,58 +152,60 @@ export function WorldListView({
 
           {/* Compact action rail keeps creation and setup nearby without pushing worlds down. */}
           <aside className="md:col-span-5 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={onOpenGenerator}
-              className="group relative min-h-[92px] overflow-hidden rounded-[var(--radius-card)] border border-primary/25 bg-card/80 hover:border-primary/55 transition-all p-3 sm:p-4 text-left"
+            <SpotlightCard
+              spotlightColor="rgba(var(--color-primary), 0.15)"
+              className="p-0 border-primary/25 bg-card/80 hover:border-primary/55"
             >
-              <div
-                aria-hidden="true"
-                className="absolute -right-12 -top-12 h-28 w-28 rounded-full opacity-40 group-hover:opacity-65 transition-opacity"
-                style={{
-                  background:
-                    "radial-gradient(circle, color-mix(in oklab, var(--color-primary) 70%, transparent) 0%, transparent 70%)",
-                }}
-              />
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-2">
-                  <Wand2 className="w-4 h-4 text-primary" />
-                  <span className="ui-eyebrow text-primary">
-                    {t("world.aiCreate", "AI generate")}
-                  </span>
+              <button
+                type="button"
+                onClick={onOpenGenerator}
+                className="group relative min-h-[92px] w-full p-3 sm:p-4 text-left transition-all cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wand2 className="w-4 h-4 text-primary" />
+                    <span className="ui-eyebrow text-primary font-semibold">
+                      {t("world.aiCreate", "AI generate")}
+                    </span>
+                  </div>
+                  <p className="font-display text-[13px] sm:text-sm font-semibold leading-snug line-clamp-2">
+                    {t(
+                      "session.aiCreateTeaser",
+                      "Spin up a brand new world from a one-line idea.",
+                    )}
+                  </p>
+                  <p className="mt-3 text-xs text-primary inline-flex items-center gap-1.5 group-hover:gap-2.5 transition-all font-medium">
+                    {t("session.aiCreateAction", "Describe your idea")}
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </p>
                 </div>
-                <p className="font-display text-[13px] sm:text-sm font-semibold leading-snug line-clamp-2">
-                  {t(
-                    "session.aiCreateTeaser",
-                    "Spin up a brand new world from a one-line idea.",
-                  )}
-                </p>
-                <p className="mt-3 text-xs text-primary inline-flex items-center gap-1.5 group-hover:gap-2.5 transition-all font-medium">
-                  {t("session.aiCreateAction", "Describe your idea")}
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </p>
-              </div>
-            </button>
+              </button>
+            </SpotlightCard>
 
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="group flex min-h-[92px] items-center justify-between rounded-[var(--radius-card)] border border-border bg-card/70 hover:border-primary/40 hover:bg-muted/30 transition-all p-3 sm:p-4 text-left"
+            <SpotlightCard
+              spotlightColor="rgba(255, 255, 255, 0.08)"
+              className="p-0 border-border bg-card/70 hover:border-primary/40 hover:bg-muted/30"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <KeyRound className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[13px] sm:text-sm font-medium leading-snug line-clamp-2">
-                    {t("session.configureKeys", "API keys & presets")}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground/80 truncate">
-                    {primarySlotLabel ??
-                      t("session.noModelsConfigured", "No model configured")}
-                  </p>
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="group flex min-h-[92px] w-full items-center justify-between p-3 sm:p-4 text-left transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <KeyRound className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] sm:text-sm font-medium leading-snug line-clamp-2 text-foreground">
+                      {t("session.configureKeys", "API keys & presets")}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground/80 truncate">
+                      {primarySlotLabel ??
+                        t("session.noModelsConfigured", "No model configured")}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-            </button>
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+              </button>
+            </SpotlightCard>
           </aside>
         </header>
 

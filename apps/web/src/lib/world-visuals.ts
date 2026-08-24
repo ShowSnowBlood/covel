@@ -2,12 +2,16 @@ import type { WorldRecord } from "@/services/api.js";
 
 export interface WorldVisual {
   image: string;
+  image4k?: string;
+  image2k?: string;
   accent: string;
   label: string;
 }
 
 const DEFAULT_VISUAL: WorldVisual = {
   image: "/visuals/backgrounds/studio-shell.webp",
+  image4k: "/visuals/backgrounds/studio-shell.webp",
+  image2k: "/visuals/backgrounds/moonveil-home-2k.webp",
   accent: "var(--accent-primary)",
   label: "Covel Studio",
 };
@@ -15,26 +19,36 @@ const DEFAULT_VISUAL: WorldVisual = {
 const VISUALS_BY_ID: Record<string, WorldVisual> = {
   cloudmere: {
     image: "/visuals/worlds/cloudmere.webp",
+    image4k: "/visuals/worlds/cloudmere.webp",
+    image2k: "/visuals/worlds/cloudmere.webp",
     accent: "oklch(72% 0.16 75)",
     label: "Cloudmere",
   },
   emberback: {
     image: "/visuals/worlds/emberback-4k.webp?v=2",
+    image4k: "/visuals/worlds/emberback-4k.webp?v=2",
+    image2k: "/visuals/worlds/emberback.webp",
     accent: "oklch(72% 0.14 50)",
     label: "Emberback",
   },
   "haruka-academy": {
     image: "/visuals/worlds/haruka-academy-4k.webp?v=2",
+    image4k: "/visuals/worlds/haruka-academy-4k.webp?v=2",
+    image2k: "/visuals/worlds/haruka-academy.webp",
     accent: "oklch(72% 0.15 350)",
     label: "Haruka Academy",
   },
   mistport: {
     image: "/visuals/worlds/mistport-4k.webp?v=2",
+    image4k: "/visuals/worlds/mistport-4k.webp?v=2",
+    image2k: "/visuals/worlds/mistport.webp",
     accent: "oklch(72% 0.1 185)",
     label: "Mistport",
   },
   neonridge: {
     image: "/visuals/worlds/neonridge.webp",
+    image4k: "/visuals/worlds/neonridge.webp",
+    image2k: "/visuals/worlds/neonridge.webp",
     accent: "oklch(72% 0.16 220)",
     label: "Neon Ridge",
   },

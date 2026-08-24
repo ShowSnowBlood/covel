@@ -21,7 +21,7 @@ import type { WorldRecord } from "@/services/api.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { SessionBreadcrumb } from "../session-breadcrumb.js";
 import { ConnectionStatus } from "./connection-status.js";
-
+import { ThemeToggle } from "@/components/theme-toggle.js";
 export type GameViewMode = "parsed" | "detailed" | "raw" | "stage";
 
 interface GameViewHeaderProps {
@@ -105,12 +105,12 @@ export function GameViewHeader({
         <ConnectionStatus />
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <div className="flex items-center border border-[var(--rule-color)] rounded-[var(--radius-control)] overflow-hidden">
+        <div className="flex items-center border border-border/80 rounded-xl overflow-hidden bg-background/50 backdrop-blur-xs p-0.5 gap-0.5">
           <Toggle
             pressed={viewMode === "parsed"}
             onPressedChange={() => onViewModeChange("parsed")}
             size="sm"
-            className="rounded-none border-0 h-7 px-2 data-[state=on]:bg-foreground data-[state=on]:text-[var(--surface-page)]"
+            className="rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
             aria-label={t("session.viewParsedAria")}
             title={t("session.viewParsed")}
           >
@@ -120,7 +120,7 @@ export function GameViewHeader({
             pressed={viewMode === "detailed"}
             onPressedChange={() => onViewModeChange("detailed")}
             size="sm"
-            className="rounded-none border-0 h-7 px-2 data-[state=on]:bg-foreground data-[state=on]:text-[var(--surface-page)]"
+            className="rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
             aria-label={t("session.viewDetailedAria")}
             title={t("session.viewDetailed")}
           >
@@ -130,7 +130,7 @@ export function GameViewHeader({
             pressed={viewMode === "raw"}
             onPressedChange={() => onViewModeChange("raw")}
             size="sm"
-            className="rounded-none border-0 h-7 px-2 data-[state=on]:bg-foreground data-[state=on]:text-[var(--surface-page)]"
+            className="rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
             aria-label={t("session.viewRawAria")}
             title={t("session.viewRaw")}
           >
@@ -140,14 +140,13 @@ export function GameViewHeader({
             pressed={viewMode === "stage"}
             onPressedChange={() => onViewModeChange("stage")}
             size="sm"
-            className="rounded-none border-0 h-7 px-2 data-[state=on]:bg-foreground data-[state=on]:text-[var(--surface-page)]"
+            className="rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
             aria-label={t("session.viewStageAria")}
             title={t("session.viewStage")}
           >
             <Clapperboard className="w-3.5 h-3.5" />
           </Toggle>
         </div>
-
         {campaignLevel !== undefined && (
           <Button
             variant={levelCompleted ? "ghost" : "outline"}
@@ -181,17 +180,18 @@ export function GameViewHeader({
           </Button>
         )}
 
+        <ThemeToggle />
+
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 shrink-0"
+          className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
           onClick={onOpenSettings}
           aria-label={t("nav.settings")}
           title={t("nav.settings")}
         >
           <KeyRound className="w-3.5 h-3.5" />
         </Button>
-
         {suspensionsCount > 0 && (
           <Button
             variant="ghost"
