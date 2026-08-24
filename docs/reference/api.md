@@ -102,7 +102,7 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 
 `/api/frostfox/models` 的目录按 `client-config.configurationVersion` 和凭据世代短时缓存。模型请求最终仍由 Router Gateway 执行渠道启用态、分组货架、余额、限流、计费和模型上架判断。渠道映射是命名同步，不是 ACL。
 
-启用 FrostFox 后，以下会话执行路径没有有效账号 Cookie 时 fail-closed，返回 `401 { "code": "frostfox_account_required" }`：`/api/actions`、`/api/ai/*`、`/api/kernel/*`、`/api/sessions/:id/resume` 和 `/api/sessions/:id/plugin-rpc`。账户 Key 的不可区分失效只进入待恢复状态，不自动删除旧密文。
+启用 FrostFox 后，账号登录是进入游戏的前置条件。Web 在 `/session` 路由先检查账号状态；未登录只显示登录入口，不挂载世界选择、准备页或游戏界面。服务端同时对 `/api/sessions`、`/api/actions`、`/api/approvals`、`/api/events`、`/api/traces` 及其子路径执行账号 Cookie 校验；没有有效账号时 fail-closed，返回 `401 { "code": "frostfox_account_required" }`。运维 master token 继续用于部署探针和管理工具，未启用 FrostFox 的桌面端与 self-hosted 部署保持本地行为。`/api/ai/*`、`/api/kernel/*` 等模型执行路径仍由 per-request LLM 中间件执行同一账号要求。账户 Key 的不可区分失效只进入待恢复状态，不自动删除旧密文。
 
 固定派生算法：
 

@@ -110,6 +110,15 @@
     "frostfoxAccountSummary": "Account and balance",
     "getStarted": "Get Started"
   },
+  "account": {
+    "checking": "Checking account status",
+    "checkFailed": "Account status unavailable",
+    "checkFailedDescription": "Covel could not verify your account. Retry before entering the game.",
+    "retry": "Retry",
+    "loginRequired": "Sign in to start playing",
+    "loginRequiredDescription": "A connected account is required to create or continue a game session.",
+    "loginAction": "Sign in"
+  },
   "session": {
     "config": "Studio Config",
     "status": "Session Status",

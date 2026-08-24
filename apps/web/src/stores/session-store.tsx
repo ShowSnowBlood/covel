@@ -1,5 +1,6 @@
 import { useMemo, useReducer, type ReactNode } from "react";
 import { getDataService } from "@/services/data-service";
+import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
 import { useBuildSessionActions } from "./session-store/actions.js";
 import {
   SessionActionsContext,
@@ -34,6 +35,8 @@ export { useSession, useSessionActions, useSessionState };
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { status: frostFoxStatus, loading: frostFoxLoading } =
+    useFrostFoxAccount();
   const ds = useMemo(() => getDataService(), []);
   const refs = useSessionRuntimeRefs(state);
   const sessionId = selectSessionId(state);
@@ -61,7 +64,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     handleSseEvent,
   });
 
-  useBootEffect(state, actions.boot);
+  useBootEffect(
+    state,
+    actions.boot,
+    !frostFoxLoading &&
+      (!frostFoxStatus?.enabled || frostFoxStatus.authenticated),
+  );
   usePersistExecutionStepsEffect(state, ds);
   useMessageUiSpecHydrationEffect(sessionId, dispatch);
   useSessionSubscription({

@@ -110,6 +110,15 @@
     "frostfoxAccountSummary": "账号与余额",
     "getStarted": "开始使用"
   },
+  "account": {
+    "checking": "正在检查账号状态",
+    "checkFailed": "无法获取账号状态",
+    "checkFailedDescription": "Covel 暂时无法验证账号，请重试后再进入游戏。",
+    "retry": "重试",
+    "loginRequired": "登录后才能开始游玩",
+    "loginRequiredDescription": "创建或继续游戏会话前，必须先连接账号。",
+    "loginAction": "登录账号"
+  },
   "session": {
     "config": "工作室配置",
     "status": "会话状态",

@@ -1,4 +1,12 @@
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { CircleUserRound, WalletCards } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,32 +16,68 @@ import {
 
 const REFRESH_INTERVAL_MS = 60_000;
 
-export function FrostFoxAccountSummary() {
-  const { i18n, t } = useTranslation();
+interface FrostFoxAccountContextValue {
+  readonly status: FrostFoxAccountStatus | null;
+  readonly loading: boolean;
+  readonly error: boolean;
+  readonly refresh: () => Promise<void>;
+}
+
+const FrostFoxAccountContext =
+  createContext<FrostFoxAccountContextValue | null>(null);
+
+export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<FrostFoxAccountStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const mounted = useRef(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const next = await fetchFrostFoxAccount(true);
+      if (mounted.current) setStatus(next);
+    } catch {
+      if (mounted.current) setError(true);
+    } finally {
+      if (mounted.current) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    const refresh = async () => {
-      try {
-        const next = await fetchFrostFoxAccount(true);
-        if (active) setStatus(next);
-      } catch {
-        // The header should not block the application when account status is unavailable.
-      }
-    };
-
+    mounted.current = true;
     void refresh();
     const interval = window.setInterval(
       () => void refresh(),
       REFRESH_INTERVAL_MS,
     );
     return () => {
-      active = false;
+      mounted.current = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [refresh]);
+
+  return (
+    <FrostFoxAccountContext.Provider
+      value={{ status, loading, error, refresh }}
+    >
+      {children}
+    </FrostFoxAccountContext.Provider>
+  );
+}
+
+export function useFrostFoxAccount(): FrostFoxAccountContextValue {
+  const value = useContext(FrostFoxAccountContext);
+  if (!value) {
+    throw new Error("useFrostFoxAccount requires FrostFoxAccountProvider");
+  }
+  return value;
+}
+
+export function FrostFoxAccountSummary() {
+  const { i18n, t } = useTranslation();
+  const { status } = useFrostFoxAccount();
 
   if (!status?.enabled) return null;
 

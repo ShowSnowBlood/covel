@@ -7,12 +7,13 @@ import type { SessionDispatch, SessionState } from "./types.js";
 export function useBootEffect(
   state: Pick<SessionState, "booted" | "bootError">,
   boot: () => Promise<void>,
+  enabled = true,
 ): void {
   useEffect(() => {
-    if (!state.booted && !state.bootError) {
-      boot();
+    if (enabled && !state.booted && !state.bootError) {
+      void boot();
     }
-  }, [boot, state.booted, state.bootError]);
+  }, [boot, enabled, state.booted, state.bootError]);
 }
 
 export function usePersistExecutionStepsEffect(

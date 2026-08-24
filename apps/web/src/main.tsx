@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ReloadOverlay } from "@/components/reload-overlay";
+import { FrostFoxAccountProvider } from "@/components/frostfox-account-summary";
 import { SessionProvider } from "@/stores/session-store";
 import {
   setStorageMode,
@@ -194,9 +195,11 @@ probeDesktopMode()
           storageKey="covel:scheme"
           attribute="class"
         >
-          <SessionProvider>
-            <RouterProvider router={router} />
-          </SessionProvider>
+          <FrostFoxAccountProvider>
+            <SessionProvider>
+              <RouterProvider router={router} />
+            </SessionProvider>
+          </FrostFoxAccountProvider>
           <ReloadOverlay />
         </ThemeProvider>
       </StrictMode>,

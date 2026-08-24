@@ -43,6 +43,7 @@ import {
   createFrostFoxPrincipalMiddleware,
   createFrostFoxRoutes,
 } from "./routes/frostfox.js";
+import { createFrostFoxSessionRequirementMiddleware } from "./middleware/frostfox-session-required.js";
 import {
   errorBody,
   makeErrorHandler,
@@ -184,6 +185,23 @@ const mediaStore = await createMediaStoreFromEnv(process.env);
 const frostFox = await FrostFoxService.create({ env, ai });
 app.use("/api/*", createFrostFoxPrincipalMiddleware(frostFox));
 app.use("/auth/frostfox/*", createFrostFoxPrincipalMiddleware(frostFox));
+const requireFrostFoxSession = createFrostFoxSessionRequirementMiddleware(
+  frostFox !== null,
+);
+for (const path of [
+  "/api/actions",
+  "/api/actions/*",
+  "/api/approvals",
+  "/api/approvals/*",
+  "/api/events",
+  "/api/events/*",
+  "/api/sessions",
+  "/api/sessions/*",
+  "/api/traces",
+  "/api/traces/*",
+]) {
+  app.use(path, requireFrostFoxSession);
+}
 
 // ── Session lock ────────────────────────────────────────────────
 //

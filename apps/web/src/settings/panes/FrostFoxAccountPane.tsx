@@ -19,9 +19,11 @@ import {
   signOutFrostFox,
   type FrostFoxAccountStatus,
 } from "@/services/api.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
 
 export function FrostFoxAccountPane() {
   const { t, i18n } = useTranslation();
+  const { refresh: refreshSharedAccount } = useFrostFoxAccount();
   const [status, setStatus] = useState<FrostFoxAccountStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<"signout" | "disconnect" | null>(null);
@@ -60,6 +62,7 @@ export function FrostFoxAccountPane() {
           ? { ...current, authenticated: false, account: undefined }
           : current,
       );
+      await refreshSharedAccount();
     } finally {
       setAction(null);
     }
@@ -75,6 +78,7 @@ export function FrostFoxAccountPane() {
           ? { ...current, authenticated: false, account: undefined }
           : current,
       );
+      await refreshSharedAccount();
       setConfirmDisconnect(false);
     } finally {
       setAction(null);

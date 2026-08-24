@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, LogIn, RefreshCw } from "lucide-react";
 import { useSession } from "@/stores/session-store.js";
 import { getDataService } from "@/services/data-service.js";
 import { mergeChatExportMessages } from "@/lib/chat-export.js";
@@ -14,6 +14,8 @@ import { initDesktopBridge } from "@/lib/desktop-bridge.js";
 import { WorldSelectScreen } from "@/components/session/world-select-screen.js";
 import { SessionPrepScreen } from "@/components/session/session-prep-screen.js";
 import { OnboardingWizard } from "@/components/onboarding-wizard.js";
+import { Button } from "@/components/ui/button.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
 
 // Lazy-load the in-game surface (chat + stage + json-render panels + plugin
 // UI) — the single heaviest component tree in the app, but only reachable once
@@ -31,11 +33,72 @@ interface SessionSearchParams {
 }
 
 export const Route = createFileRoute("/session")({
-  component: SessionPage,
+  component: AccountRequiredSessionPage,
   validateSearch: (search: Record<string, unknown>): SessionSearchParams => ({
     sid: typeof search.sid === "string" ? search.sid : undefined,
   }),
 });
+
+function AccountRequiredSessionPage() {
+  const { t } = useTranslation();
+  const { status, loading, error, refresh } = useFrostFoxAccount();
+
+  if (loading && !status) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="sr-only">{t("account.checking")}</span>
+      </div>
+    );
+  }
+
+  if (error && !status) {
+    return (
+      <div className="flex h-full items-center justify-center px-6">
+        <div className="max-w-md space-y-4 text-center">
+          <AlertCircle
+            className="mx-auto h-6 w-6 text-destructive"
+            aria-hidden
+          />
+          <h1 className="text-lg font-semibold">{t("account.checkFailed")}</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t("account.checkFailedDescription")}
+          </p>
+          <Button variant="outline" onClick={() => void refresh()}>
+            <RefreshCw className="h-4 w-4" aria-hidden />
+            {t("account.retry")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status?.enabled && (!status.authenticated || !status.account)) {
+    return (
+      <div className="flex h-full items-center justify-center px-6">
+        <div className="max-w-md space-y-5 text-center">
+          <LogIn className="mx-auto h-7 w-7 text-primary" aria-hidden />
+          <div className="space-y-2">
+            <h1 className="text-xl font-semibold">
+              {t("account.loginRequired")}
+            </h1>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t("account.loginRequiredDescription")}
+            </p>
+          </div>
+          <Button
+            onClick={() => window.location.assign("/auth/frostfox/start")}
+          >
+            <LogIn className="h-4 w-4" aria-hidden />
+            {t("account.loginAction")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return <SessionPage />;
+}
 
 function SessionPage() {
   const { t } = useTranslation();
