@@ -31,22 +31,33 @@ export const EMPTY_PROVIDER_DRAFT: ProviderDraft = {
   modelIds: "",
 };
 
-/** Bind only the first user-created model, preserving any explicit role. */
+/** Bind the first model only for core slots without an explicit assignment. */
 export function bindFirstProviderModel(
   slotConfig: Record<string, SlotConfigEntry>,
   existingProfiles: readonly ProviderModelProfile[],
   modelRef: string | undefined,
+  serverPresets: readonly PresetSummary[],
+  serverSlotIds: readonly string[],
 ): Record<string, SlotConfigEntry> {
   const alreadyHasModel = existingProfiles.some(
     (profile) => profile.models.length > 0,
   );
   if (!modelRef || alreadyHasModel) return slotConfig;
+
+  const assignedServerSlots = new Set(serverSlotIds);
+  for (const preset of serverPresets) {
+    for (const slotId of preset.slotBindings ?? []) {
+      assignedServerSlots.add(slotId);
+    }
+  }
   const binding = { modelRef };
-  return {
-    ...slotConfig,
-    story: slotConfig.story ?? binding,
-    plugin: slotConfig.plugin ?? binding,
-  };
+  let nextSlots = slotConfig;
+  for (const slotId of ["story", "plugin"] as const) {
+    if (slotConfig[slotId] || assignedServerSlots.has(slotId)) continue;
+    if (nextSlots === slotConfig) nextSlots = { ...slotConfig };
+    nextSlots[slotId] = binding;
+  }
+  return nextSlots;
 }
 
 /** Match the canonical provider namespace used by settings persistence. */

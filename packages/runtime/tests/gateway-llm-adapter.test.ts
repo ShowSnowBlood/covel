@@ -58,4 +58,33 @@ describe("createGatewayAdapter target resolution", () => {
 
     expect(adapter.resolveTarget?.("missing")).toBeUndefined();
   });
+
+  it("forwards the per-call target observer into the gateway", async () => {
+    let gatewayObserver:
+      ((target: { provider: string; model: string }) => void) | undefined;
+    const gateway: GatewayLike = {
+      resolveSlot() {
+        return { provider: "primary", model: "primary-model" };
+      },
+      async generateText(_input, options) {
+        gatewayObserver = options?.onTargetAttempt;
+        gatewayObserver?.({ provider: "backup", model: "backup-model" });
+        return {
+          text: "ok",
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    };
+    const adapter = createGatewayAdapter(gateway);
+    const observed: Array<{ provider: string; model: string }> = [];
+
+    await adapter.generate({
+      messages: [{ role: "user", content: "hi" }],
+      onTargetAttempt: (target) => observed.push(target),
+    });
+
+    expect(gatewayObserver).toBeTypeOf("function");
+    expect(observed).toEqual([{ provider: "backup", model: "backup-model" }]);
+  });
 });

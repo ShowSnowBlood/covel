@@ -1,24 +1,31 @@
-/** Convert Electron/Chromium proxy resolution tokens into an Undici URL. */
-export function parseElectronProxyResult(result: string): string | undefined {
-  for (const entry of result.split(";")) {
-    const [rawKind, ...addressParts] = entry.trim().split(/\s+/);
-    const kind = rawKind?.toUpperCase();
-    const address = addressParts.join("").trim();
-    if (!kind || kind === "DIRECT" || !address) continue;
-    const scheme =
-      kind === "PROXY" || kind === "HTTP"
-        ? "http"
-        : kind === "HTTPS"
-          ? "https"
-          : kind === "SOCKS" || kind === "SOCKS5"
-            ? "socks5"
-            : undefined;
-    if (!scheme) continue;
-    try {
-      return new URL(`${scheme}://${address}`).href.replace(/\/$/, "");
-    } catch {
-      // Try the next Chromium fallback entry.
-    }
+import {
+  SYSTEM_PROXY_IPC_VERSION,
+  isSystemProxyResolveRequest,
+  type SystemProxyResolveResponse,
+} from "@covel/shared";
+
+/** Resolve a validated sidecar request without exposing Electron to arbitrary IPC. */
+export async function resolveSystemProxyRequest(
+  message: unknown,
+  resolveProxy: (url: string) => Promise<string>,
+): Promise<SystemProxyResolveResponse | undefined> {
+  if (!isSystemProxyResolveRequest(message)) return undefined;
+  try {
+    return {
+      type: "covel:system-proxy:resolved",
+      version: SYSTEM_PROXY_IPC_VERSION,
+      requestId: message.requestId,
+      result: await resolveProxy(message.url),
+    };
+  } catch (error) {
+    return {
+      type: "covel:system-proxy:resolved",
+      version: SYSTEM_PROXY_IPC_VERSION,
+      requestId: message.requestId,
+      error: (error instanceof Error ? error.message : String(error)).slice(
+        0,
+        1_024,
+      ),
+    };
   }
-  return undefined;
 }

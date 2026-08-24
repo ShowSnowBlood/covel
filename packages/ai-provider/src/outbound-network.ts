@@ -9,18 +9,31 @@ export interface OutboundProxyConfig {
 }
 
 export interface ConfigureOutboundProxyInput extends OutboundProxyConfig {
-  /** Proxy URL resolved by the Electron main process from the OS settings. */
+  /** Resolve Chromium's ordered proxy result for each concrete target URL. */
+  readonly resolveSystemProxy?: SystemProxyResolver;
+  /** @deprecated Compatibility path for shells without a per-request resolver. */
   readonly systemProxyUrl?: string;
 }
 
 export interface OutboundProxyStatus extends OutboundProxyConfig {
-  readonly effective: "direct" | "proxy";
+  readonly effective: "direct" | "proxy" | "system";
   readonly systemAvailable: boolean;
 }
 
+export type SystemProxyResolver = (
+  targetUrl: string,
+  signal?: AbortSignal,
+) => Promise<string>;
+
+export type SystemProxyRoute =
+  | { readonly kind: "direct" }
+  | { readonly kind: "proxy"; readonly url: string };
+
 let currentConfig: OutboundProxyConfig = { mode: "direct" };
 let currentSystemProxyUrl: string | undefined;
+let currentSystemProxyResolver: SystemProxyResolver | undefined;
 let proxyDispatcher: Dispatcher | undefined;
+const systemProxyDispatchers = new Map<string, Dispatcher>();
 let directDispatcher:
   ReturnType<typeof createConnectPinnedDispatcher> | undefined;
 
@@ -82,6 +95,76 @@ function systemProxyUrl(rawUrl: string | undefined): string | undefined {
   return parsed.href.replace(/\/$/, "");
 }
 
+/** Parse Chromium's ordered proxy list, retaining every supported fallback. */
+export function parseSystemProxyRoutes(result: string): SystemProxyRoute[] {
+  const routes: SystemProxyRoute[] = [];
+  for (const rawEntry of result.split(";")) {
+    const entry = rawEntry.trim();
+    if (!entry) continue;
+    const [rawKind, ...addressParts] = entry.split(/\s+/);
+    const kind = rawKind?.toUpperCase();
+    const address = addressParts.join("").trim();
+    if (kind === "DIRECT" && !address) {
+      routes.push({ kind: "direct" });
+      continue;
+    }
+    const scheme =
+      kind === "PROXY" || kind === "HTTP"
+        ? "http"
+        : kind === "HTTPS"
+          ? "https"
+          : kind === "SOCKS5"
+            ? "socks5"
+            : undefined;
+    // Chromium's SOCKS/SOCKS4 token means SOCKSv4, which Undici cannot use.
+    if (!scheme || !address) continue;
+    try {
+      const url = new URL(`${scheme}://${address}`);
+      if (
+        !url.hostname ||
+        (url.pathname && url.pathname !== "/") ||
+        url.search ||
+        url.hash
+      )
+        continue;
+      routes.push({ kind: "proxy", url: url.href.replace(/\/$/, "") });
+    } catch {
+      // A malformed or unsupported entry does not discard later fallbacks.
+    }
+  }
+  if (routes.length === 0) {
+    throw new Error("System proxy resolution returned no supported route.");
+  }
+  return routes;
+}
+
+function getSystemProxyDispatcher(url: string): Dispatcher {
+  const existing = systemProxyDispatchers.get(url);
+  if (existing) {
+    systemProxyDispatchers.delete(url);
+    systemProxyDispatchers.set(url, existing);
+    return existing;
+  }
+  const dispatcher = new ProxyAgent(url);
+  systemProxyDispatchers.set(url, dispatcher);
+  if (systemProxyDispatchers.size > 16) {
+    const oldest = systemProxyDispatchers.entries().next().value as
+      [string, Dispatcher] | undefined;
+    if (oldest) {
+      systemProxyDispatchers.delete(oldest[0]);
+      void oldest[1].close().catch(() => undefined);
+    }
+  }
+  return dispatcher;
+}
+
+function closeSystemProxyDispatchers(): void {
+  for (const dispatcher of systemProxyDispatchers.values()) {
+    void dispatcher.close().catch(() => undefined);
+  }
+  systemProxyDispatchers.clear();
+}
+
 export function normalizeOutboundProxyConfig(
   input: OutboundProxyConfig,
 ): OutboundProxyConfig {
@@ -107,7 +190,9 @@ export function configureOutboundProxy(
   const normalized = normalizeOutboundProxyConfig(input);
   const nextSystemProxyUrl = systemProxyUrl(input.systemProxyUrl);
   const effectiveProxyUrl =
-    normalized.mode === "system" ? nextSystemProxyUrl : normalized.url;
+    normalized.mode === "system" && !input.resolveSystemProxy
+      ? nextSystemProxyUrl
+      : normalized.url;
   const nextDispatcher = effectiveProxyUrl
     ? new ProxyAgent(effectiveProxyUrl)
     : undefined;
@@ -115,16 +200,22 @@ export function configureOutboundProxy(
 
   currentConfig = normalized;
   currentSystemProxyUrl = nextSystemProxyUrl;
+  currentSystemProxyResolver = input.resolveSystemProxy;
   proxyDispatcher = nextDispatcher;
+  closeSystemProxyDispatchers();
   if (previous) void previous.close().catch(() => undefined);
   return getOutboundProxyStatus();
 }
 
 export function getOutboundProxyStatus(): OutboundProxyStatus {
+  const dynamicSystem =
+    currentConfig.mode === "system" && currentSystemProxyResolver !== undefined;
   return {
     ...currentConfig,
-    effective: proxyDispatcher ? "proxy" : "direct",
-    systemAvailable: currentSystemProxyUrl !== undefined,
+    effective: dynamicSystem ? "system" : proxyDispatcher ? "proxy" : "direct",
+    systemAvailable:
+      currentSystemProxyResolver !== undefined ||
+      currentSystemProxyUrl !== undefined,
   };
 }
 
@@ -175,10 +266,80 @@ export async function fetchWithDispatcher(
 }
 
 /** Framework-owned provider/model-database fetch honoring desktop proxy mode. */
+function canReplayBody(body: RequestInit["body"]): boolean {
+  if (body == null) return true;
+  if (typeof body !== "object") return true;
+  return !("getReader" in body || "pipe" in body);
+}
+
+function canFallbackAfter(
+  error: unknown,
+  signal?: AbortSignal | null,
+): boolean {
+  if (signal?.aborted) return false;
+  const fallbackCodes = new Set([
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ECONNREFUSED",
+    "EHOSTUNREACH",
+    "ENETUNREACH",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_PRX_CONN",
+  ]);
+  let cause = error;
+  for (let depth = 0; cause instanceof Error && depth < 8; depth++) {
+    if (cause.name === "AbortError") return false;
+    const code = (cause as Error & { code?: unknown }).code;
+    if (typeof code === "string" && fallbackCodes.has(code)) return true;
+    cause = cause.cause;
+  }
+  return false;
+}
+
+async function fetchWithSystemProxy(
+  input: string | URL,
+  init: RequestInit,
+  resolver: SystemProxyResolver,
+): Promise<Response> {
+  const targetUrl = input instanceof URL ? input.href : new URL(input).href;
+  const routes = parseSystemProxyRoutes(
+    await resolver(targetUrl, init.signal ?? undefined),
+  );
+  let lastError: unknown;
+  for (let index = 0; index < routes.length; index++) {
+    const route = routes[index]!;
+    const dispatcher =
+      route.kind === "direct"
+        ? getDirectDispatcher()
+        : getSystemProxyDispatcher(route.url);
+    try {
+      return await fetchWithDispatcher(input, init, dispatcher);
+    } catch (error) {
+      lastError = error;
+      if (
+        index === routes.length - 1 ||
+        !canFallbackAfter(error, init.signal)
+      ) {
+        throw error;
+      }
+      if (!canReplayBody(init.body)) {
+        throw new Error(
+          "System proxy fallback cannot replay a streaming request body.",
+          { cause: error },
+        );
+      }
+    }
+  }
+  throw lastError;
+}
+
 export function outboundFetch(
   input: string | URL,
   init: RequestInit = {},
 ): Promise<Response> {
+  if (currentConfig.mode === "system" && currentSystemProxyResolver) {
+    return fetchWithSystemProxy(input, init, currentSystemProxyResolver);
+  }
   return fetchWithDispatcher(
     input,
     init,
@@ -191,8 +352,15 @@ export async function resetOutboundProxyForTests(): Promise<void> {
     (dispatcher): dispatcher is Dispatcher => dispatcher !== undefined,
   );
   proxyDispatcher = undefined;
+  const dynamicDispatchers = [...systemProxyDispatchers.values()];
+  systemProxyDispatchers.clear();
   directDispatcher = undefined;
   currentConfig = { mode: "direct" };
   currentSystemProxyUrl = undefined;
-  await Promise.all(dispatchers.map((dispatcher) => dispatcher.close()));
+  currentSystemProxyResolver = undefined;
+  await Promise.all(
+    [...dispatchers, ...dynamicDispatchers].map((dispatcher) =>
+      dispatcher.close(),
+    ),
+  );
 }

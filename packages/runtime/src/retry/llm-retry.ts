@@ -31,6 +31,7 @@ import type {
   LLMResponseFormat,
   LLMResponse,
   LLMStreamEvent,
+  LLMTargetIdentity,
   LLMToolCall,
   LLMToolDefinition,
 } from "../llm/llm-adapter.js";
@@ -141,6 +142,42 @@ export interface RetryInfo {
   readonly error: unknown;
 }
 
+function createAttemptTrace(
+  params: CallLLMWithRetryParams,
+  messages: readonly LLMMessage[],
+  attempt: number,
+  streaming = false,
+): {
+  readonly onTargetAttempt: (target: LLMTargetIdentity) => void;
+  readonly ensureCalling: () => Promise<void>;
+} {
+  let target: LLMTargetIdentity | undefined =
+    params.provider && params.resolvedModel
+      ? { provider: params.provider, model: params.resolvedModel }
+      : undefined;
+  let callingEmitted = false;
+  return {
+    onTargetAttempt(nextTarget) {
+      target = nextTarget;
+    },
+    async ensureCalling() {
+      if (callingEmitted) return;
+      callingEmitted = true;
+      await emitLlmCalling(params.emitter, {
+        runtimeId: params.runtimeId,
+        pluginId: params.pluginId,
+        slot: params.model,
+        model: target?.model ?? params.resolvedModel ?? params.model,
+        provider: target?.provider ?? params.provider,
+        messages,
+        tools: params.tools,
+        attempt,
+        ...(streaming ? { streaming: true } : {}),
+      });
+    },
+  };
+}
+
 export async function callLLMWithRetry(
   params: CallLLMWithRetryParams,
 ): Promise<LLMResponse> {
@@ -166,24 +203,17 @@ export async function callLLMWithRetry(
     const attemptMessages = perturbMessages(messages, attempt, lastReason);
 
     const callStart = Date.now();
+    const trace = createAttemptTrace(params, attemptMessages, attempt);
     try {
-      await emitLlmCalling(params.emitter, {
-        runtimeId: params.runtimeId,
-        pluginId: params.pluginId,
-        slot: params.model,
-        model: params.resolvedModel ?? params.model,
-        provider: params.provider,
-        messages: attemptMessages,
-        tools: params.tools,
-        attempt,
-      });
       const response = await llm.generate({
         model,
         messages: attemptMessages,
         tools,
         responseFormat: params.responseFormat,
         signal,
+        onTargetAttempt: trace.onTargetAttempt,
       });
+      await trace.ensureCalling();
       await emitLlmRespondedSuccess(params.emitter, {
         runtimeId: params.runtimeId,
         pluginId: params.pluginId,
@@ -193,6 +223,7 @@ export async function callLLMWithRetry(
       });
       return response;
     } catch (err) {
+      await trace.ensureCalling();
       await emitLlmRespondedError(params.emitter, {
         runtimeId: params.runtimeId,
         pluginId: params.pluginId,
@@ -320,17 +351,7 @@ export async function streamLLMWithRetry(
     const attemptMessages = perturbMessages(messages, attempt, lastReason);
     const forwardDeltas = attempt === 0; // avoid duplicate text on retry
     const streamStart = Date.now();
-    await emitLlmCalling(params.emitter, {
-      runtimeId: params.runtimeId,
-      pluginId: params.pluginId,
-      slot: params.model,
-      model: params.resolvedModel ?? params.model,
-      provider: params.provider,
-      messages: attemptMessages,
-      tools: params.tools,
-      attempt,
-      streaming: true,
-    });
+    const trace = createAttemptTrace(params, attemptMessages, attempt, true);
 
     try {
       for await (const event of llm.stream({
@@ -338,19 +359,25 @@ export async function streamLLMWithRetry(
         messages: attemptMessages,
         tools,
         signal: callAborter.signal,
+        onTargetAttempt: trace.onTargetAttempt,
       })) {
         if (event.type === "text-delta") {
           firstTokenSeen = true;
           streamedContent += event.textDelta;
-          if (forwardDeltas) await onDelta?.(event.textDelta);
+          if (event.textDelta.length > 0) {
+            await trace.ensureCalling();
+            if (forwardDeltas) await onDelta?.(event.textDelta);
+          }
         } else if (event.type === "tool-call") {
           firstTokenSeen = true;
+          await trace.ensureCalling();
           streamedToolCalls.push({
             id: event.id,
             name: event.name,
             arguments: event.arguments,
           });
         } else if (event.type === "done") {
+          await trace.ensureCalling();
           streamFinishReason = event.finishReason as
             "stop" | "tool_calls" | "length" | "error";
           if (event.reasoningContent)
@@ -362,6 +389,7 @@ export async function streamLLMWithRetry(
       clearTimeout(callTimeoutHandle);
       clearTimeout(ttfbHandle);
       params.abortSignal?.removeEventListener("abort", onExternalAbort);
+      await trace.ensureCalling();
 
       const finalResponse: LLMResponse = {
         content: streamedContent || null,
@@ -396,6 +424,7 @@ export async function streamLLMWithRetry(
       // `llm.calling` in trace_events and breaks trace-viewer pairing. This
       // must run BEFORE the abort throw below so a player abort still emits
       // the paired `llm.responded`.
+      await trace.ensureCalling();
       await emitLlmRespondedError(params.emitter, {
         runtimeId: params.runtimeId,
         pluginId: params.pluginId,

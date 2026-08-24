@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { parse as parseToml } from "smol-toml";
 import {
   normalizeOutboundProxyConfig,
   type OutboundProxyConfig,
@@ -19,41 +20,23 @@ const MODE_VALUES = new Set<OutboundProxyMode>([
   "socks",
 ]);
 
-function readTomlString(
-  source: string,
-  section: string,
-  key: string,
-): string | undefined {
-  let activeSection = "";
-  for (const line of source.split(/\r?\n/)) {
-    const sectionMatch = /^\s*\[([^\]]+)]\s*(?:#.*)?$/.exec(line);
-    if (sectionMatch) {
-      activeSection = sectionMatch[1]!.trim();
-      continue;
-    }
-    if (activeSection !== section) continue;
-    const valueMatch = new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`).exec(line);
-    if (!valueMatch) continue;
-    try {
-      const value = JSON.parse(valueMatch[1]!) as unknown;
-      return typeof value === "string" ? value : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-  return undefined;
-}
-
 export function readStoredProxyConfig(covelHome: string): OutboundProxyConfig {
   const file = join(covelHome, "config.toml");
   if (!existsSync(file)) return { mode: "direct" };
   try {
     const source = readFileSync(file, "utf-8");
-    const rawMode = readTomlString(source, "network", "proxy_mode");
+    const parsed = parseToml(source) as Record<string, unknown>;
+    const rawNetwork = parsed.network;
+    const network =
+      rawNetwork && typeof rawNetwork === "object" && !Array.isArray(rawNetwork)
+        ? (rawNetwork as Record<string, unknown>)
+        : {};
+    const rawMode = network.proxy_mode;
     const mode = MODE_VALUES.has(rawMode as OutboundProxyMode)
       ? (rawMode as OutboundProxyMode)
       : "direct";
-    const url = readTomlString(source, "network", "proxy_url");
+    const url =
+      typeof network.proxy_url === "string" ? network.proxy_url : undefined;
     return normalizeOutboundProxyConfig({ mode, ...(url ? { url } : {}) });
   } catch (error) {
     console.warn("[proxy-config] Could not read proxy settings:", error);

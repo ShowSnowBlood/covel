@@ -12,6 +12,15 @@ export {
 } from "./utils/json-value.js";
 export { reservedPluginDataNamespaceError } from "./utils/plugin-data-namespace.js";
 export {
+  SYSTEM_PROXY_IPC_VERSION,
+  isSystemProxyResolveRequest,
+  isSystemProxyResolveResponse,
+} from "./system-proxy-ipc.js";
+export type {
+  SystemProxyResolveRequest,
+  SystemProxyResolveResponse,
+} from "./system-proxy-ipc.js";
+export {
   MAX_WORKING_MEMORY_ENTRIES,
   MAX_WORKING_MEMORY_VALUE_CHARS,
   workingMemoryQuotaViolation,

@@ -100,20 +100,12 @@ const bundledModelDb = path.join(
   "packages/ai-provider/data/model-db.json",
 );
 
-// The generated database is intentionally gitignored, so a clean release
-// checkout must materialize it before pnpm deploy. A package without this file
-// boots, but loses model capability/pricing data and used to make the Settings
-// refresh action impossible to bootstrap.
-if (!fs.existsSync(bundledModelDb)) {
-  console.log("  Generating bundled LiteLLM model database...");
-  execSync("pnpm --filter @covel/ai-provider update-model-db", {
-    cwd: projectRoot,
-    stdio: "inherit",
-  });
-}
+// Release builds use a committed snapshot generated from a fixed LiteLLM
+// revision. Builds never fetch mutable upstream data; maintainers update the
+// snapshot explicitly with the package's update-model-db task.
 if (!fs.existsSync(bundledModelDb)) {
   throw new Error(
-    `Model database generation did not produce ${bundledModelDb}`,
+    `Committed model database snapshot is missing: ${bundledModelDb}`,
   );
 }
 
@@ -279,6 +271,22 @@ function verifyStagedServerRuntime() {
     );
   }
 
+  const stagedModelDbPath = checks[3];
+  let stagedModelDb;
+  try {
+    stagedModelDb = JSON.parse(fs.readFileSync(stagedModelDbPath, "utf-8"));
+  } catch (error) {
+    throw new Error(
+      `Desktop model database snapshot is invalid: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const stagedModelCount = Object.keys(stagedModelDb.models ?? {}).length;
+  if (stagedModelDb.count !== stagedModelCount || stagedModelCount === 0) {
+    throw new Error(
+      `Desktop model database snapshot is inconsistent (${stagedModelDb.count ?? "missing"} declared, ${stagedModelCount} entries)`,
+    );
+  }
+
   const esbuildScopeDir = path.join(serverStaging, "node_modules/@esbuild");
   const hasPlatformBinary =
     fs.existsSync(esbuildScopeDir) &&
@@ -333,8 +341,8 @@ ensureRuntimePackages();
 // resolve in the packaged sidecar instead of ERR_MODULE_NOT_FOUND.
 ensurePluginWorkspaceDeps();
 
-// Root `data/` is gitignored and pnpm's workspace packlist may omit the
-// generated file. Copy it explicitly so every installer has a baseline DB.
+// Copy the committed snapshot explicitly so workspace packlist differences do
+// not remove the baseline database from an installer.
 const stagedModelDb = path.join(
   serverStaging,
   "node_modules/@covel/ai-provider/data/model-db.json",

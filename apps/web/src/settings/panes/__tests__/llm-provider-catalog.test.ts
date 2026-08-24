@@ -11,7 +11,7 @@ import {
 
 describe("provider catalogue", () => {
   it("binds the first manually created model to story and plugin", () => {
-    expect(bindFirstProviderModel({}, [], "model_first")).toEqual({
+    expect(bindFirstProviderModel({}, [], "model_first", [], [])).toEqual({
       story: { modelRef: "model_first" },
       plugin: { modelRef: "model_first" },
     });
@@ -23,6 +23,8 @@ describe("provider catalogue", () => {
         { story: { modelRef: "existing" } },
         [],
         "model_first",
+        [],
+        [],
       ),
     ).toEqual({
       story: { modelRef: "existing" },
@@ -40,8 +42,50 @@ describe("provider catalogue", () => {
           },
         ],
         "model_second",
+        [],
+        [],
       ),
     ).toEqual({});
+  });
+
+  it("preserves explicit server assignments for each core slot", () => {
+    const serverPreset = {
+      id: "server-story",
+      name: "Server story",
+      provider: "openai",
+      model: "gpt-5",
+      enabled: true,
+      isDefault: true,
+      scope: "server" as const,
+      slotBindings: ["story", "plugin"],
+    };
+
+    expect(
+      bindFirstProviderModel({}, [], "model_first", [serverPreset], []),
+    ).toEqual({});
+    expect(
+      bindFirstProviderModel({}, [], "model_first", [], ["story"]),
+    ).toEqual({ plugin: { modelRef: "model_first" } });
+  });
+
+  it("auto-binds core slots when server config only covers other roles", () => {
+    const imagePreset = {
+      id: "server-image",
+      name: "Server image",
+      provider: "openai",
+      model: "gpt-image-1",
+      enabled: true,
+      isDefault: true,
+      scope: "server" as const,
+      slotBindings: ["image"],
+    };
+
+    expect(
+      bindFirstProviderModel({}, [], "model_first", [imagePreset], ["image"]),
+    ).toEqual({
+      story: { modelRef: "model_first" },
+      plugin: { modelRef: "model_first" },
+    });
   });
 
   it("uses the persisted provider-id normalization for catalogue identity", () => {

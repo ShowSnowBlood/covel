@@ -67,6 +67,8 @@ export interface GatewayOptions {
   parameterOverrides?: ModelParameterOverrides;
   /** Abort signal for cancellation (e.g. budget timeout). */
   signal?: AbortSignal;
+  /** Synchronously observes every concrete provider/model attempt. */
+  onTargetAttempt?: (target: { provider: string; model: string }) => void;
   /**
    * Per-request overlay that transiently extends the gateway's preset /
    * provider / slot view. Populated by server middleware from the

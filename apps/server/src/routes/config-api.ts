@@ -48,6 +48,7 @@ import {
   readStoredProxyConfig,
   writeStoredProxyConfig,
 } from "../lib/proxy-config.js";
+import { getDesktopSystemProxyResolver } from "../lib/desktop-system-proxy.js";
 
 export interface ConfigApiDeps {
   /** Mutable map shared with the gateway adapter. PUT handlers mutate in-place. */
@@ -58,12 +59,30 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
   const app = new Hono();
   const requireToken = makeDesktopRestTokenGuard();
   const initialCovelHome = resolveCovelHome();
-  configureOutboundProxy({
-    ...(initialCovelHome
-      ? readStoredProxyConfig(initialCovelHome)
-      : { mode: "direct" as const }),
-    systemProxyUrl: readRuntimeEnv().systemProxyUrl,
-  });
+  const systemProxyUrl = readRuntimeEnv().systemProxyUrl;
+  const resolveSystemProxy = getDesktopSystemProxyResolver();
+  try {
+    configureOutboundProxy({
+      ...(initialCovelHome
+        ? readStoredProxyConfig(initialCovelHome)
+        : { mode: "direct" as const }),
+      systemProxyUrl,
+      resolveSystemProxy,
+    });
+  } catch (error) {
+    // A manually edited or previously persisted proxy must not prevent the
+    // desktop sidecar from starting. Keep the file for user recovery and run
+    // direct until a valid setting is saved.
+    console.warn(
+      "[proxy-config] Ignoring invalid stored proxy settings:",
+      error,
+    );
+    configureOutboundProxy({
+      mode: "direct",
+      systemProxyUrl,
+      resolveSystemProxy,
+    });
+  }
 
   app.get("/api/config/info", (c) => {
     const covelHome = resolveCovelHome();
@@ -270,13 +289,15 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
         mode: rawMode as OutboundProxyMode,
         url: (body as { url?: string }).url,
       });
+      const status = configureOutboundProxy({
+        ...config,
+        systemProxyUrl: readRuntimeEnv().systemProxyUrl,
+        resolveSystemProxy,
+      });
+      // ProxyAgent construction above validates transport-specific details
+      // such as credential escaping before the new value reaches disk.
       writeStoredProxyConfig(covelHome, config);
-      return c.json(
-        configureOutboundProxy({
-          ...config,
-          systemProxyUrl: readRuntimeEnv().systemProxyUrl,
-        }),
-      );
+      return c.json(status);
     } catch (error) {
       return c.json(
         errorBody(error instanceof Error ? error.message : String(error), {

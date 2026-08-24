@@ -269,7 +269,7 @@ export type DesktopProxyMode = "direct" | "system" | "http" | "socks";
 export interface DesktopProxyConfig {
   readonly mode: DesktopProxyMode;
   readonly url?: string;
-  readonly effective: "direct" | "proxy";
+  readonly effective: "direct" | "proxy" | "system";
   readonly systemAvailable: boolean;
 }
 

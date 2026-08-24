@@ -24,7 +24,9 @@
  *      `WORLD*.md`; world.yaml and worldData sources also pass through the
  *      production schemas and diagnostics.
  *   5. `prompts/server/` has at least one `*.md`.
- *   6. `actionlint` passes (when installed).
+ *   6. The bundled LiteLLM model database is a valid snapshot pinned to an
+ *      immutable upstream commit.
+ *   7. `actionlint` passes (when installed).
  *
  * Exit code 0 = safe to push. Non-zero = fix before tagging.
  *
@@ -142,7 +144,7 @@ function pkgRoot(spec) {
 }
 
 // ── 1. Lockfile sync ─────────────────────────────────────────────
-console.log("\n[1/6] Lockfile sync (pnpm --frozen-lockfile dry-run)");
+console.log("\n[1/7] Lockfile sync (pnpm --frozen-lockfile dry-run)");
 if (args.has("--skip-lockfile")) {
   warn("skipped (--skip-lockfile)");
 } else {
@@ -160,7 +162,7 @@ if (args.has("--skip-lockfile")) {
 }
 
 // ── 2. Undeclared imports ─────────────────────────────────────────
-console.log("\n[2/6] Undeclared bare imports across packages/* and apps/*");
+console.log("\n[2/7] Undeclared bare imports across packages/* and apps/*");
 const wsPkgDirs = [
   ...fs
     .readdirSync(path.join(repoRoot, "packages"), { withFileTypes: true })
@@ -218,7 +220,7 @@ if (undeclaredCount === 0)
   ok(`all ${wsPkgDirs.length} workspace packages have all imports declared`);
 
 // ── 3. plugins/ structure ─────────────────────────────────────────
-console.log("\n[3/6] plugins/<id>/ structure (verify-release sentinels)");
+console.log("\n[3/7] plugins/<id>/ structure (verify-release sentinels)");
 const isPluginManifest = (f) => /^PLUGIN(\.[a-z-]+)?\.md$/i.test(f);
 
 // Same extraction as scripts/check-plugin-i18n.mjs — frontmatter is the YAML
@@ -391,7 +393,7 @@ if (pluginIssues === 0)
   );
 
 // ── 4. worlds/ structure ──────────────────────────────────────────
-console.log("\n[4/6] worlds/<id>/ structure");
+console.log("\n[4/7] worlds/<id>/ structure");
 const worldDirs = fs
   .readdirSync(path.join(repoRoot, "worlds"), { withFileTypes: true })
   // `_`-prefixed dirs are archives (e.g. worlds/_archive) — the world-seed
@@ -437,7 +439,7 @@ if (worldIssues === 0)
   );
 
 // ── 5. prompts/server/ ────────────────────────────────────────────
-console.log("\n[5/6] prompts/server/*.md");
+console.log("\n[5/7] prompts/server/*.md");
 const promptsDir = path.join(repoRoot, "prompts/server");
 if (!fs.existsSync(promptsDir)) {
   fail("prompts/server/ does not exist");
@@ -447,8 +449,80 @@ if (!fs.existsSync(promptsDir)) {
   else ok(`${md.length} prompt files present`);
 }
 
-// ── 6. actionlint ────────────────────────────────────────────────
-console.log("\n[6/6] GitHub Actions workflow lint");
+// ── 6. Bundled model database snapshot ──────────────────────────
+console.log("\n[6/7] Bundled LiteLLM model database snapshot");
+const modelDbPath = path.join(
+  repoRoot,
+  "packages/ai-provider/data/model-db.json",
+);
+const modelDbRelativePath = "packages/ai-provider/data/model-db.json";
+const modelDbSourcePath = path.join(
+  repoRoot,
+  "packages/ai-provider/model-db-source.json",
+);
+const modelDbSourceRelativePath = "packages/ai-provider/model-db-source.json";
+
+function isGitTracked(relativePath) {
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", "--", relativePath], {
+      cwd: repoRoot,
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!fs.existsSync(modelDbPath)) {
+  fail("packages/ai-provider/data/model-db.json is missing");
+} else if (!isGitTracked(modelDbRelativePath)) {
+  fail(`${modelDbRelativePath} is not tracked by Git`);
+}
+if (!fs.existsSync(modelDbSourcePath)) {
+  fail(`${modelDbSourceRelativePath} is missing`);
+} else if (!isGitTracked(modelDbSourceRelativePath)) {
+  fail(`${modelDbSourceRelativePath} is not tracked by Git`);
+}
+
+if (fs.existsSync(modelDbPath) && fs.existsSync(modelDbSourcePath)) {
+  try {
+    const sourceManifest = JSON.parse(
+      fs.readFileSync(modelDbSourcePath, "utf-8"),
+    );
+    const revision = sourceManifest.revision ?? "";
+    const expectedSource = `https://raw.githubusercontent.com/BerriAI/litellm/${revision}/model_prices_and_context_window.json`;
+    const hasValidRevision = /^[0-9a-f]{40}$/.test(revision);
+    const hasValidTimestamp = /^\d{4}-\d{2}-\d{2}T/.test(
+      sourceManifest.updatedAt ?? "",
+    );
+    if (!hasValidRevision) {
+      fail("model-db-source.json revision must be a 40-character commit");
+    }
+    if (!hasValidTimestamp) {
+      fail("model-db-source.json updatedAt must be an ISO timestamp");
+    }
+
+    const modelDb = JSON.parse(fs.readFileSync(modelDbPath, "utf-8"));
+    const modelCount = Object.keys(modelDb.models ?? {}).length;
+    if (modelDb.source !== expectedSource) {
+      fail("model-db.json source does not match model-db-source.json");
+    } else if (modelDb.updatedAt !== sourceManifest.updatedAt) {
+      fail("model-db.json updatedAt does not match model-db-source.json");
+    } else if (modelDb.count !== modelCount || modelCount === 0) {
+      fail(
+        `model-db.json count is inconsistent (${modelDb.count ?? "missing"} declared, ${modelCount} entries)`,
+      );
+    } else if (hasValidRevision && hasValidTimestamp) {
+      ok(`${modelCount} models match the pinned LiteLLM source manifest`);
+    }
+  } catch (e) {
+    fail(`bundled model database metadata is invalid — ${e.message}`);
+  }
+}
+
+// ── 7. actionlint ────────────────────────────────────────────────
+console.log("\n[7/7] GitHub Actions workflow lint");
 try {
   execSync("which actionlint", { stdio: "pipe" });
   try {

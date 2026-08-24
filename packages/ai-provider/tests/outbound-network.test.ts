@@ -5,6 +5,8 @@ import { getJson } from "../src/adapters/http.js";
 import {
   configureOutboundProxy,
   normalizeOutboundProxyConfig,
+  outboundFetch,
+  parseSystemProxyRoutes,
   resetOutboundProxyForTests,
 } from "../src/outbound-network.js";
 
@@ -64,6 +66,98 @@ describe("outbound network transport", () => {
         url: "socks5://127.0.0.1:7891",
       }),
     ).toThrow(/HTTP/i);
+  });
+
+  it("preserves supported Chromium proxy routes in fallback order", () => {
+    expect(
+      parseSystemProxyRoutes(
+        "PROXY proxy-1.example:8080; HTTPS proxy-2.example:8443; SOCKS5 [::1]:1080; DIRECT",
+      ),
+    ).toEqual([
+      { kind: "proxy", url: "http://proxy-1.example:8080" },
+      { kind: "proxy", url: "https://proxy-2.example:8443" },
+      { kind: "proxy", url: "socks5://[::1]:1080" },
+      { kind: "direct" },
+    ]);
+    expect(parseSystemProxyRoutes("SOCKS4 proxy.example:1080; DIRECT")).toEqual(
+      [{ kind: "direct" }],
+    );
+    expect(() =>
+      parseSystemProxyRoutes(
+        "SOCKS4 proxy.example:1080; QUIC proxy.example:443",
+      ),
+    ).toThrow(/supported route/i);
+  });
+
+  it("resolves system proxy rules for every concrete target URL", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("ok"));
+    vi.stubGlobal("fetch", fetchMock);
+    const resolveSystemProxy = vi.fn(async (targetUrl: string) =>
+      targetUrl.includes("provider.example")
+        ? "PROXY proxy.example:8080"
+        : "DIRECT",
+    );
+
+    const status = configureOutboundProxy({
+      mode: "system",
+      resolveSystemProxy,
+    });
+    expect(status).toMatchObject({
+      mode: "system",
+      effective: "system",
+      systemAvailable: true,
+    });
+
+    await outboundFetch("https://provider.example/v1/models");
+    await outboundFetch("http://127.0.0.1:3001/api/health");
+
+    expect(resolveSystemProxy).toHaveBeenNthCalledWith(
+      1,
+      "https://provider.example/v1/models",
+      undefined,
+    );
+    expect(resolveSystemProxy).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:3001/api/health",
+      undefined,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]?.dispatcher).not.toBe(
+      fetchMock.mock.calls[1]?.[1]?.dispatcher,
+    );
+  });
+
+  it("falls back through system routes only after connection failures", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    const connectionFailure = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED proxy"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(connectionFailure)
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    configureOutboundProxy({
+      mode: "system",
+      resolveSystemProxy: async () =>
+        "PROXY dead-proxy.example:8080; PROXY live-proxy.example:8080; DIRECT",
+    });
+
+    await expect(
+      outboundFetch("https://provider.example/v1/models"),
+    ).resolves.toMatchObject({ status: 200 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(
+      new Response("upstream failed", { status: 500 }),
+    );
+    const response = await outboundFetch("https://provider.example/v1/models");
+    expect(response.status).toBe(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("routes core provider requests through an HTTP proxy", async () => {

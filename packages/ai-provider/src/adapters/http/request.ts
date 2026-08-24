@@ -1,3 +1,4 @@
+import type { FormData as UndiciFormData } from "undici";
 import type { ProviderConfig } from "../../types.js";
 import { outboundFetch } from "../../outbound-network.js";
 import {
@@ -140,7 +141,7 @@ export async function getJson(
 export async function postFormData(
   config: ProviderConfig,
   path: string,
-  body: FormData,
+  body: UndiciFormData,
   signal?: AbortSignal,
 ): Promise<Response> {
   assertAllowedBaseUrl(config.baseUrl);
@@ -153,7 +154,7 @@ export async function postFormData(
         ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
         ...config.headers,
       },
-      body,
+      body: body as unknown as BodyInit,
       redirect: "manual",
       signal: signal ?? config.signal,
     }),

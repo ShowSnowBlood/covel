@@ -36,6 +36,7 @@ import type { ProviderResolution } from "./provider-registry.js";
 import {
   notifyStart,
   notifySuccess,
+  notifyTargetAttempt,
   targetModel,
 } from "./gateway-lifecycle.js";
 import {
@@ -137,6 +138,7 @@ export function createRunOperation(
         const startTime = Date.now();
 
         try {
+          notifyTargetAttempt(options?.onTargetAttempt, target);
           await notifyStart(
             resolved.hooks,
             provider,
