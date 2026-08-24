@@ -20,11 +20,13 @@ import {
   HardDrive,
   FileCode,
   KeyRound,
+  Network,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import {
   hasElectronIpc,
   getDesktopInfo,
+  getDesktopProxyConfig,
   isDesktopApp,
   openLogsDir,
   openConfigDir,
@@ -33,6 +35,9 @@ import {
   openKeysEnv,
   pickDataDir,
   reloadServerAndWait,
+  setDesktopProxyConfig,
+  type DesktopProxyConfig,
+  type DesktopProxyMode,
 } from "@/lib/desktop-bridge.js";
 import { resetOnboarding } from "@/components/onboarding-wizard.js";
 import { useSession } from "@/stores/session-store.js";
@@ -58,6 +63,9 @@ export function DesktopPane() {
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [proxy, setProxy] = useState<DesktopProxyConfig | null>(null);
+  const [proxyMode, setProxyMode] = useState<DesktopProxyMode>("direct");
+  const [proxyUrl, setProxyUrl] = useState("");
 
   // First-launch llm.toml detection (O-6). Only surface on desktop builds
   // where opening the file actually works; Web users can't edit the sidecar
@@ -72,7 +80,35 @@ export function DesktopPane() {
     getDesktopInfo()
       .then((i) => setInfo(i as DesktopInfo | null))
       .catch(ignoreError("load desktop info"));
+    getDesktopProxyConfig()
+      .then((config) => {
+        setProxy(config);
+        setProxyMode(config.mode);
+        setProxyUrl(config.url ?? "");
+      })
+      .catch(ignoreError("load desktop proxy config"));
   }, []);
+
+  async function handleSaveProxy() {
+    setBusy("proxy");
+    try {
+      const config = await setDesktopProxyConfig({
+        mode: proxyMode,
+        ...(proxyMode === "http" || proxyMode === "socks"
+          ? { url: proxyUrl }
+          : {}),
+      });
+      setProxy(config);
+      setProxyMode(config.mode);
+      setProxyUrl(config.url ?? "");
+      setToast(t("settings.desktopProxySaved"));
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(null);
+      setTimeout(() => setToast(null), 5000);
+    }
+  }
 
   async function refreshInfo() {
     setBusy("refresh");
@@ -268,6 +304,67 @@ export function DesktopPane() {
             <KeyRound className="w-3 h-3 mr-1.5" />
             {t("settings.desktopEditKeys")}
           </Button>
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Network className="w-3.5 h-3.5" />
+          {t("settings.desktopProxy")}
+        </h3>
+        <div className="text-[11px] text-muted-foreground leading-relaxed">
+          {t("settings.desktopProxyHint")}
+        </div>
+        <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-2">
+          <select
+            value={proxyMode}
+            onChange={(event) =>
+              setProxyMode(event.target.value as DesktopProxyMode)
+            }
+            className="border border-border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="direct">{t("settings.desktopProxyDirect")}</option>
+            <option value="system">{t("settings.desktopProxySystem")}</option>
+            <option value="http">{t("settings.desktopProxyHttp")}</option>
+            <option value="socks">{t("settings.desktopProxySocks")}</option>
+          </select>
+          {(proxyMode === "http" || proxyMode === "socks") && (
+            <input
+              value={proxyUrl}
+              onChange={(event) => setProxyUrl(event.target.value)}
+              placeholder={
+                proxyMode === "socks"
+                  ? "socks5://127.0.0.1:7891"
+                  : "http://127.0.0.1:7890"
+              }
+              className="border border-border bg-background px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-primary"
+            />
+          )}
+        </div>
+        {proxyMode === "system" && !proxy?.systemAvailable && (
+          <div className="text-[10px] text-amber-600">
+            {t("settings.desktopProxySystemDirect")}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSaveProxy}
+            disabled={busy !== null}
+          >
+            {busy === "proxy" && (
+              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+            )}
+            {t("settings.desktopProxySave")}
+          </Button>
+          {proxy && (
+            <span className="text-[10px] text-muted-foreground">
+              {proxy.effective === "proxy"
+                ? t("settings.desktopProxyActive")
+                : t("settings.desktopProxyInactive")}
+            </span>
+          )}
         </div>
       </section>
 

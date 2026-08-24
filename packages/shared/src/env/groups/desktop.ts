@@ -76,6 +76,14 @@ export const DESKTOP_ENV_VARS = [
     description: "Desktop config directory for model DB and settings.",
   },
   {
+    name: "COVEL_SYSTEM_PROXY_URL",
+    group: "desktop",
+    type: "string",
+    status: "active",
+    description:
+      "Proxy URL resolved by Electron from the operating-system proxy settings. Empty means DIRECT.",
+  },
+  {
     name: "COVEL_LOGS_DIR",
     group: "desktop",
     type: "path",

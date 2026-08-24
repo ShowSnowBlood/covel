@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, Loader2, XCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
+import { ActionableErrorNotice } from "@/components/shared/actionable-error-notice.js";
 import { pingPreset, type PingResult } from "@/services/api.js";
 
 /**
@@ -48,37 +49,6 @@ const resultCache = new Map<string, { result: PingResult; at: number }>();
 
 function requestIdFor(target: PingTarget): string {
   return target.kind === "preset" ? target.presetId : `slot-${target.slotId}`;
-}
-
-/**
- * Bucket raw provider/network error strings into a short actionable label
- * (`auth` / `rate-limited` / `timeout` / …) so the UI can surface what
- * the user can actually do about it. Pattern-based, never throws.
- */
-function classifyPingError(raw: string | undefined): {
-  kind: string;
-  detail: string;
-} {
-  if (!raw) return { kind: "unknown", detail: "Unknown error" };
-  const lower = raw.toLowerCase();
-  if (/\b401\b|unauthoriz|invalid.+key|invalid.*api.?key/.test(lower)) {
-    return { kind: "auth", detail: raw };
-  }
-  if (/\b403\b|forbidden/.test(lower))
-    return { kind: "forbidden", detail: raw };
-  if (/\b404\b|not found/.test(lower))
-    return { kind: "not-found", detail: raw };
-  if (/\b429\b|rate[-\s]?limit|too many/.test(lower))
-    return { kind: "rate-limited", detail: raw };
-  if (/\b5\d\d\b|server error|bad gateway|unavailable/.test(lower))
-    return { kind: "server", detail: raw };
-  if (/timeout|timed out|etimedout/.test(lower))
-    return { kind: "timeout", detail: raw };
-  if (
-    /network|fetch|econnrefused|enotfound|socket|dns|offline|cors/.test(lower)
-  )
-    return { kind: "network", detail: raw };
-  return { kind: "error", detail: raw };
 }
 
 /**
@@ -225,13 +195,11 @@ export function PingButton({
 
   if (hideResult) return button;
 
-  const errInfo = result && !result.ok ? classifyPingError(result.error) : null;
-
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
       {button}
       {result && !testing && (
-        <span className="inline-flex items-center gap-1 text-xs">
+        <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1 text-xs">
           {result.ok ? (
             <>
               <CheckCircle2 className="w-3 h-3 text-green-500" />
@@ -253,20 +221,10 @@ export function PingButton({
             </>
           ) : (
             <>
-              <XCircle className="w-3 h-3 text-destructive" />
-              <span
-                className="text-destructive font-mono uppercase text-[10px] px-1.5 py-0.5 border border-destructive/40 bg-destructive/5 rounded-sm"
-                title={errInfo?.detail ?? result.error}
-              >
-                {errInfo?.kind ?? "error"}
-              </span>
-              <span
-                className="text-destructive truncate max-w-[180px]"
-                title={result.error}
-              >
-                {result.error?.slice(0, 40) ??
-                  t("settings.pingFailed", "Failed")}
-              </span>
+              <XCircle className="h-3 w-3 shrink-0 text-destructive" />
+              <ActionableErrorNotice
+                error={result.error ?? t("settings.pingFailed", "Failed")}
+              />
             </>
           )}
         </span>
@@ -278,4 +236,9 @@ export function PingButton({
 /** Invalidate the cached ping result for one target (e.g. after key edit). */
 export function invalidatePingResult(target: PingTarget): void {
   resultCache.delete(requestIdFor(target));
+}
+
+/** API-key edits can affect every preset/slot using that provider. */
+export function invalidateAllPingResults(): void {
+  resultCache.clear();
 }

@@ -2,6 +2,7 @@ import type {
   CustomPreset,
   PresetSummary,
   ProviderModelProfile,
+  SlotConfigEntry,
 } from "@/services/api.js";
 import { providerKeyToId } from "@covel/shared";
 
@@ -29,6 +30,24 @@ export const EMPTY_PROVIDER_DRAFT: ProviderDraft = {
   protocol: "openai-chat-v1",
   modelIds: "",
 };
+
+/** Bind only the first user-created model, preserving any explicit role. */
+export function bindFirstProviderModel(
+  slotConfig: Record<string, SlotConfigEntry>,
+  existingProfiles: readonly ProviderModelProfile[],
+  modelRef: string | undefined,
+): Record<string, SlotConfigEntry> {
+  const alreadyHasModel = existingProfiles.some(
+    (profile) => profile.models.length > 0,
+  );
+  if (!modelRef || alreadyHasModel) return slotConfig;
+  const binding = { modelRef };
+  return {
+    ...slotConfig,
+    story: slotConfig.story ?? binding,
+    plugin: slotConfig.plugin ?? binding,
+  };
+}
 
 /** Match the canonical provider namespace used by settings persistence. */
 export function normalizeProviderId(value: string): string {

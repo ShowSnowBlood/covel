@@ -95,6 +95,27 @@ await build({
 // electron-builder 打包时不再触碰 workspace 体系。
 console.log("\n[3/4] Staging server resources (pnpm deploy)...");
 const stagingDir = path.join(desktopRoot, "staging");
+const bundledModelDb = path.join(
+  projectRoot,
+  "packages/ai-provider/data/model-db.json",
+);
+
+// The generated database is intentionally gitignored, so a clean release
+// checkout must materialize it before pnpm deploy. A package without this file
+// boots, but loses model capability/pricing data and used to make the Settings
+// refresh action impossible to bootstrap.
+if (!fs.existsSync(bundledModelDb)) {
+  console.log("  Generating bundled LiteLLM model database...");
+  execSync("pnpm --filter @covel/ai-provider update-model-db", {
+    cwd: projectRoot,
+    stdio: "inherit",
+  });
+}
+if (!fs.existsSync(bundledModelDb)) {
+  throw new Error(
+    `Model database generation did not produce ${bundledModelDb}`,
+  );
+}
 
 // Clean previous staging
 if (fs.existsSync(stagingDir)) {
@@ -246,6 +267,10 @@ function verifyStagedServerRuntime() {
     path.join(serverStaging, "src/index.ts"),
     path.join(serverStaging, "node_modules/tsx/dist/cli.mjs"),
     path.join(serverStaging, "node_modules/esbuild/package.json"),
+    path.join(
+      serverStaging,
+      "node_modules/@covel/ai-provider/data/model-db.json",
+    ),
   ];
   const missing = checks.filter((target) => !fs.existsSync(target));
   if (missing.length > 0) {
@@ -307,6 +332,16 @@ ensureRuntimePackages();
 // (e.g. @covel/plugin-handlers-utils) — stage them so handler/guard imports
 // resolve in the packaged sidecar instead of ERR_MODULE_NOT_FOUND.
 ensurePluginWorkspaceDeps();
+
+// Root `data/` is gitignored and pnpm's workspace packlist may omit the
+// generated file. Copy it explicitly so every installer has a baseline DB.
+const stagedModelDb = path.join(
+  serverStaging,
+  "node_modules/@covel/ai-provider/data/model-db.json",
+);
+fs.mkdirSync(path.dirname(stagedModelDb), { recursive: true });
+fs.copyFileSync(bundledModelDb, stagedModelDb);
+console.log("  ✓ bundled model database staged");
 
 // 拷贝 server 运行所需的仓库级资源（这些不在 @covel/server 依赖图里）。
 // 注意：plugins/*/node_modules 来自 pnpm workspace 安装，内部是层层嵌套的

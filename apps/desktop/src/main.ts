@@ -12,7 +12,7 @@
  *   8. Clean up on quit
  */
 
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, session } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import path from "node:path";
@@ -47,6 +47,7 @@ import {
   navigateToApp,
 } from "./windows.js";
 import { initDesktopI18n, t } from "./main-i18n.js";
+import { parseElectronProxyResult } from "./system-proxy.js";
 
 // ── Splash screen ──────────────────────────────────────────────
 
@@ -161,6 +162,14 @@ async function startServer(
 
   const envOverrides = loadEnvFiles(projectRoot);
   const keysEnv = loadKeysEnvForChild(paths.userKeysEnvPath);
+  let systemProxyUrl: string | undefined;
+  try {
+    systemProxyUrl = parseElectronProxyResult(
+      await session.defaultSession.resolveProxy("https://api.openai.com"),
+    );
+  } catch (error) {
+    writeLog("warn", "Could not resolve the operating-system proxy:", error);
+  }
 
   // Data dir lives at <dataRoot>/; ensure the db's parent (and logs dir) exist.
   fs.mkdirSync(path.dirname(paths.dbPath), { recursive: true });
@@ -187,6 +196,7 @@ async function startServer(
     COVEL_USER_WORLDS_DIR: paths.userWorldsDir,
     COVEL_USER_PLUGINS_DIR: paths.userPluginsDir,
     COVEL_USER_CONFIG_DIR: paths.covelHome,
+    COVEL_SYSTEM_PROXY_URL: systemProxyUrl ?? "",
     COVEL_LLM_TOML: paths.effectiveLlmToml,
     COVEL_LOGS_DIR: paths.logsDir,
     COVEL_LOG_MAX_SIZE_MB: String(paths.logRotation.maxSizeMb),
@@ -203,6 +213,10 @@ async function startServer(
   writeLog("info", `cwd: ${projectRoot}`);
   writeLog("info", `db: ${paths.dbPath}`);
   writeLog("info", `llm.toml: ${paths.effectiveLlmToml}`);
+  writeLog(
+    "info",
+    `system proxy: ${systemProxyUrl ? new URL(systemProxyUrl).protocol.replace(":", "") : "DIRECT"}`,
+  );
 
   const spawnEnv: Record<string, string> = { ...env };
   const nodeBin = isDev ? "node" : process.execPath;

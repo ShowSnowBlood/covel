@@ -24,6 +24,15 @@ export class SettingsStore implements SettingsStoreApi {
   private readonly secrets = new Map<string, string>();
   private readonly keyListeners = new Map<SettingKey, Set<SettingsListener>>();
   private readonly globalListeners = new Set<SettingsListener>();
+  /**
+   * Full snapshots must reach each backend in mutation order. Without this
+   * queue, a slow older save can finish after a newer one and silently erase
+   * the latest provider, model, or API-key configuration on disk.
+   */
+  private readonly persistTails: Record<"values" | "secrets", Promise<void>> = {
+    values: Promise.resolve(),
+    secrets: Promise.resolve(),
+  };
   private loaded: Promise<void>;
   private loadResolve!: () => void;
   /** Set when `init()` could not read existing state. See {@link assertHydrated}. */
@@ -89,25 +98,36 @@ export class SettingsStore implements SettingsStoreApi {
     mutate: () => () => void,
   ): Promise<void> {
     this.assertHydrated();
-    // `mutate` runs synchronously and returns its own undo. Two reasons it is
-    // not deferred into a queue and does not snapshot the whole map:
-    //   - Callers read back synchronously (`applyThemeSelection` does
-    //     `void set(...)` then `get(...)` in the same tick), so the value must
-    //     be visible immediately.
-    //   - A whole-map snapshot would, on failure, also revert a *concurrent*
-    //     write that had already succeeded. Undoing only the key we touched
-    //     leaves other writers alone.
+    // Mutate synchronously so callers retain read-after-write behaviour, then
+    // capture this mutation's full snapshot and enqueue only the backend I/O.
+    // Undo remains key-scoped so one failed write cannot roll back unrelated
+    // concurrent mutations.
     const undo = mutate();
+    const snapshot =
+      target === "values"
+        ? this.serializeEntries()
+        : (Object.fromEntries(this.secrets) as Record<string, string>);
     try {
-      await (target === "values"
-        ? this.adapter.save(this.serializeEntries())
-        : this.adapter.saveSecrets(
-            Object.fromEntries(this.secrets) as Record<string, string>,
-          ));
+      await this.enqueueSnapshot(target, snapshot);
     } catch (err) {
       undo();
       throw err;
     }
+  }
+
+  private enqueueSnapshot(
+    target: "values" | "secrets",
+    snapshot: Record<string, unknown> | Record<string, string>,
+  ): Promise<void> {
+    const operation = this.persistTails[target].then(() =>
+      target === "values"
+        ? this.adapter.save(snapshot as Record<SettingKey, unknown>)
+        : this.adapter.saveSecrets(snapshot as Record<string, string>),
+    );
+    // Keep the queue usable after a rejected write while returning the
+    // original rejection to the caller that owns that mutation.
+    this.persistTails[target] = operation.catch(() => undefined);
+    return operation;
   }
 
   /** Capture a key's current state so a failed write can put it back. */
@@ -219,7 +239,10 @@ export class SettingsStore implements SettingsStoreApi {
     this.values.clear();
     this.secrets.clear();
     try {
-      await Promise.all([this.adapter.save({}), this.adapter.saveSecrets({})]);
+      await Promise.all([
+        this.enqueueSnapshot("values", {}),
+        this.enqueueSnapshot("secrets", {}),
+      ]);
     } catch (err) {
       this.restore(this.values, valuesSnapshot);
       this.restore(this.secrets, secretsSnapshot);

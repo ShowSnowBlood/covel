@@ -15,6 +15,7 @@ const ENV_KEYS = [
   "COVEL_LLM_TOML",
   "COVEL_USER_PLUGINS_DIR",
   "COVEL_USER_WORLDS_DIR",
+  "COVEL_SYSTEM_PROXY_URL",
 ] as const;
 
 function buildApp(apiKeys: Record<string, string>): Hono {
@@ -228,6 +229,57 @@ describe("config API env and file contracts", () => {
     );
   });
 
+  it("persists and hot-applies the compact desktop proxy setting", async () => {
+    process.env.COVEL_HOME = tmpHome;
+    process.env.COVEL_SYSTEM_PROXY_URL = "http://127.0.0.1:7890";
+    const app = buildApp(apiKeys);
+
+    const putRes = await app.request("/api/config/proxy", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "socks", url: "127.0.0.1:7891" }),
+    });
+    expect(putRes.status).toBe(200);
+    await expect(putRes.json()).resolves.toMatchObject({
+      mode: "socks",
+      url: "socks5://127.0.0.1:7891",
+      effective: "proxy",
+      systemAvailable: true,
+    });
+
+    const configToml = fs.readFileSync(
+      path.join(tmpHome, "config.toml"),
+      "utf-8",
+    );
+    expect(configToml).toContain("[network]");
+    expect(configToml).toContain('proxy_mode = "socks"');
+    expect(configToml).toContain('proxy_url = "socks5://127.0.0.1:7891"');
+
+    const getRes = await app.request("/api/config/proxy");
+    expect(getRes.status).toBe(200);
+    await expect(getRes.json()).resolves.toMatchObject({
+      mode: "socks",
+      url: "socks5://127.0.0.1:7891",
+    });
+  });
+
+  it("rejects a mismatched proxy type without changing config.toml", async () => {
+    process.env.COVEL_HOME = tmpHome;
+    const app = buildApp(apiKeys);
+
+    const res = await app.request("/api/config/proxy", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "http",
+        url: "socks5://127.0.0.1:7891",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(fs.existsSync(path.join(tmpHome, "config.toml"))).toBe(false);
+  });
+
   // ── Desktop REST bearer token guard ────────────────────────────
   //
   // When the desktop shell injects COVEL_DESKTOP_REST_TOKEN into the sidecar
@@ -310,7 +362,7 @@ describe("config API env and file contracts", () => {
       expect(apiKeys).toEqual({ deepseek: "sk-test" });
     });
 
-    it("gates settings, data-root, and open-folder writes with the same token", async () => {
+    it("gates settings, proxy, data-root, and open-folder writes with the same token", async () => {
       process.env.COVEL_HOME = tmpHome;
       process.env.COVEL_DESKTOP_REST_TOKEN = TOKEN;
       const app = buildApp(apiKeys);
@@ -329,6 +381,13 @@ describe("config API env and file contracts", () => {
       });
       expect(dataRootRes.status).toBe(401);
 
+      const proxyRes = await app.request("/api/config/proxy", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "direct" }),
+      });
+      expect(proxyRes.status).toBe(401);
+
       const openRes = await app.request("/api/config/open-folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -337,7 +396,7 @@ describe("config API env and file contracts", () => {
       expect(openRes.status).toBe(401);
     });
 
-    it("gates GET /api/config/settings with the same token", async () => {
+    it("gates sensitive config reads with the same token", async () => {
       process.env.COVEL_HOME = tmpHome;
       process.env.COVEL_DESKTOP_REST_TOKEN = TOKEN;
       fs.writeFileSync(
@@ -351,6 +410,7 @@ describe("config API env and file contracts", () => {
       const app = buildApp(apiKeys);
 
       expect((await app.request("/api/config/settings")).status).toBe(401);
+      expect((await app.request("/api/config/proxy")).status).toBe(401);
       const okRes = await app.request("/api/config/settings", {
         headers: { Authorization: `Bearer ${TOKEN}` },
       });

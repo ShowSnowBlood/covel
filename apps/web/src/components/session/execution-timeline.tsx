@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ExecutionStep } from "@/stores/session-store.js";
 import type { PackageSummary } from "@/services/api.js";
+import { ActionableErrorNotice } from "@/components/shared/actionable-error-notice.js";
 
 interface RuntimeStatus {
   runtimeId: string;
@@ -133,7 +134,7 @@ function RuntimeChip({
   return (
     <span
       className={
-        "group inline-flex items-center gap-1 px-2 py-0.5 text-[11px] border transition-colors " +
+        "group inline-flex max-w-full flex-wrap items-center gap-1 px-2 py-0.5 text-[11px] border transition-colors " +
         "ui-chip " +
         (isActive
           ? "border-primary/30 bg-primary/5 text-foreground"
@@ -166,12 +167,7 @@ function RuntimeChip({
         </span>
       )}
       {rt.status === "failed" && resolvedDetail && (
-        <span
-          className="text-[10px] text-destructive/90 truncate max-w-[260px]"
-          title={resolvedDetail}
-        >
-          {resolvedDetail}
-        </span>
+        <ActionableErrorNotice error={resolvedDetail} />
       )}
       {canRetry && onRetry && (
         <button

@@ -39,6 +39,11 @@ Seeded with a commented template on first launch. Fields:
 # absolute paths are used as-is. Default: ~/.covel/data
 # data_root = "/Volumes/External/covel-data"
 
+[network]
+# direct | system | http | socks
+proxy_mode = "direct"
+# proxy_url = "http://127.0.0.1:7890"
+
 [logging]
 # Single log-file cap (MB). Rolls over once exceeded.
 max_size_mb = 10
@@ -47,7 +52,11 @@ max_size_mb = 10
 max_files   = 10
 ```
 
-Restart Covel after edits. **Changing `data_root` does NOT move old data** — the new location starts empty, and the old data and user worlds are left intact for you to migrate or ignore.
+Manual edits require a Covel restart; saving under **Settings → Desktop → Network Proxy** applies immediately. `direct` bypasses proxies, `system` follows Electron's OS proxy resolution, `http` accepts HTTP(S) URLs, and `socks` accepts SOCKS5 URLs. A missing scheme is normalized to `http://` or `socks5://`. URLs may include `user:password@host`, so the file is tightened to mode `0600` when proxy settings are saved.
+
+The proxy covers framework-owned LLM calls and GitHub model-database updates. Third-party plugin `fetchWithRetry` remains direct with strict DNS/SSRF pinning.
+
+**Changing `data_root` does NOT move old data** — the new location starts empty, and the old data and user worlds are left intact for you to migrate or ignore.
 
 ## `~/.covel/keys.env`
 
@@ -68,7 +77,7 @@ The model settings are split into **Model Roles**, **Providers & Models**, and *
 
 ## Frontend entry point
 
-**Settings → Desktop** tab surfaces every path, opens folders in one click, and lets you change `data_root` via a picker — no need to hand-edit files unless you want to.
+**Settings → Desktop** surfaces every path, proxy selection, one-click folder actions, and the `data_root` picker.
 
 ## Related docs
 

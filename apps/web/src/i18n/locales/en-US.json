@@ -529,6 +529,9 @@
     "overrideApplied": "Overridden",
     "modelDatabase": "Model Database",
     "updateFromGitHub": "Update from GitHub",
+    "modelDbRefreshStarted": "Started updating the model database from GitHub",
+    "modelDbRefreshSucceeded": "Model database updated: {{count}} models",
+    "modelDbRefreshFailed": "Model database update failed",
     "modelCount": "{{count}} models (LiteLLM)",
     "updatedAt": "Updated: {{date}}",
     "dbUnavailable": "Database unavailable",
@@ -641,6 +644,17 @@
       "reloadFailed": "Reload failed"
     },
     "desktopDataLocations": "Data Locations",
+    "desktopProxy": "Network Proxy",
+    "desktopProxyHint": "Choose whether core model requests and model database updates use a proxy.",
+    "desktopProxyDirect": "No proxy",
+    "desktopProxySystem": "Use system proxy",
+    "desktopProxyHttp": "HTTP(S) proxy",
+    "desktopProxySocks": "SOCKS5 proxy",
+    "desktopProxySystemDirect": "No system proxy was detected; requests will connect directly.",
+    "desktopProxySave": "Save and apply",
+    "desktopProxySaved": "Proxy settings saved and applied",
+    "desktopProxyActive": "Requests currently use a proxy",
+    "desktopProxyInactive": "Requests currently connect directly",
     "desktopDataConfig": "Config",
     "desktopDataData": "Data",
     "desktopDataDb": "Database",
@@ -1043,6 +1057,21 @@
     "syncFailed": "Could not sync this session to the server"
   },
   "error": {
+    "actionable": {
+      "auth": "Authentication failed. Check the API key.",
+      "forbidden": "The provider rejected this request. Check account permissions.",
+      "notFound": "The endpoint or model was not found. Check the API URL and model ID.",
+      "rateLimited": "Requests are being rate-limited. Check quota and balance.",
+      "server": "The provider is temporarily unavailable. Try again later.",
+      "timeout": "The request timed out. Check the network or proxy.",
+      "network": "Could not reach the provider. Check the network or proxy.",
+      "generic": "The request failed. Open details for the original error.",
+      "unknown": "The request failed without an error message.",
+      "showDetail": "Show details",
+      "hideDetail": "Hide details",
+      "copyDetail": "Copy details",
+      "copied": "Copied"
+    },
     "plugin": {
       "loadFailed": "Plugin load failed"
     },
