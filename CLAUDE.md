@@ -64,8 +64,10 @@ pnpm release:preflight  # static pre-tag gate: lockfile sync, import resolution,
 pnpm commit:push -- "feat: 中文摘要"  # once, only after the whole requested change is verified
 
 # Publication invariant: one completed user-requested change set produces one
-# Chinese Conventional Commit and one push. Never commit per file save or
+# Chinese Conventional Commit and one push to origin/main. `commit:push` MUST
+# run on main and rejects every other branch. Never commit per file save or
 # intermediate edit; main pushes trigger production deployment.
+
 ```
 
 ## Config Files

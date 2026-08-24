@@ -64,21 +64,24 @@ pnpm e2e                                   # Playwright 端到端
 
 常用 type：`feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`。
 
-### 整体提交与推送
+### 中文整体提交与 main 推送协议
 
-完成一个完整修改并通过对应验证后，只执行一次：
+项目维护者完成一个完整修改并通过对应验证后，必须位于 `main` 分支，并且只执行一次：
 
 ```bash
 pnpm commit:push -- "feat: 完成账号余额展示"
 ```
 
-该命令把当前工作区的全部非忽略变更合并为一个中文 Conventional Commit，再推送当前分支。禁止按文件保存或中间编辑步骤自动提交，避免将不可构建的半成品触发到部署流水线。脚本会拒绝 `.env`、密钥证书文件、未解决冲突和强制推送。
+该命令把当前工作区的全部非忽略变更合并为一个**中文 Conventional Commit**，固定推送到 `origin/main`。脚本会拒绝非 `main` 分支、`.env`、密钥证书文件、未解决冲突和强制推送。禁止按文件保存或中间编辑步骤提交，避免将不可构建的半成品触发到生产部署流水线。
 
 ### Pull Request
+
+外部贡献者仍从 `main` 创建 feature branch，使用普通 Git 提交并向 `main` 发起 PR；feature branch 不执行维护者专用的 `pnpm commit:push`。
 
 1. 从 `main` 分出一个 feature branch
 2. 推送后通过 GitHub UI 开 PR，指向 `main`
 3. 确保 CI 全部绿；`pnpm lint` 与 `pnpm test` 本地先跑过
+
 4. PR 描述说明「为什么」与「如何验证」
 5. 有破坏性变更时，在正文中标注 `BREAKING CHANGE:`
 

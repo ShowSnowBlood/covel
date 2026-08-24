@@ -1,22 +1,64 @@
 import { FROSTFOX_LEVEL_WORLD_IDS } from "@covel/shared";
-import { useEffect, useState } from "react";
-
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
-import { fetchFrostFoxProgression } from "@/services/api.js";
-import { worldVisualForId } from "@/lib/world-visuals.js";
-
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
+import { worldVisualForId } from "@/lib/world-visuals.js";
+import { fetchFrostFoxProgression } from "@/services/api.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
+
+const AUTO_LOGIN_ATTEMPT_KEY = "covel:frostfox:auto-login-attempted";
+const DEFAULT_MARKET_URL = "https://market.dstopology.com";
+const HOME_TRANSITION_MS = 1_280;
+type LoginState = "checking" | "redirecting" | "ready" | "failed";
 
 export function GameHome() {
   const { t } = useTranslation();
-  const { status, loading } = useFrostFoxAccount();
+  const navigate = useNavigate();
+  const { status, loading, error } = useFrostFoxAccount();
   const settings = useSettingsDialog();
-  const requiresLogin = Boolean(status?.enabled && !status.authenticated);
+  const autoLoginStarted = useRef(false);
+  const [loginState, setLoginState] = useState<LoginState>("checking");
   const [currentLevel, setCurrentLevel] = useState(1);
+  const [transitioning, setTransitioning] = useState(false);
+
+  useEffect(() => {
+    if (loading) {
+      setLoginState("checking");
+      return;
+    }
+    if (error || !status) {
+      setLoginState("failed");
+      return;
+    }
+    if (!status.enabled) {
+      setLoginState("ready");
+      return;
+    }
+    if (status.authenticated) {
+      sessionStorage.removeItem(AUTO_LOGIN_ATTEMPT_KEY);
+      clearFrostFoxCallbackQuery();
+      setLoginState("ready");
+      return;
+    }
+    if (autoLoginStarted.current) return;
+
+    const callbackResult = new URLSearchParams(window.location.search).get(
+      "frostfox",
+    );
+    const attempted = sessionStorage.getItem(AUTO_LOGIN_ATTEMPT_KEY) === "1";
+    if (callbackResult === "error" || attempted) {
+      setLoginState("failed");
+      return;
+    }
+
+    autoLoginStarted.current = true;
+    sessionStorage.setItem(AUTO_LOGIN_ATTEMPT_KEY, "1");
+    setLoginState("redirecting");
+    window.location.replace("/auth/frostfox/start");
+  }, [error, loading, status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +82,39 @@ export function GameHome() {
   const currentWorldVisual = worldVisualForId(currentWorldId);
   const homeCover =
     currentWorldVisual?.image ?? "/visuals/backgrounds/moonveil-home-2k.webp";
+  const transitionImage = `/visuals/transitions/${currentWorldId ?? "mistport"}-enter.webp`;
+  const requiresLogin = Boolean(status?.enabled && !status.authenticated);
+  const loginPending =
+    loginState === "checking" || loginState === "redirecting";
+  const marketUrl = status?.routerBaseUrl ?? DEFAULT_MARKET_URL;
+
+  useEffect(() => {
+    const image = new Image();
+    image.src = transitionImage;
+  }, [transitionImage]);
+
+  function retryLogin() {
+    sessionStorage.removeItem(AUTO_LOGIN_ATTEMPT_KEY);
+    autoLoginStarted.current = true;
+    setLoginState("redirecting");
+    window.location.assign("/auth/frostfox/start");
+  }
+
+  function handleMarketLogin() {
+    sessionStorage.removeItem(AUTO_LOGIN_ATTEMPT_KEY);
+  }
+
+  function handleStartGame() {
+    if (transitioning) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      void navigate({ to: "/session" });
+      return;
+    }
+    setTransitioning(true);
+    window.setTimeout(() => {
+      void navigate({ to: "/session" });
+    }, HOME_TRANSITION_MS);
+  }
 
   return (
     <section
@@ -52,7 +127,6 @@ export function GameHome() {
         alt=""
         width={3840}
         height={2160}
-
         loading="eager"
         fetchPriority="high"
         draggable={false}
@@ -88,71 +162,103 @@ export function GameHome() {
           </p>
 
           <div className="mt-9 flex w-full max-w-[23rem] flex-col items-center gap-3">
-            {loading && !status ? (
+            {loginPending ? (
               <Button
                 size="lg"
                 disabled
                 className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914]"
               >
-                {t("account.checking")}
+                <FantasyGateIcon className="mr-2 h-5 w-5" />
+                {t("home.autoLogin", "正在自动登录…")}
               </Button>
-            ) : requiresLogin ? (
-              <Button
-                size="lg"
-                asChild
-                className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] hover:bg-[#f0dda2]"
+            ) : requiresLogin || loginState === "failed" ? (
+              <div
+                role="alert"
+                className="w-full rounded-[12px] border border-[#ead99e]/45 bg-[#071316]/88 p-4 text-left shadow-[0_18px_48px_rgba(0,0,0,.32)] backdrop-blur-md"
               >
-                <a href="/auth/frostfox/start">
-                  <img
-                    src="/visuals/ui/moonveil-enter.svg"
-                    alt=""
-                    width={24}
-                    height={24}
-                    aria-hidden="true"
-                    className="mr-2 h-5 w-5"
-                  />
-                  {t("home.startPlaying")}
-                </a>
-              </Button>
+                <div className="flex items-start gap-3">
+                  <FantasyGateIcon className="mt-0.5 h-6 w-6 shrink-0 text-[#e4ce8c]" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#f4f0e5]">
+                      {t("home.mainLoginRequired", "请先登录霜狐主站")}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-[#f4f0e5]/68">
+                      {t(
+                        "home.mainLoginRequiredBody",
+                        "自动登录未完成。请先在主站登录账号，再返回重新连接。",
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2">
+                  <a
+                    href={marketUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={handleMarketLogin}
+                    className="group inline-flex h-11 items-center justify-center rounded-[9px] bg-[#e4ce8c] px-4 text-xs font-semibold text-[#191914] transition-colors hover:bg-[#102428] hover:text-[#f0dda2]"
+                  >
+                    <FantasyGateIcon className="mr-2 h-4 w-4 text-current" />
+                    {t("home.openMainSite", "前往霜狐主站登录")}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={retryLogin}
+                    className="h-10 rounded-[9px] border border-[#eee5ca]/35 text-xs font-medium text-[#f4f0e5]/78 transition-colors hover:border-[#e4ce8c] hover:text-[#e4ce8c]"
+                  >
+                    {t("home.retryAutoLogin", "我已登录，重新连接")}
+                  </button>
+                </div>
+              </div>
             ) : (
               <Button
                 size="lg"
-                asChild
-                className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] hover:bg-[#f0dda2]"
+                onClick={handleStartGame}
+                disabled={transitioning}
+                className="group h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] transition-colors hover:bg-[#102428] hover:text-[#f0dda2]"
               >
-                <Link to="/session">
-                  <img
-                    src="/visuals/ui/moonveil-enter.svg"
-                    alt=""
-                    width={24}
-                    height={24}
-                    aria-hidden="true"
-                    className="mr-2 h-5 w-5"
-                  />
-                  {t("home.startPlaying")}
-                </Link>
+                <FantasyGateIcon className="mr-2 h-5 w-5 text-current" />
+                {transitioning
+                  ? t("home.enteringWorld", "正在进入世界…")
+                  : t("home.startPlaying")}
               </Button>
             )}
 
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => settings.openWithKey("llm.providers")}
-              className="h-14 w-full rounded-[10px] border-[#eee5ca]/80 bg-[#061316]/60 px-7 text-sm font-semibold text-[#f4f0e5] hover:bg-[#102428]/85 hover:text-white"
-            >
-              <img
-                src="/visuals/ui/moonveil-settings.svg"
-                alt=""
-                width={24}
-                height={24}
-                aria-hidden="true"
-                className="mr-2 h-5 w-5"
-              />
-              {t("home.openSettings")}
-            </Button>
+            {!loginPending && !requiresLogin && loginState !== "failed" && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => settings.openWithKey("llm.providers")}
+                disabled={transitioning}
+                className="group h-14 w-full rounded-[10px] border border-[#e4ce8c] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] transition-colors hover:border-[#102428] hover:bg-[#102428] hover:text-[#f0dda2]"
+              >
+                <FantasySettingsIcon className="mr-2 h-5 w-5 text-current" />
+                {t("home.openSettings")}
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      {transitioning && (
+        <div
+          className="fixed inset-0 z-[100] bg-[#030708]"
+          role="status"
+          aria-live="polite"
+        >
+          <img
+            src={transitionImage}
+            alt=""
+            aria-hidden="true"
+            width={1280}
+            height={720}
+            className="h-full w-full object-cover"
+          />
+          <span className="sr-only">
+            {t("home.enteringWorld", "正在进入世界…")}
+          </span>
+        </div>
+      )}
 
       <SettingsDialog
         open={settings.open}
@@ -162,4 +268,71 @@ export function GameHome() {
       />
     </section>
   );
+}
+
+function FantasyGateIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="M7.5 26V11.5L16 5l8.5 6.5V26M4.5 26h23"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 26v-9.25c0-2.9 1.8-5.25 4-5.25s4 2.35 4 5.25V26"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="m15 15 4 3-4 3v-6Z" fill="currentColor" />
+      <path
+        d="m7.5 11.5-3-1.5 3-1.5M24.5 11.5l3-1.5-3-1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function FantasySettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="m16 8 2.2 5.8L24 16l-5.8 2.2L16 24l-2.2-5.8L8 16l5.8-2.2L16 8Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="16" cy="16" r="2.4" fill="currentColor" />
+      <path
+        d="M16 3v3M16 26v3M3 16h3M26 16h3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function clearFrostFoxCallbackQuery() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("frostfox") && !url.searchParams.has("code")) {
+    return;
+  }
+  url.searchParams.delete("frostfox");
+  url.searchParams.delete("code");
+  window.history.replaceState(window.history.state, "", url);
 }

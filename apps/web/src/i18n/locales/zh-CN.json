@@ -7,7 +7,13 @@
     "startPlaying": "开始游戏",
     "openSettings": "设置",
     "gameTitle": "月隐天阙",
-    "gameBody": "她于月下醒来，诸天从此有了回声。"
+    "gameBody": "她于月下醒来，诸天从此有了回声。",
+    "autoLogin": "正在自动登录…",
+    "mainLoginRequired": "请先登录霜狐主站",
+    "mainLoginRequiredBody": "自动登录未完成。请先在主站登录账号，再返回重新连接。",
+    "openMainSite": "前往霜狐主站登录",
+    "retryAutoLogin": "我已登录，重新连接",
+    "enteringWorld": "正在进入世界…"
   },
   "nav": {
     "home": "首页",

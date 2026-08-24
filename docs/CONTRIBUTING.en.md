@@ -64,21 +64,24 @@ Follow Conventional Commits:
 
 Common types: `feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`.
 
-### Whole-change commit and push
+### Chinese whole-change publication protocol
 
-After one complete change has passed its relevant verification, run exactly once:
+After one complete maintainer change has passed its relevant verification, switch to `main` and run exactly once:
 
 ```bash
 pnpm commit:push -- "feat: 完成账号余额展示"
 ```
 
-The command groups every non-ignored workspace change into one Chinese Conventional Commit and pushes the current branch. Never commit on each file save or intermediate edit because an incomplete commit can trigger the deployment pipeline. The script refuses `.env` files, key or certificate files, unresolved conflicts, and force-pushes.
+The command groups every non-ignored workspace change into one **Chinese Conventional Commit** and publishes it to `origin/main`. It rejects non-`main` branches, `.env` files, key or certificate files, unresolved conflicts, and force-pushes. Never publish intermediate edits because every main push can trigger production deployment.
 
 ### Pull requests
+
+External contributors still branch from `main`, use normal Git commits, and open a PR targeting `main`; feature branches must not run the maintainer-only `pnpm commit:push` command.
 
 1. Branch off `main` into a feature branch
 2. Open a PR targeting `main` after pushing
 3. Make sure CI is green; run `pnpm lint` and `pnpm test` locally first
+
 4. Describe **why** the change exists and **how to verify** it
 5. For breaking changes, add a `BREAKING CHANGE:` footer
 

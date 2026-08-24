@@ -7,7 +7,13 @@
     "startPlaying": "Start Game",
     "openSettings": "Settings",
     "gameTitle": "Moonveil Citadel",
-    "gameBody": "She wakes beneath the moon, and the heavens answer."
+    "gameBody": "She wakes beneath the moon, and the heavens answer.",
+    "autoLogin": "Signing in automatically…",
+    "mainLoginRequired": "Sign in to FrostFox first",
+    "mainLoginRequiredBody": "Automatic sign-in could not finish. Sign in on the main site, then return and reconnect.",
+    "openMainSite": "Open FrostFox main site",
+    "retryAutoLogin": "I’m signed in — reconnect",
+    "enteringWorld": "Entering the world…"
   },
   "nav": {
     "home": "Home",

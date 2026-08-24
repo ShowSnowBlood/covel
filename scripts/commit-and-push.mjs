@@ -18,6 +18,7 @@ const sensitiveExtensions = new Set([".key", ".p12", ".pem", ".pfx"]);
 const conflictCodes = new Set(["AA", "AU", "DD", "DU", "UA", "UD", "UU"]);
 const chineseConventionalCommit =
   /^(?:build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([^)]+\))?!?: .*\p{Script=Han}/u;
+const publicationBranch = "main";
 
 function git(args, options = {}) {
   const output = execFileSync("git", args, {
@@ -89,18 +90,11 @@ function defaultSubject(lines) {
   return `chore(整体修改): 完成工作区变更（${summary}）`;
 }
 
-function push(branch) {
-  let remote = "origin";
-  try {
-    const configured = git(["config", "--get", `branch.${branch}.remote`]);
-    if (configured && configured !== ".") remote = configured;
-  } catch {
-    // A branch without an upstream is published to origin.
-  }
-  git(["push", "--set-upstream", remote, `HEAD:refs/heads/${branch}`], {
+function push() {
+  git(["push", "--set-upstream", "origin", "HEAD:refs/heads/main"], {
     stdio: "inherit",
   });
-  console.log(`[整体提交] 已推送到 ${remote}/${branch}`);
+  console.log("[整体提交] 已推送到 origin/main");
 }
 
 function hasUnpushedCommits() {
@@ -113,9 +107,15 @@ function hasUnpushedCommits() {
 
 function main() {
   const branch = currentBranch();
+  if (branch !== publicationBranch) {
+    throw new Error(
+      `整体发布协议只允许在 ${publicationBranch} 分支执行；当前分支为 ${branch}`,
+    );
+  }
+
   const lines = statusLines();
   if (lines.length === 0) {
-    if (hasUnpushedCommits()) push(branch);
+    if (hasUnpushedCommits()) push();
     else console.log("[整体提交] 工作区与远端已同步，无需提交");
     return;
   }
@@ -146,7 +146,7 @@ function main() {
     { stdio: "inherit" },
   );
   console.log(`[整体提交] 已提交：${subject}`);
-  push(branch);
+  push();
 }
 
 try {
