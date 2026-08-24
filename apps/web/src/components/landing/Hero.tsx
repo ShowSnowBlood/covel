@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const REPO_URL = "https://github.com/ackness/covel";
 
 export function Hero() {
   const { t } = useTranslation();
@@ -117,17 +116,6 @@ export function Hero() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              asChild
-              className="h-12 px-6 sm:px-7 text-sm rounded-[var(--radius-control)] font-medium uppercase tracking-wider"
-            >
-              <a href={REPO_URL} target="_blank" rel="noreferrer noopener">
-                {t("home.viewRepository", "View Repository")}
-              </a>
-            </Button>
-          </div>
         </div>
 
         <div className="flex items-end justify-between gap-6">
