@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1-labs
-# node:26-alpine (26.5.0-alpine3.24 as of 2026-07-21) — pinned by digest so
+# node:26.7.0-alpine3.24 (2026-08-05) — pinned by multi-platform digest so
 # the base image can't silently drift; bump the digest (and this comment)
 # when intentionally upgrading Node.
-FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS base
+FROM node:26.7.0-alpine3.24@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS base
 RUN apk add --no-cache libc6-compat libstdc++
 # Node 25+ no longer bundles corepack, so install it explicitly. Corepack
 # resolves the pnpm version from the root package.json `packageManager` field,

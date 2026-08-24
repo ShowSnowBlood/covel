@@ -60,7 +60,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 26
+          node-version: 26.7.0
           cache: pnpm
 
       # Mirrors the Windows job below — without it every run re-downloads the
@@ -125,7 +125,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 26
+          node-version: 26.7.0
           cache: pnpm
 
       # Electron binaries + electron-builder toolchain (bundled NSIS).
