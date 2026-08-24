@@ -218,18 +218,23 @@ async function malformedToolArgsFallback(args: {
     provider,
   } = args;
   const fallbackCallStart = Date.now();
-  // This fallback bypasses the retry helper, so carry forward the target that
-  // requestLLMResponse resolved for the normal attempt.
-  await emitLlmCalling(deps.emitter, {
-    runtimeId: manifest.name,
-    pluginId: manifest.pluginId,
-    slot: effectiveModel,
-    model: resolvedModel ?? effectiveModel,
-    provider,
-    messages,
-    tools: toolDefs,
-    attempt: 0,
-  });
+  let actualTarget =
+    provider && resolvedModel ? { provider, model: resolvedModel } : undefined;
+  let callingEmitted = false;
+  const ensureCalling = async (): Promise<void> => {
+    if (callingEmitted) return;
+    callingEmitted = true;
+    await emitLlmCalling(deps.emitter, {
+      runtimeId: manifest.name,
+      pluginId: manifest.pluginId,
+      slot: effectiveModel,
+      model: actualTarget?.model ?? resolvedModel ?? effectiveModel,
+      provider: actualTarget?.provider ?? provider,
+      messages,
+      tools: toolDefs,
+      attempt: 0,
+    });
+  };
   let response: LLMResponse;
   try {
     response = await deps.llm.generate({
@@ -237,6 +242,9 @@ async function malformedToolArgsFallback(args: {
       messages,
       tools: toolDefs,
       responseFormat,
+      onTargetAttempt: (target) => {
+        actualTarget = target;
+      },
       signal: AbortSignal.timeout(
         Math.max(
           1000,
@@ -244,9 +252,11 @@ async function malformedToolArgsFallback(args: {
         ),
       ),
     });
+    await ensureCalling();
   } catch (fallbackErr) {
     // Pair every `llm.calling` with an `llm.responded` on the error path so
     // trace-viewer pairing stays intact when this fallback generate throws.
+    await ensureCalling();
     await emitLlmRespondedError(deps.emitter, {
       runtimeId: manifest.name,
       pluginId: manifest.pluginId,

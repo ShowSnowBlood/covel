@@ -7,6 +7,7 @@ import { applySlotOverlay } from "./slot-overlay.js";
 import {
   notifyStart,
   notifySuccess,
+  notifyTargetAttempt,
   targetModel,
   targetProvider,
 } from "./gateway-lifecycle.js";
@@ -222,6 +223,7 @@ export function createGateway(deps: GatewayDependencies) {
       const startTime = Date.now();
 
       try {
+        notifyTargetAttempt(options?.onTargetAttempt, target);
         await notifyStart(
           resolved.hooks,
           provider,
@@ -250,7 +252,8 @@ export function createGateway(deps: GatewayDependencies) {
           if (
             (event.type === "text-delta" && event.textDelta.length > 0) ||
             (event.type === "reasoning-delta" &&
-              event.reasoningDelta.length > 0)
+              event.reasoningDelta.length > 0) ||
+            event.type === "tool-call"
           ) {
             emittedDelta = true;
           }

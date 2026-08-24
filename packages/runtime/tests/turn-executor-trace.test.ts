@@ -190,8 +190,13 @@ describe("turn-executor direct-generate error trace pairing (Q1)", () => {
         expect(slot).toBe("plugin");
         return { provider: "deepseek-proxy", model: "deepseek-chat" };
       },
-      async generate() {
+      async generate(params) {
         callCount++;
+        params.onTargetAttempt?.(
+          callCount === 1
+            ? { provider: "deepseek-proxy", model: "deepseek-chat" }
+            : { provider: "backup-proxy", model: "backup-chat" },
+        );
         // Every attempt throws a malformed-args-classified error.
         // Helper path: throws → LLMRetryError with classified cause.
         // Fallback direct call: throws → Q1 catch block runs here.
@@ -230,13 +235,14 @@ describe("turn-executor direct-generate error trace pairing (Q1)", () => {
     expect(
       callingEvents.every((event) => event.payload.slot === "plugin"),
     ).toBe(true);
-    expect(
-      callingEvents.every(
-        (event) =>
-          event.payload.model === "deepseek-chat" &&
-          event.payload.provider === "deepseek-proxy",
-      ),
-    ).toBe(true);
+    expect(callingEvents[0]?.payload).toMatchObject({
+      model: "deepseek-chat",
+      provider: "deepseek-proxy",
+    });
+    expect(callingEvents.at(-1)?.payload).toMatchObject({
+      model: "backup-chat",
+      provider: "backup-proxy",
+    });
 
     // At least one llm.responded carries finishReason:error, usage, durationMs.
     const errorResponded = respondedEvents.find(

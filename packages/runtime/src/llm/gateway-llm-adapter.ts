@@ -12,6 +12,7 @@ import type {
   LLMMessageContent,
   LLMResponse,
   LLMStreamEvent,
+  LLMTargetIdentity,
   LLMToolDefinition,
 } from "./llm-adapter.js";
 
@@ -82,6 +83,7 @@ export interface GatewayLike {
       traceId?: string;
       signal?: AbortSignal;
       slotOverrides?: SlotOverridesInput;
+      onTargetAttempt?: (target: LLMTargetIdentity) => void;
     },
   ): Promise<{
     text: string;
@@ -117,6 +119,7 @@ export interface GatewayLike {
       traceId?: string;
       signal?: AbortSignal;
       slotOverrides?: SlotOverridesInput;
+      onTargetAttempt?: (target: LLMTargetIdentity) => void;
     },
   ): AsyncIterable<{
     type: string;
@@ -202,6 +205,9 @@ export function createGatewayAdapter(
             ? { slotOverrides: config.slotOverrides }
             : {}),
           ...(params.signal ? { signal: params.signal } : {}),
+          ...(params.onTargetAttempt
+            ? { onTargetAttempt: params.onTargetAttempt }
+            : {}),
         },
       );
 
@@ -250,6 +256,9 @@ export function createGatewayAdapter(
             ? { slotOverrides: config.slotOverrides }
             : {}),
           ...(params.signal ? { signal: params.signal } : {}),
+          ...(params.onTargetAttempt
+            ? { onTargetAttempt: params.onTargetAttempt }
+            : {}),
         },
       )) {
         if (event.type === "text-delta" && event.textDelta !== undefined) {
