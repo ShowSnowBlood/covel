@@ -16,8 +16,13 @@ import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import type { LLMAdapter } from "@covel/runtime";
 import type { PluginRuntimeGateway } from "@covel/plugin-loader";
+import type { SlotOverridesInput } from "@covel/ai-provider";
 import type { AiStack } from "../../src/ai-setup.js";
 import { createPerRequestLlmMiddleware } from "../../src/middleware/per-request-llm.js";
+import type {
+  FrostFoxPrincipal,
+  FrostFoxService,
+} from "../../src/frostfox/service.js";
 
 type GenerateOptions = Parameters<AiStack["gateway"]["generateText"]>[1];
 
@@ -133,6 +138,7 @@ function buildTestApp(opts: {
   envApiKeys: Record<string, string>;
   defaultAdapter: LLMAdapter;
   defaultPluginGateway?: PluginRuntimeGateway;
+  frostFox?: FrostFoxService;
 }) {
   const defaultPluginGateway =
     opts.defaultPluginGateway ?? stubDefaultPluginGateway();
@@ -141,12 +147,14 @@ function buildTestApp(opts: {
     envApiKeys: opts.envApiKeys,
     defaultLlmAdapter: opts.defaultAdapter,
     defaultPluginGateway,
+    frostFox: opts.frostFox,
   });
 
   const app = new Hono<{
     Variables: {
       llmAdapter: LLMAdapter;
       pluginGateway?: PluginRuntimeGateway;
+      frostFoxPrincipal: FrostFoxPrincipal | null;
     };
   }>();
 
@@ -154,6 +162,7 @@ function buildTestApp(opts: {
   app.use("*", async (c, next) => {
     c.set("llmAdapter", opts.defaultAdapter);
     c.set("pluginGateway", defaultPluginGateway);
+    c.set("frostFoxPrincipal", opts.frostFox ? TEST_PRINCIPAL : null);
     await next();
   });
   app.use("*", mw);
@@ -200,6 +209,15 @@ function buildTestApp(opts: {
 function b64(value: unknown): string {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64");
 }
+
+const TEST_PRINCIPAL: FrostFoxPrincipal = {
+  localUserId: "local-1",
+  routerAccountId: "account-1",
+  accountName: "Player One",
+  balance: 10,
+  credentialState: "active",
+  lastVerifiedAt: "2026-08-25T00:00:00.000Z",
+};
 
 describe("per-request LLM middleware", () => {
   it("forwards customPresets and slotPresetOverrides to the gateway", async () => {
@@ -275,6 +293,86 @@ describe("per-request LLM middleware", () => {
     // the request-key map where they would follow any custom baseUrl.
     expect(calls[0].apiKeys).toEqual({ vendorX: "sk-vendor-LIVE" });
     expect(calls[0].envApiKeys).toEqual({ deepseek: "env-only-key" });
+  });
+
+  it("uses managed account slots when the browser sends no model headers", async () => {
+    const { ai, calls } = createMockAi();
+    const managedPreset = {
+      id: "frostfox-managed-default",
+      name: "DeepSeek · deepseek-v4-flash",
+      provider: "frostfox-646565707365656b",
+      baseUrl: "https://market.example/v1",
+      model: "deepseek-v4-flash",
+      protocol: "openai-chat-v1" as const,
+    };
+    const frostFox = {
+      async prepareAiContext(principal: FrostFoxPrincipal | null) {
+        return principal
+          ? {
+              principal,
+              apiKeys: { [managedPreset.provider]: "sk-ff-derived" },
+              managedSlotDefaults: {
+                slotPresetOverrides: { story: managedPreset.id },
+                customPresets: [managedPreset],
+              },
+            }
+          : null;
+      },
+      sanitizeSlotOverrides(overrides: SlotOverridesInput | null) {
+        return overrides;
+      },
+    } as unknown as FrostFoxService;
+    const app = buildTestApp({
+      ai,
+      envApiKeys: {},
+      defaultAdapter: {
+        async generate() {
+          throw new Error("managed account request used the default adapter");
+        },
+      },
+      frostFox,
+    });
+
+    const res = await app.request("/echo", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "story" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].apiKeys).toEqual({
+      [managedPreset.provider]: "sk-ff-derived",
+    });
+    expect(calls[0].slotOverrides).toEqual({
+      slotPresetOverrides: { story: managedPreset.id },
+      customPresets: [managedPreset],
+    });
+
+    const browserPreset = {
+      id: "browser-choice",
+      name: "Browser Choice",
+      provider: "vendor-x",
+      baseUrl: "https://vendor.example/v1",
+      model: "model-x",
+      protocol: "openai-chat-v1",
+    };
+    const overrideResponse = await app.request("/echo", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Slot-Config": b64({
+          slotPresetOverrides: { story: browserPreset.id },
+          customPresets: [browserPreset],
+        }),
+      },
+      body: JSON.stringify({ model: "story" }),
+    });
+    expect(overrideResponse.status).toBe(200);
+    expect(calls[1].slotOverrides).toEqual({
+      slotPresetOverrides: { story: browserPreset.id },
+      customPresets: [browserPreset],
+    });
   });
 
   it("leaves the default adapter in place when no request-scoped headers are present", async () => {

@@ -61,10 +61,10 @@ describe("FrostFox first-party SaaS", () => {
             configurationVersion: "1970-01-01T00:00:00.0000001+00:00",
             channelMappings: [
               {
-                channelKey: "gpt-pro",
+                channelKey: "deepseek",
                 routerChannelId: CHANNEL_ID,
-                routerChannelName: "gpt-pro",
-                routerChannelDisplayName: "GPT Pro",
+                routerChannelName: "deepseek",
+                routerChannelDisplayName: "DeepSeek",
                 enabled: true,
               },
             ],
@@ -91,9 +91,10 @@ describe("FrostFox first-party SaaS", () => {
       },
     );
 
+    const ai = createAiStack();
     const service = await FrostFoxService.create({
       env: HOST_ENV,
-      ai: createAiStack(),
+      ai,
       source: SOURCE,
       fetchImpl: fetchImpl as typeof fetch,
       credentialStore: createMemoryCredentialStore(),
@@ -153,11 +154,36 @@ describe("FrostFox first-party SaaS", () => {
     expect(context?.apiKeys[providerId]).toBe(
       deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel"),
     );
+    const managedPresetId =
+      context?.managedSlotDefaults?.slotPresetOverrides?.story;
+    expect(managedPresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(context?.managedSlotDefaults?.customPresets).toEqual([
+      expect.objectContaining({
+        id: managedPresetId,
+        provider: providerId,
+        baseUrl: "https://market.example/v1",
+        model: "deepseek-v4-flash",
+        protocol: "openai-chat-v1",
+      }),
+    ]);
+    const resolvedStory = ai.gateway.resolveSlot("story", {
+      apiKeys: context!.apiKeys,
+      slotOverrides: context!.managedSlotDefaults,
+    });
+    expect(resolvedStory).toMatchObject({
+      presetId: managedPresetId,
+      provider: providerId,
+      protocol: "openai-chat-v1",
+      baseUrl: "https://market.example/v1",
+      apiKey: deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel"),
+      model: "deepseek-v4-flash",
+      headers: { "X-FrostFox-Channel-Id": CHANNEL_ID },
+    });
 
     const models = await service!.listModels(connected.principal);
     expect(models.channels).toEqual([
       expect.objectContaining({
-        channelKey: "gpt-pro",
+        channelKey: "deepseek",
         providerId,
         models: [{ id: "openai/gpt-5.6-sol", name: "GPT 5.6" }],
       }),

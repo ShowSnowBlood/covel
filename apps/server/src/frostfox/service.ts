@@ -91,6 +91,7 @@ export interface FrostFoxProgressionStatus {
 export interface FrostFoxAiContext {
   readonly principal: FrostFoxPrincipal;
   readonly apiKeys: Record<string, string>;
+  readonly managedSlotDefaults: SlotOverridesInput | undefined;
 }
 
 interface RouterAccount {
@@ -131,6 +132,7 @@ export class FrostFoxService {
     readonly clientConfig: FrostFoxClientConfigManager,
     private readonly store: FrostFoxCredentialStore,
     private readonly fetchImpl: typeof fetch,
+    private readonly managedSlotDefaults: SlotOverridesInput | undefined,
   ) {
     this.sessionSigningKey = deriveContextKey(
       runtimeConfig.credentialKey,
@@ -172,7 +174,13 @@ export class FrostFoxService {
     try {
       await store.purgeExpiredTransactions(Date.now());
       await clientConfig.start();
-      return new FrostFoxService(runtimeConfig, clientConfig, store, fetchImpl);
+      return new FrostFoxService(
+        runtimeConfig,
+        clientConfig,
+        store,
+        fetchImpl,
+        buildManagedSlotDefaults(options.ai, clientConfig),
+      );
     } catch (error) {
       clientConfig.stop();
       await store.close();
@@ -430,7 +438,11 @@ export class FrostFoxService {
         .providers()
         .map((provider) => [provider.providerId, gatewayKey]),
     );
-    return { principal, apiKeys };
+    return {
+      principal,
+      apiKeys,
+      managedSlotDefaults: this.managedSlotDefaults,
+    };
   }
 
   sanitizeSlotOverrides(
@@ -695,6 +707,48 @@ export class FrostFoxService {
       ? localUserId
       : null;
   }
+}
+
+function buildManagedSlotDefaults(
+  ai: AiStack,
+  clientConfig: FrostFoxClientConfigManager,
+): SlotOverridesInput | undefined {
+  const providersByChannel = new Map(
+    clientConfig
+      .providers()
+      .map((provider) => [provider.channelKey, provider] as const),
+  );
+  const slotPresetOverrides: Record<string, string> = {};
+  const customPresets = new Map<
+    string,
+    NonNullable<SlotOverridesInput["customPresets"]>[number]
+  >();
+
+  for (const preset of ai.config.presets) {
+    if (!preset.enabled || !preset.defaultSlot) continue;
+    const provider = providersByChannel.get(preset.provider);
+    if (!provider) continue;
+    const id = `frostfox-managed-${createHash("sha256")
+      .update(`${provider.channelKey}\n${preset.model}`, "utf8")
+      .digest("hex")
+      .slice(0, 24)}`;
+    slotPresetOverrides[preset.defaultSlot] = id;
+    customPresets.set(id, {
+      id,
+      name: `${provider.displayName} · ${preset.model}`,
+      provider: provider.providerId,
+      baseUrl: provider.baseUrl,
+      model: preset.model,
+      protocol: provider.protocol,
+    });
+  }
+
+  return Object.keys(slotPresetOverrides).length === 0
+    ? undefined
+    : {
+        slotPresetOverrides,
+        customPresets: [...customPresets.values()],
+      };
 }
 
 export function deriveFrostFoxGatewayKey(

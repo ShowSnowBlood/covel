@@ -108,12 +108,16 @@ export function createPerRequestLlmMiddleware(
     }
     let slotOverrides: SlotOverridesInput | null;
     try {
-      slotOverrides = opts.frostFox
+      const browserSlotOverrides = opts.frostFox
         ? opts.frostFox.sanitizeSlotOverrides(
             parsedOverrides,
             frostFoxContext !== null,
           )
         : parsedOverrides;
+      slotOverrides = mergeManagedSlotDefaults(
+        frostFoxContext?.managedSlotDefaults,
+        browserSlotOverrides,
+      );
     } catch (error) {
       if (error instanceof FrostFoxServiceError) {
         return c.json(errorBody(error.code, { code: error.code }), 400);
@@ -177,6 +181,38 @@ export function createPerRequestLlmMiddleware(
       }
       throw error;
     }
+  };
+}
+
+function mergeManagedSlotDefaults(
+  defaults: SlotOverridesInput | undefined,
+  overrides: SlotOverridesInput | null,
+): SlotOverridesInput | null {
+  if (!defaults) return overrides;
+  if (!overrides) return defaults;
+
+  const explicitSlots = overrides.slotPresetOverrides ?? {};
+  const defaultSlots = Object.fromEntries(
+    Object.entries(defaults.slotPresetOverrides ?? {}).filter(
+      ([slotId]) => !Object.hasOwn(explicitSlots, slotId),
+    ),
+  );
+  const activeDefaultPresetIds = new Set(Object.values(defaultSlots));
+  const customPresets = [
+    ...(defaults.customPresets ?? []).filter((preset) =>
+      activeDefaultPresetIds.has(preset.id),
+    ),
+    ...(overrides.customPresets ?? []).filter(
+      (preset) => !activeDefaultPresetIds.has(preset.id),
+    ),
+  ];
+
+  return {
+    ...overrides,
+    slotPresetOverrides: { ...defaultSlots, ...explicitSlots },
+    ...(customPresets.length > 0
+      ? { customPresets }
+      : { customPresets: undefined }),
   };
 }
 
