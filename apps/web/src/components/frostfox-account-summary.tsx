@@ -75,7 +75,11 @@ export function useFrostFoxAccount(): FrostFoxAccountContextValue {
   return value;
 }
 
-export function FrostFoxAccountSummary() {
+export function FrostFoxAccountSummary({
+  overlay = false,
+}: {
+  readonly overlay?: boolean;
+}) {
   const { i18n, t } = useTranslation();
   const { status } = useFrostFoxAccount();
 
@@ -87,7 +91,11 @@ export function FrostFoxAccountSummary() {
         type="button"
         onClick={() => window.location.assign("/auth/frostfox/start")}
         aria-label={t("nav.frostfoxConnect", "Connect account")}
-        className="flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary"
+        className={`flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-2 transition-colors ${
+          overlay
+            ? "text-[#f4f0e5]/85 hover:bg-black/25 hover:text-white"
+            : "text-muted-foreground hover:bg-muted/40 hover:text-primary"
+        }`}
       >
         <CircleUserRound className="h-4 w-4" aria-hidden="true" />
         <span className="hidden text-[11px] font-medium sm:inline">
@@ -104,7 +112,7 @@ export function FrostFoxAccountSummary() {
 
   return (
     <div
-      className="flex items-center gap-1.5 text-muted-foreground"
+      className={`flex items-center gap-1.5 ${overlay ? "text-[#f4f0e5]/85" : "text-muted-foreground"}`}
       aria-label={t("nav.frostfoxAccountSummary", "Account and balance")}
     >
       <div className="hidden h-9 max-w-36 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-xs sm:flex">

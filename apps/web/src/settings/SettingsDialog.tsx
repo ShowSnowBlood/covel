@@ -35,12 +35,15 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Deep-link target — either a nav node id ("llm.slots") or a setting key. */
   initialKey?: string;
+  /** Restrict the dialog to one purpose-built pane (used by the game launcher). */
+  focusNode?: string;
 }
 
 export function SettingsDialog({
   open,
   onOpenChange,
   initialKey,
+  focusNode,
 }: SettingsDialogProps) {
   const store = useSettingsStore();
   const { t, i18n } = useTranslation();
@@ -63,9 +66,13 @@ export function SettingsDialog({
     // registered new entries since last render.
     [store, desktop, i18n.language, open, storeRevision],
   );
+  const visibleTree = useMemo(
+    () => (focusNode ? tree.filter((node) => node.id === focusNode) : tree),
+    [tree, focusNode],
+  );
   const filtered = useMemo(
-    () => filterNav(tree, query, i18n.language),
-    [tree, query, i18n.language],
+    () => filterNav(visibleTree, query, i18n.language),
+    [visibleTree, query, i18n.language],
   );
 
   const firstSelectable = useMemo(
@@ -115,7 +122,9 @@ export function SettingsDialog({
               § SETTINGS
             </span>
             <span className="ui-title text-base font-semibold tracking-tight">
-              {t("settings.title")}
+              {focusNode === "llm.providers"
+                ? t("settings.providerSettingsTitle")
+                : t("settings.title")}
             </span>
             <Settings2 className="w-3.5 h-3.5 ml-auto opacity-50" />
           </DialogTitle>
@@ -124,59 +133,61 @@ export function SettingsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 flex overflow-hidden">
-          <aside
-            className="w-56 shrink-0 border-r border-[var(--rule-color)] flex flex-col"
-            style={{ background: "var(--surface-rail)" }}
-          >
-            <div className="p-3 border-b border-[var(--rule-color)] flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("settings.searchPlaceholder")}
-                className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground min-w-0"
-              />
-            </div>
-            <nav className="flex-1 overflow-y-auto py-2 ui-scroll">
-              {filtered.map((node) => {
-                const selectable = isSelectable(node);
-                const indent = node.parentId ? "pl-9 " : "pl-4 ";
-                const isHeader = node.kind === "group" && !selectable;
-                const isSelected = selected === node.id;
-                return (
-                  <button
-                    key={node.id}
-                    type="button"
-                    disabled={isHeader}
-                    onClick={() => setSelected(node.id)}
-                    className={
-                      "w-full text-left pr-4 py-1.5 text-xs transition-colors relative " +
-                      indent +
-                      (isHeader
-                        ? "ui-meta text-[10px] text-muted-foreground pt-4 pb-1"
-                        : isSelected
-                          ? "text-foreground font-medium"
-                          : "text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {isSelected && !isHeader && (
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-0 bottom-0 w-[3px]"
-                        style={{ background: "var(--accent-primary)" }}
-                      />
-                    )}
-                    {node.label}
-                  </button>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div className="px-4 py-2 text-xs text-muted-foreground">
-                  {t("settings.noResults", { query })}
-                </div>
-              )}
-            </nav>
-          </aside>
+          {!focusNode && (
+            <aside
+              className="w-56 shrink-0 border-r border-[var(--rule-color)] flex flex-col"
+              style={{ background: "var(--surface-rail)" }}
+            >
+              <div className="p-3 border-b border-[var(--rule-color)] flex items-center gap-2">
+                <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("settings.searchPlaceholder")}
+                  className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground min-w-0"
+                />
+              </div>
+              <nav className="flex-1 overflow-y-auto py-2 ui-scroll">
+                {filtered.map((node) => {
+                  const selectable = isSelectable(node);
+                  const indent = node.parentId ? "pl-9 " : "pl-4 ";
+                  const isHeader = node.kind === "group" && !selectable;
+                  const isSelected = selected === node.id;
+                  return (
+                    <button
+                      key={node.id}
+                      type="button"
+                      disabled={isHeader}
+                      onClick={() => setSelected(node.id)}
+                      className={
+                        "w-full text-left pr-4 py-1.5 text-xs transition-colors relative " +
+                        indent +
+                        (isHeader
+                          ? "ui-meta text-[10px] text-muted-foreground pt-4 pb-1"
+                          : isSelected
+                            ? "text-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground")
+                      }
+                    >
+                      {isSelected && !isHeader && (
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-0 bottom-0 w-[3px]"
+                          style={{ background: "var(--accent-primary)" }}
+                        />
+                      )}
+                      {node.label}
+                    </button>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <div className="px-4 py-2 text-xs text-muted-foreground">
+                    {t("settings.noResults", { query })}
+                  </div>
+                )}
+              </nav>
+            </aside>
+          )}
           <section
             ref={contentRef}
             className="flex-1 overflow-y-auto p-6 ui-scroll"

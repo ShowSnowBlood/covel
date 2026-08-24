@@ -75,6 +75,16 @@ fallback = "story"
 # output    = ["image"]
 # imageApi  = "openai-chat"            # ← optional: this is the default
 
+# Option C: JulyAPI Image2, fixed 2K image SKU
+# [covel.image]
+# provider  = "july"
+# model     = "gpt-image-2-2k"
+# baseUrl   = "https://julyapi.com/v1"
+# protocol  = "openai-chat-v1"
+# tag       = "image"
+# output    = ["image"]
+# providerRequestMetadata = { imageWire = "openai-images" }
+
 # ── Embedding Slots (RAG / Graph-RAG) ────────────────────────────
 #
 # RAG plugins (e.g. core-npc-graph) need an embedding model. Without an

@@ -8,6 +8,7 @@ readonly RELEASES_DIR="${APP_ROOT}/releases"
 readonly CURRENT_LINK="${APP_ROOT}/current"
 readonly ENV_FILE="${APP_ROOT}/secrets/app.env"
 readonly LLM_CONFIG="${APP_ROOT}/config/llm.toml"
+readonly LLM_ENV="${APP_ROOT}/config/.env.llm"
 readonly BACKUP_DIR="${APP_ROOT}/backups"
 readonly LOCK_FILE="/run/lock/covel-game-deploy.lock"
 readonly COMPOSE_PROJECT="docker"
@@ -106,6 +107,9 @@ rsync --archive --delete \
   "${workspace}/" "${release_dir}/"
 ln -s "$ENV_FILE" "${release_dir}/.env"
 ln -s "$LLM_CONFIG" "${release_dir}/llm.toml"
+if [[ -f "$LLM_ENV" ]]; then
+  ln -s "$LLM_ENV" "${release_dir}/.env.llm"
+fi
 printf '%s\n' "$image" >"${release_dir}/.deploy-image"
 printf '%s\n' "$commit" >"${release_dir}/.deploy-commit"
 
