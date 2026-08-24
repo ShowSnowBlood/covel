@@ -1,0 +1,14 @@
+{
+  "name": "@covel/plugin-faction-reputation",
+  "version": "0.0.26",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@covel/tools": "workspace:*",
+    "vitest": "^4.1.10"
+  }
+}

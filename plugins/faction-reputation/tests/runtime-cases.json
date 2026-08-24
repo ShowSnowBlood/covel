@@ -1,0 +1,38 @@
+{
+  "cases": [
+    {
+      "name": "explicit-faction-action-writes-reputation",
+      "mode": "mock",
+      "runtimeId": "faction-reputation",
+      "ignoreUpstreams": true,
+      "message": "你救回了悬钩堂被断链困住的拾荒队。",
+      "llmResponses": [
+        {
+          "content": null,
+          "finishReason": "tool_calls",
+          "toolCalls": [
+            {
+              "id": "call-update-reputation",
+              "name": "update-faction-reputation",
+              "arguments": "{\"changes\":[{\"name\":\"悬钩堂\",\"delta\":8,\"reason\":\"你救回了被断链困住的拾荒队\"}]}"
+            }
+          ]
+        },
+        {
+          "content": "",
+          "finishReason": "stop",
+          "toolCalls": []
+        }
+      ],
+      "expect": {
+        "runtimeResults": [
+          {
+            "runtimeId": "faction-reputation",
+            "status": "success"
+          }
+        ],
+        "pluginData": [{ "namespace": "reputation", "field": "standing" }]
+      }
+    }
+  ]
+}

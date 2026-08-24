@@ -1,0 +1,85 @@
+{
+  "id": "faction-reputation-toast",
+  "dataSource": { "namespace": "message" },
+  "view": {
+    "component": "Card",
+    "props": { "variant": "subtle" },
+    "children": [
+      {
+        "component": "Row",
+        "props": { "gap": "sm", "align": "baseline" },
+        "children": [
+          {
+            "component": "Text",
+            "props": {
+              "content": "§ REPUTATION",
+              "variant": "muted",
+              "size": "xs",
+              "className": "ui-meta"
+            }
+          },
+          {
+            "component": "Text",
+            "props": {
+              "content": {
+                "zh": "阵营声望变化",
+                "en": "Faction reputation changes"
+              },
+              "weight": "bold",
+              "size": "sm"
+            }
+          }
+        ]
+      },
+      {
+        "component": "Stack",
+        "props": { "gap": "xs" },
+        "repeat": { "statePath": "/changes", "key": "id" },
+        "children": [
+          {
+            "component": "Row",
+            "props": { "gap": "sm", "align": "center" },
+            "children": [
+              {
+                "component": "Text",
+                "props": {
+                  "content": { "$item": "name" },
+                  "weight": "bold",
+                  "size": "sm"
+                }
+              },
+              {
+                "component": "Badge",
+                "props": {
+                  "label": { "$item": "deltaText" },
+                  "color": { "$item": "deltaColor" }
+                }
+              },
+              {
+                "component": "Badge",
+                "props": {
+                  "label": { "$item": "standingLabel" },
+                  "color": { "$item": "standingColor" }
+                }
+              },
+              {
+                "component": "Text",
+                "props": {
+                  "content": { "$item": "reason" },
+                  "variant": "muted",
+                  "size": "xs"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "emptyState": {
+    "message": {
+      "zh": "本回合没有阵营声望变化。",
+      "en": "No faction reputation changes this turn."
+    }
+  }
+}

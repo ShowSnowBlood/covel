@@ -1,0 +1,104 @@
+{
+  "id": "faction-reputation",
+  "group": "faction-reputation",
+  "label": { "zh": "阵营声望", "en": "Faction Reputation" },
+  "shortLabel": { "zh": "声望", "en": "Reputation" },
+  "icon": "landmark",
+  "groupOrder": 720,
+  "dataSource": { "namespace": "reputation" },
+  "emptyState": {
+    "message": {
+      "zh": "还没有阵营声望记录。影响某个势力后会自动出现。",
+      "en": "No faction reputation yet. Records appear after you affect a faction."
+    }
+  },
+  "view": {
+    "component": "Stack",
+    "props": { "gap": "sm" },
+    "children": [
+      {
+        "component": "Text",
+        "props": {
+          "content": {
+            "zh": "-100 敌对 · 0 中立 · 100 崇敬",
+            "en": "-100 hostile · 0 neutral · 100 revered"
+          },
+          "variant": "muted",
+          "size": "xs"
+        }
+      },
+      {
+        "component": "CardList",
+        "repeat": { "statePath": "/entries", "key": "key" },
+        "children": [
+          {
+            "component": "Card",
+            "children": [
+              {
+                "component": "Row",
+                "props": { "gap": "sm", "align": "center" },
+                "children": [
+                  {
+                    "component": "Text",
+                    "props": {
+                      "content": { "$item": "value/name" },
+                      "weight": "bold",
+                      "size": "sm"
+                    }
+                  },
+                  {
+                    "component": "Spacer"
+                  },
+                  {
+                    "component": "Badge",
+                    "props": {
+                      "label": { "$item": "value/standingLabel" },
+                      "color": { "$item": "value/standingColor" }
+                    }
+                  },
+                  {
+                    "component": "Text",
+                    "props": {
+                      "content": { "$item": "value/score" },
+                      "weight": "bold",
+                      "size": "sm"
+                    }
+                  }
+                ]
+              },
+              {
+                "component": "ProgressBar",
+                "props": {
+                  "value": { "$item": "value/scoreBar" },
+                  "max": 200,
+                  "color": { "$item": "value/standingColor" }
+                }
+              },
+              {
+                "component": "Row",
+                "props": { "gap": "xs", "align": "center" },
+                "children": [
+                  {
+                    "component": "Badge",
+                    "props": {
+                      "label": { "$item": "value/lastDelta" },
+                      "color": { "$item": "value/lastDeltaColor" }
+                    }
+                  },
+                  {
+                    "component": "Text",
+                    "props": {
+                      "content": { "$item": "value/lastReason" },
+                      "variant": "muted",
+                      "size": "xs"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

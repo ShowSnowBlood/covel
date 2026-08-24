@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plugin://faction-reputation/reputation",
+  "type": "object",
+  "required": ["id", "name", "score"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Stable faction record id; also used as the plugin-data key"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Canonical faction name"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Initial player reputation with the faction"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional world-author notes preserved by the updater"
+    }
+  },
+  "additionalProperties": true
+}
