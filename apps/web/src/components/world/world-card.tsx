@@ -100,8 +100,8 @@ export function WorldCard({
         src={visual.image}
         alt=""
         aria-hidden="true"
-        width={1536}
-        height={1024}
+        width={3840}
+        height={2160}
         loading={index < 2 ? "eager" : "lazy"}
         fetchPriority={index < 2 ? "high" : "auto"}
         className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 ${

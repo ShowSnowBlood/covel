@@ -19,17 +19,17 @@ const VISUALS_BY_ID: Record<string, WorldVisual> = {
     label: "Cloudmere",
   },
   emberback: {
-    image: "/visuals/worlds/emberback.webp",
+    image: "/visuals/worlds/emberback-4k.webp",
     accent: "oklch(72% 0.14 50)",
     label: "Emberback",
   },
   "haruka-academy": {
-    image: "/visuals/worlds/haruka-academy.webp",
+    image: "/visuals/worlds/haruka-academy-4k.webp",
     accent: "oklch(72% 0.15 350)",
     label: "Haruka Academy",
   },
   mistport: {
-    image: "/visuals/worlds/mistport.webp",
+    image: "/visuals/worlds/mistport-4k.webp",
     accent: "oklch(72% 0.1 185)",
     label: "Mistport",
   },

@@ -50,8 +50,9 @@ export function GameHome() {
         key={homeCover}
         src={homeCover}
         alt=""
-        width={2048}
-        height={1152}
+        width={3840}
+        height={2160}
+
         loading="eager"
         fetchPriority="high"
         draggable={false}
@@ -86,12 +87,12 @@ export function GameHome() {
             {t("home.gameBody")}
           </p>
 
-          <div className="mt-9 flex w-full max-w-[31rem] flex-col gap-3 sm:flex-row">
+          <div className="mt-9 flex w-full max-w-[23rem] flex-col items-center gap-3">
             {loading && !status ? (
               <Button
                 size="lg"
                 disabled
-                className="h-14 flex-1 rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914]"
+                className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914]"
               >
                 {t("account.checking")}
               </Button>
@@ -99,7 +100,7 @@ export function GameHome() {
               <Button
                 size="lg"
                 asChild
-                className="h-14 flex-1 rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] hover:bg-[#f0dda2]"
+                className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] hover:bg-[#f0dda2]"
               >
                 <a href="/auth/frostfox/start">
                   <img
@@ -117,7 +118,7 @@ export function GameHome() {
               <Button
                 size="lg"
                 asChild
-                className="h-14 flex-1 rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] hover:bg-[#f0dda2]"
+                className="h-14 w-full rounded-[10px] bg-[#e4ce8c] px-7 text-sm font-semibold text-[#191914] hover:bg-[#f0dda2]"
               >
                 <Link to="/session">
                   <img
@@ -137,7 +138,7 @@ export function GameHome() {
               size="lg"
               variant="outline"
               onClick={() => settings.openWithKey("llm.providers")}
-              className="h-14 flex-1 rounded-[10px] border-[#eee5ca]/80 bg-[#061316]/60 px-7 text-sm font-semibold text-[#f4f0e5] hover:bg-[#102428]/85 hover:text-white"
+              className="h-14 w-full rounded-[10px] border-[#eee5ca]/80 bg-[#061316]/60 px-7 text-sm font-semibold text-[#f4f0e5] hover:bg-[#102428]/85 hover:text-white"
             >
               <img
                 src="/visuals/ui/moonveil-settings.svg"
