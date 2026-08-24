@@ -26,11 +26,12 @@ let pending = false;
 let watcher = null;
 
 function git(args, options = {}) {
-  return execFileSync("git", args, {
+  const output = execFileSync("git", args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
-  }).trim();
+  });
+  return typeof output === "string" ? output.trim() : "";
 }
 
 function log(message) {
