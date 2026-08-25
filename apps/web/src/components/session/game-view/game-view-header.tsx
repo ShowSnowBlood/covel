@@ -1,6 +1,4 @@
-import { Link } from "@tanstack/react-router";
 import {
-  Bug,
   Clapperboard,
   Clock,
   Code,
@@ -26,7 +24,6 @@ export type GameViewMode = "parsed" | "detailed" | "raw" | "stage";
 
 interface GameViewHeaderProps {
   t: TFunction;
-  sessionId: string;
   world: WorldRecord | null;
   executing: boolean;
   viewMode: GameViewMode;
@@ -49,7 +46,6 @@ interface GameViewHeaderProps {
 
 export function GameViewHeader({
   t,
-  sessionId,
   world,
   executing,
   viewMode,
@@ -208,18 +204,6 @@ export function GameViewHeader({
           </Button>
         )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hidden md:inline-flex h-7 w-7 shrink-0"
-          asChild
-          aria-label={t("session.debugTraces")}
-          title={t("session.debugTraces")}
-        >
-          <Link to="/debug" search={{ sid: sessionId }}>
-            <Bug className="w-3.5 h-3.5" />
-          </Link>
-        </Button>
 
         <Button
           variant="ghost"

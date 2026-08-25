@@ -39,7 +39,17 @@
     "retry": "Retry",
     "loginRequired": "Sign in to start playing",
     "loginRequiredDescription": "A connected account is required to create or continue a game session.",
-    "loginAction": "Sign in"
+    "loginAction": "Sign in",
+    "connected": "Connected",
+    "recoveryRequired": "Reconnect Required",
+    "balance": "Router Balance",
+    "refreshBalance": "Refresh Balance",
+    "lastVerified": "Last Verified",
+    "settings": "Account Settings",
+    "copyId": "Copy Account ID",
+    "idCopied": "Copied to clipboard",
+    "signOut": "Sign Out",
+    "reconnect": "Reconnect"
   },
   "session": {
     "config": "Studio Config",

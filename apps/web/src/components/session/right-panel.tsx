@@ -9,18 +9,15 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs.js";
 import { ScrollArea } from "@/components/ui/scroll-area.js";
-import { Badge } from "@/components/ui/badge.js";
 import { WorldDocumentPanel } from "./world-document-panel.js";
 import { PluginPanel } from "./plugin-panel.js";
 import type { PluginPanelStateCache } from "./plugin-panel.js";
 import { DatabasePanel } from "./database-panel.js";
 import {
-  fetchServerHealth,
   fetchUiSpecs,
   listPluginData,
 } from "@/services/api.js";
 import type { WorldRecord } from "@/services/api.js";
-import type { ServerStoreBackend } from "@/services/data-service.js";
 import {
   aggregateSpecsIntoGroups,
   compactTabLabel,
@@ -91,9 +88,6 @@ export function RightPanel({
 }: RightPanelProps) {
   const { t, i18n } = useTranslation();
   const pluginPanelStateCacheRef = useRef<PluginPanelStateCache>(new Map());
-  const [storeBackend, setStoreBackend] = useState<ServerStoreBackend | null>(
-    null,
-  );
   const [pluginTabGroups, setPluginTabGroups] = useState<PluginPanelTabGroup[]>(
     [],
   );
@@ -137,11 +131,6 @@ export function RightPanel({
     [pluginTabGroups, t],
   );
 
-  useEffect(() => {
-    fetchServerHealth()
-      .then((h) => setStoreBackend(h.storage?.data?.backend ?? null))
-      .catch(ignoreError("fetch server health"));
-  }, []);
 
   // Topbar nav → controlled tab switch. Previously this dispatched synthetic
   // mouse events at the trigger DOM node matched by aria-label, which silently
@@ -408,33 +397,6 @@ export function RightPanel({
           })}
         </ScrollArea>
       </Tabs>
-      {storeBackend && (
-        <div className="border-t border-border px-3 py-2 flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 bg-[color-mix(in_oklab,var(--surface-rail)_82%,var(--surface-page))]">
-          <Database className="w-3 h-3" />
-          <span className="ui-meta text-[9px]">
-            {t("session.store", "Store")}
-          </span>
-          <Badge
-            variant="outline"
-            className={`text-[9px] rounded-none ${
-              storeBackend === "pg" || storeBackend === "sqlite"
-                ? "border-green-500/40 text-green-600 dark:text-green-400"
-                : "border-amber-500/40 text-amber-600 dark:text-amber-400"
-            }`}
-          >
-            {storeBackend === "pg"
-              ? "PostgreSQL"
-              : storeBackend === "sqlite"
-                ? "SQLite"
-                : "Memory"}
-          </Badge>
-          {storeBackend === "memory" && (
-            <span className="text-amber-600 dark:text-amber-400">
-              {t("session.memoryStoreWarning", "Data lost on restart")}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }

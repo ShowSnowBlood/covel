@@ -17,7 +17,10 @@ let readyPromise: Promise<void> | null = null;
 
 const LEGACY_IMAGE_SLOT_ID = "openai-image";
 const IMAGE_SLOT_ID = "image";
-const OPENAI_IMAGE_MODEL_SETTING = "plugin.openai-image-gen.modelPresetId";
+const LEGACY_IMAGE_SETTING_KEYS = [
+  "plugin.openai-image-gen.modelPresetId",
+  "plugin.dashscope-image-gen.modelPresetId",
+] as const;
 
 type SlotConfigEntry = { presetId?: string; modelRef?: string };
 
@@ -36,11 +39,10 @@ async function migrateCanonicalImageSlot(
     await store.set("llm.slotConfig", next);
   }
 
-  if (
-    store.has(OPENAI_IMAGE_MODEL_SETTING) &&
-    store.get<string>(OPENAI_IMAGE_MODEL_SETTING) === LEGACY_IMAGE_SLOT_ID
-  ) {
-    await store.set(OPENAI_IMAGE_MODEL_SETTING, IMAGE_SLOT_ID);
+  for (const key of LEGACY_IMAGE_SETTING_KEYS) {
+    if (store.has(key) && store.get<string>(key) === LEGACY_IMAGE_SLOT_ID) {
+      await store.set(key, IMAGE_SLOT_ID);
+    }
   }
 }
 

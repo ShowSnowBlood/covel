@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ChevronRight,
@@ -30,6 +30,11 @@ export function SessionPluginItem({
 }: SessionPluginItemProps) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+
+  const textSlots = useMemo(
+    () => (resolvedSlots ?? []).filter((slot) => slot.tag === "text"),
+    [resolvedSlots],
+  );
 
   const runtimeKey = plugin.id;
   const [boundSlot, handleSlotChange] = useRuntimeModelSlotOverride({
@@ -130,9 +135,9 @@ export function SessionPluginItem({
           )}
         </button>
         {plugin.runtimeType !== "function" &&
-          (resolvedSlots && resolvedSlots.length > 0 ? (
+          (textSlots.length > 0 ? (
             <select
-              value={boundSlot}
+              value={textSlots.some((slot) => slot.slotId === boundSlot) ? boundSlot : ""}
               onChange={(e) => handleSlotChange(e.target.value)}
               onClick={(e) => e.stopPropagation()}
               disabled={executing}
@@ -146,7 +151,7 @@ export function SessionPluginItem({
               <option value="">
                 {plugin.model ? `auto · ${plugin.model}` : "auto"}
               </option>
-              {resolvedSlots.map((slot) => (
+              {textSlots.map((slot) => (
                 <option key={slot.slotId} value={slot.slotId}>
                   {slot.slotId}
                   {slot.serverModel ? ` · ${slot.serverModel}` : ""}

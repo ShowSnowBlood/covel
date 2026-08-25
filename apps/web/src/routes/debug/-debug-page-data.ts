@@ -11,9 +11,6 @@ import {
   type DebugView,
 } from "./-debug-page-model.js";
 
-export type SessionSnapshot = Awaited<
-  ReturnType<typeof apiClient.getSessionSnapshot>
->;
 
 export function useDebugPageData(sid: string | undefined) {
   const navigate = useNavigate();
@@ -39,11 +36,6 @@ export function useDebugPageData(sid: string | undefined) {
     null,
   );
   const [debugView, setDebugView] = useState<DebugView>("traces");
-  const [snapshotData, setSnapshotData] = useState<SessionSnapshot | null>(
-    null,
-  );
-  const [traceDiscovery, setTraceDiscovery] =
-    useState<api.TraceDiscovery | null>(null);
 
   const selectSession = useCallback(
     (id: string) => {
@@ -99,12 +91,10 @@ export function useDebugPageData(sid: string | undefined) {
       const data = await apiClient.fetchTraceTurnsPage(selectedSessionId);
       setTurns(data.turns);
       setOlderCursor(data.nextCursor);
-      setTraceDiscovery(data.discovery ?? null);
       expandLatestTurn(data.turns);
     } catch {
       setTurns([]);
       setOlderCursor(null);
-      setTraceDiscovery(null);
     } finally {
       setLoading(false);
     }
@@ -135,7 +125,6 @@ export function useDebugPageData(sid: string | undefined) {
     try {
       const data = await apiClient.fetchTraceTurnsPage(selectedSessionId);
       setTurns((prev) => mergeTurnPages(prev, data.turns));
-      if (data.discovery) setTraceDiscovery(data.discovery);
     } catch {
       // 轮询失败静默：保留已加载数据。
     }
@@ -149,7 +138,6 @@ export function useDebugPageData(sid: string | undefined) {
       const data = await apiClient.fetchTraceTurns(selectedSessionId);
       setTurns(data.turns);
       setOlderCursor(null);
-      setTraceDiscovery(data.discovery ?? null);
       expandLatestTurn(data.turns);
     } catch {
       // 保留已加载数据；失败不清空。
@@ -166,16 +154,6 @@ export function useDebugPageData(sid: string | undefined) {
     loadTraces();
   }, [loadTraces]);
 
-  useEffect(() => {
-    if (debugView !== "data" || !selectedSessionId) {
-      setSnapshotData(null);
-      return;
-    }
-    apiClient
-      .getSessionSnapshot(selectedSessionId)
-      .then(setSnapshotData)
-      .catch(() => setSnapshotData(null));
-  }, [debugView, selectedSessionId]);
 
   useEffect(() => {
     if (!autoRefresh || !selectedSessionId) return;
@@ -230,8 +208,6 @@ export function useDebugPageData(sid: string | undefined) {
     expandedRuntimes,
     selectedEvent,
     debugView,
-    snapshotData,
-    traceDiscovery,
     totalEvents,
     storyTurnCount,
     isPartial,

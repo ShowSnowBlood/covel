@@ -46,17 +46,23 @@ export function ActiveModelSlots({
           return (
             <div
               key={slot.slotId}
-              className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/20 px-1.5 py-1"
+              className="inline-flex min-w-0 items-center gap-1 rounded-md border border-border/70 bg-muted/20 px-1.5 py-1"
               title={tooltip}
             >
               <span className="max-w-[5.5rem] truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 {slot.label}
               </span>
-              <PingButton
-                target={{ kind: "slot", slotId: slot.slotId }}
-                variant="icon"
-                size="xs"
-              />
+              {slot.tag === "text" ? (
+                <PingButton
+                  target={{ kind: "slot", slotId: slot.slotId }}
+                  variant="icon"
+                  size="xs"
+                />
+              ) : (
+                <span className="text-[9px] text-muted-foreground/60">
+                  {slot.tag}
+                </span>
+              )}
             </div>
           );
         })}
@@ -73,14 +79,14 @@ export function ActiveModelSlots({
         return (
           <Card key={slot.slotId}>
             <CardContent className="p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <Cpu className="w-4 h-4 shrink-0 text-primary" />
-                  <span className="text-sm font-medium truncate">
+                  <span className="truncate text-sm font-medium">
                     {displayName}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex shrink-0 items-center gap-1.5">
                   <Badge variant="outline" className="text-[10px] uppercase">
                     {slot.label}
                   </Badge>
@@ -90,10 +96,16 @@ export function ActiveModelSlots({
                 </div>
               </div>
               <div className="flex items-center justify-end">
-                <PingButton
-                  target={{ kind: "slot", slotId: slot.slotId }}
-                  size="xs"
-                />
+                {slot.tag === "text" ? (
+                  <PingButton
+                    target={{ kind: "slot", slotId: slot.slotId }}
+                    size="xs"
+                  />
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">
+                    {slot.tag}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>

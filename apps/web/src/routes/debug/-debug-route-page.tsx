@@ -16,7 +16,6 @@ import { useDebugPageData } from "./-debug-page-data.js";
 import { DebugToolbar } from "./-debug-toolbar.js";
 import { EventDetailPanel } from "./-event-detail-panel.js";
 import { CostPanel } from "./-cost-panel.js";
-import { SessionDataView } from "./-session-data-view.js";
 import { SessionSidebar } from "./-session-sidebar.js";
 import { TraceTimeline } from "./-trace-timeline.js";
 
@@ -33,8 +32,6 @@ export function DebugRoutePage({ sid }: { sid?: string }) {
     expandedRuntimes,
     selectedEvent,
     debugView,
-    snapshotData,
-    traceDiscovery,
     totalEvents,
     storyTurnCount,
     isPartial,
@@ -221,13 +218,7 @@ export function DebugRoutePage({ sid }: { sid?: string }) {
           />
 
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            {debugView === "data" ? (
-              <SessionDataView
-                selectedSessionId={selectedSessionId}
-                snapshotData={snapshotData}
-                traceDiscovery={traceDiscovery}
-              />
-            ) : debugView === "cost" ? (
+            {debugView === "cost" ? (
               <CostPanel
                 turns={visibleTurns}
                 isPartial={isPartial}

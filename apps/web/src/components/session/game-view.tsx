@@ -452,7 +452,6 @@ export function GameView({ session }: GameViewProps) {
             <div className="animate-in fade-in-0 duration-200">
               <GameViewHeader
                 t={t}
-                sessionId={session.id}
                 world={world}
                 executing={executing}
                 viewMode={viewMode}

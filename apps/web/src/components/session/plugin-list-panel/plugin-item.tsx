@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronRight,
   Cpu,
@@ -30,6 +30,11 @@ export function PluginItem({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
+  const textSlots = useMemo(
+    () => (resolvedSlots ?? []).filter((slot) => slot.tag === "text"),
+    [resolvedSlots],
+  );
+
   const agentRuntimes = (pkg.runtimes ?? []).filter(
     (rt) => rt.kind !== "function" && rt.model,
   );
@@ -40,7 +45,6 @@ export function PluginItem({
     sessionId,
     runtimeModelOverrides,
   });
-
   const displayName = text(pkg.displayName) || pkg.name;
   const description = text(pkg.description);
   const runtimes = pkg.runtimes ?? [];
@@ -155,12 +159,12 @@ export function PluginItem({
       {primaryRuntime && (
         <div className="px-2.5 pb-1 -mt-0.5 flex items-center gap-1 text-[9px] text-muted-foreground/80">
           <Cpu className="w-2.5 h-2.5" />
-          {resolvedSlots && resolvedSlots.length > 0 ? (
+          {textSlots.length > 0 ? (
             (() => {
               const activeSlot = boundSlot
-                ? (resolvedSlots.find((s) => s.slotId === boundSlot) ??
-                  resolvedSlots[0])
-                : resolvedSlots[0];
+                ? (textSlots.find((s) => s.slotId === boundSlot) ??
+                  textSlots[0])
+                : textSlots[0];
               const label = formatSlotLabel(activeSlot);
               return (
                 <span

@@ -39,7 +39,17 @@
     "retry": "重试",
     "loginRequired": "登录后才能开始游玩",
     "loginRequiredDescription": "创建或继续游戏会话前，必须先连接账号。",
-    "loginAction": "登录账号"
+    "loginAction": "登录账号",
+    "connected": "已连接",
+    "recoveryRequired": "需要重新验证",
+    "balance": "Router 余额",
+    "refreshBalance": "刷新余额",
+    "lastVerified": "最近验证",
+    "settings": "账号设置",
+    "copyId": "复制账号 ID",
+    "idCopied": "已复制到剪贴板",
+    "signOut": "退出登录",
+    "reconnect": "重新连接"
   },
   "session": {
     "config": "工作室配置",

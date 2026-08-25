@@ -161,12 +161,33 @@ export function createGatewaySlotResolution(
     if (!deps.slotRegistry) return presetId;
 
     const direct = deps.slotRegistry.resolveSlot(presetId);
-    if (direct) return direct;
+    if (direct) {
+      const directTag = deps.slotRegistry.getSlotTag?.(presetId);
+      if (!directTag || directTag === fallbackTag) return direct;
+
+      // A runtime override may point at a real slot with the wrong modality
+      // (for example a text agent accidentally bound to the image slot). Do
+      // not send a chat request to an image endpoint/model. Fall back only to
+      // the first slot with the requested tag; cross-modality fallback stays
+      // disabled.
+      const compatible = deps.slotRegistry.listSlotsByTag(fallbackTag);
+      if (compatible.length > 0) {
+        const fallback = compatible[0]!;
+        const key = `${presetId}(${directTag})→${fallback.slotId}(${fallbackTag})`;
+        if (!warnedFallbacks.has(key)) {
+          warnedFallbacks.add(key);
+          console.warn(
+            `[ai-gateway] slot "${presetId}" has tag "${directTag}" but "${fallbackTag}" was requested; falling back to "${fallback.slotId}"`,
+          );
+        }
+        return fallback.presetId;
+      }
+      return presetId;
+    }
 
     const candidates = deps.slotRegistry.listSlotsByTag(fallbackTag);
     if (candidates.length === 0) return presetId;
-
-    const fallback = candidates[0];
+    const fallback = candidates[0]!;
     const key = `${presetId}→${fallback.slotId}`;
     if (!warnedFallbacks.has(key)) {
       warnedFallbacks.add(key);

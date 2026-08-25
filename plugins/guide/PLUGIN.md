@@ -13,10 +13,14 @@ pluginType: plugin
 # output (gated via needs: capability narrative-engine below); they do not read
 # each other's writes.
 stage: post-turn
-model: plugin
+# Use the low-latency utility role when configured; the gateway falls back to
+# another text slot without crossing into image/audio roles.
+model: utility
 outputKind: system
-timeoutMs: 180000
-callTimeoutMs: 90000
+timeoutMs: 90000
+callTimeoutMs: 45000
+firstTokenTimeoutMs: 20000
+maxRetries: 0
 maxSteps: 2
 requireToolUse: true
 tags:
