@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type {
   GeneratedImageSource,
@@ -48,15 +49,19 @@ function sizeForFixedTier(
         : "square"
     : "square";
 
-  if (tier === 1) return "1024x1024";
+  if (tier === 1) {
+    if (orientation === "landscape") return "1536x864";
+    if (orientation === "portrait") return "864x1536";
+    return "1024x1024";
+  }
   if (tier === 2) {
-    if (orientation === "landscape") return "2048x1152";
-    if (orientation === "portrait") return "1152x2048";
+    if (orientation === "landscape") return "2560x1440";
+    if (orientation === "portrait") return "1440x2560";
     return "2048x2048";
   }
   if (orientation === "landscape") return "3840x2160";
   if (orientation === "portrait") return "2160x3840";
-  return "4096x4096";
+  return "2880x2880";
 }
 
 function pollInterval(value: unknown): number {
@@ -123,8 +128,28 @@ const AsyncTaskSchema = z
   })
   .passthrough();
 
+const RouterArtifactSchema = z
+  .object({
+    id: z.string().min(1),
+    role: z.string().optional(),
+    media_type: z.string().optional(),
+  })
+  .passthrough();
+
+const RouterTaskSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.string(),
+    progress: z.number().optional(),
+    artifacts: z.array(RouterArtifactSchema).optional(),
+    error: TaskErrorSchema.nullish(),
+  })
+  .passthrough();
+
 type ImageEntry = z.infer<typeof ImageEntrySchema>;
+type TaskError = z.infer<typeof TaskErrorSchema>;
 type AsyncTask = z.infer<typeof AsyncTaskSchema>;
+type RouterArtifact = z.infer<typeof RouterArtifactSchema>;
 
 function toImageSource(
   value: string,
@@ -204,7 +229,7 @@ function collectImages(
   return out;
 }
 
-function taskError(value: AsyncTask["error"]): string {
+function taskError(value: TaskError | null | undefined): string {
   if (typeof value === "string") {
     return value.trim() || "image generation task failed";
   }
@@ -284,6 +309,103 @@ async function generateAsync(
   }
 }
 
+const MAX_ROUTER_ARTIFACT_BYTES = 64 * 1024 * 1024;
+
+async function downloadRouterArtifact(
+  config: ProviderConfig,
+  taskId: string,
+  artifact: RouterArtifact,
+): Promise<GeneratedImageSource> {
+  const response = await getJson(
+    config,
+    `/tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifact.id)}`,
+  );
+  if (!response.ok) {
+    const payload = await parseJson(response);
+    assertSuccess(response, payload, "openai-images");
+  }
+
+  const declaredLength = Number(response.headers.get("content-length") ?? 0);
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > MAX_ROUTER_ARTIFACT_BYTES
+  ) {
+    throw new Error("openai-images Router artifact exceeds 64 MiB");
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length === 0) {
+    throw new Error("openai-images Router artifact is empty");
+  }
+  if (bytes.length > MAX_ROUTER_ARTIFACT_BYTES) {
+    throw new Error("openai-images Router artifact exceeds 64 MiB");
+  }
+
+  const responseMime = response.headers.get("content-type")?.split(";", 1)[0];
+  const mime = [artifact.media_type, responseMime].find(
+    (value): value is string =>
+      typeof value === "string" && value.startsWith("image/"),
+  );
+  if (!mime) {
+    throw new Error("openai-images Router artifact is not an image");
+  }
+  return { kind: "bytes", bytes, mime };
+}
+
+async function pollRouterTask(
+  config: ProviderConfig,
+  taskId: string,
+  intervalMs: number,
+  warnings: string[],
+): Promise<ImageGenerationResult> {
+  let delayMs = intervalMs;
+  while (true) {
+    const response = await getJson(
+      config,
+      `/tasks/${encodeURIComponent(taskId)}`,
+    );
+    if (!response.ok && isRetriableStatus(response.status)) {
+      const retryAfterMs = parseRetryAfterMs(
+        response.headers.get("retry-after"),
+      );
+      await response.arrayBuffer().catch(() => undefined);
+      await sleepWithAbort(retryAfterMs ?? delayMs, config.signal);
+      delayMs = Math.min(MAX_ASYNC_POLL_MS, Math.round(delayMs * 1.5));
+      continue;
+    }
+
+    const payload = await parseJson(response);
+    assertSuccess(response, payload, "openai-images");
+    const task = RouterTaskSchema.parse(payload);
+    if (task.status === "success") {
+      const artifacts = (task.artifacts ?? []).filter(
+        (artifact) =>
+          artifact.role === "image" ||
+          artifact.media_type?.startsWith("image/"),
+      );
+      if (artifacts.length === 0) {
+        throw new Error("openai-images Router task completed without images");
+      }
+      const images: GeneratedImageSource[] = [];
+      for (const artifact of artifacts) {
+        images.push(await downloadRouterArtifact(config, taskId, artifact));
+      }
+      return { images, usage: null, warnings };
+    }
+    if (task.status === "failed" || task.status === "expired") {
+      throw new Error(
+        `openai-images Router task ${task.status}: ${taskError(task.error)}`,
+      );
+    }
+    if (task.status !== "pending") {
+      throw new Error(`openai-images Router task has status ${task.status}`);
+    }
+
+    const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+    await sleepWithAbort(retryAfterMs ?? delayMs, config.signal);
+    delayMs = Math.min(MAX_ASYNC_POLL_MS, Math.round(delayMs * 1.5));
+  }
+}
+
 async function generate(
   config: ProviderConfig,
   params: ImageGenerationParams,
@@ -339,9 +461,24 @@ async function generate(
     if (result) return result;
   }
 
-  const response = await postJson(config, "/images/generations", body);
+  const response = await postJson(
+    config,
+    "/images/generations",
+    body,
+    undefined,
+    { "Idempotency-Key": randomUUID() },
+  );
   const payload = await parseJson(response);
   assertSuccess(response, payload, "openai-images");
+  if (response.status === 202) {
+    const task = RouterTaskSchema.parse(payload);
+    return pollRouterTask(
+      config,
+      task.id,
+      pollInterval(imagePollIntervalMs),
+      warnings,
+    );
+  }
 
   const images = collectImages(payload, config.baseUrl);
   if (images.length === 0) {

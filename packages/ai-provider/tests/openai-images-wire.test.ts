@@ -127,6 +127,45 @@ describe("openai-images wire", () => {
     expect(result.warnings.join(" ")).toMatch(/n=3 remapped to n=1/);
   });
 
+  it("maps fixed tiers to the public OpenAI image size catalog", async () => {
+    const fn = mockFetchSequence(
+      Array.from(
+        { length: 3 },
+        () =>
+          new Response(JSON.stringify({ data: [{ b64_json: PNG_B64 }] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+
+    for (const [model, size] of [
+      ["gpt-image-2-1k", "1792x1024"],
+      ["gpt-image-2-2k", "1024x1792"],
+      ["gpt-image-2-4k", "1024x1024"],
+    ] as const) {
+      await openAiImagesWire.generate(
+        { baseUrl: "https://api.example.com/v1", apiKey: "k" },
+        {
+          model,
+          prompt: "a lighthouse",
+          size,
+          providerRequestMetadata: { imageAsync: false },
+        },
+      );
+    }
+
+    expect(
+      fn.mock.calls.map(([_, init]) =>
+        JSON.parse((init as RequestInit).body as string),
+      ),
+    ).toEqual([
+      expect.objectContaining({ size: "1536x864" }),
+      expect.objectContaining({ size: "1440x2560" }),
+      expect.objectContaining({ size: "2880x2880" }),
+    ]);
+  });
+
   it("rejects protocol-relative task images outside the provider origin", async () => {
     mockFetchSequence([
       new Response(JSON.stringify({ task_id: "image-task-1" }), {
@@ -179,6 +218,84 @@ describe("openai-images wire", () => {
     expect(result.images[0]).toMatchObject({
       kind: "bytes",
       mime: "image/png",
+    });
+  });
+
+  it("polls Router tasks and downloads authenticated image artifacts", async () => {
+    const artifactBytes = Buffer.from("router-image-bytes");
+    const fn = mockFetchSequence([
+      new Response(JSON.stringify({ message: "not found" }), { status: 404 }),
+      new Response(JSON.stringify({ id: "fftask-1", status: "pending" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      }),
+      new Response(
+        JSON.stringify({ id: "fftask-1", status: "pending", progress: 30 }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json", "retry-after": "0" },
+        },
+      ),
+      new Response(
+        JSON.stringify({
+          id: "fftask-1",
+          status: "success",
+          progress: 100,
+          artifacts: [
+            {
+              id: "ffart-1",
+              role: "image",
+              media_type: "image/webp",
+              url: "/v1/tasks/fftask-1/artifacts/ffart-1",
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+      new Response(artifactBytes, {
+        status: 200,
+        headers: {
+          "content-type": "image/webp",
+          "content-length": String(artifactBytes.length),
+        },
+      }),
+    ]);
+
+    const result = await openAiImagesWire.generate(
+      {
+        baseUrl: "https://market.example/v1",
+        apiKey: "k",
+        headers: { "X-FrostFox-Channel-Id": "image" },
+      },
+      {
+        model: "gpt-image-2-2k",
+        prompt: "a lighthouse",
+        size: "1792x1024",
+        providerRequestMetadata: { imagePollIntervalMs: 1 },
+      },
+    );
+
+    expect(fn.mock.calls.map(([url]) => url)).toEqual([
+      "https://market.example/v1/images/generations/async",
+      "https://market.example/v1/images/generations",
+      "https://market.example/v1/tasks/fftask-1",
+      "https://market.example/v1/tasks/fftask-1",
+      "https://market.example/v1/tasks/fftask-1/artifacts/ffart-1",
+    ]);
+    const submission = fn.mock.calls[1]![1] as RequestInit;
+    expect(JSON.parse(submission.body as string)).toMatchObject({
+      model: "gpt-image-2-2k",
+      n: 1,
+      size: "2560x1440",
+    });
+    expect(submission.headers).toMatchObject({
+      "Idempotency-Key": expect.any(String),
+      "X-FrostFox-Channel-Id": "image",
+    });
+    expect(result.images[0]).toMatchObject({
+      kind: "bytes",
+      mime: "image/webp",
+      bytes: artifactBytes,
     });
   });
 

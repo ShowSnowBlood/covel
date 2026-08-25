@@ -54,7 +54,7 @@ userSettings:
       en: Maximum wait for one generation, so an image task does not stay stuck.
   - key: quality
     type: text
-    default: low
+    default: ""
     label:
       zh: 画质（可选）
       en: Quality (optional)

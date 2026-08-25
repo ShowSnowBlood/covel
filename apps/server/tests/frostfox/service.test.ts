@@ -80,14 +80,30 @@ describe("FrostFox first-party SaaS", () => {
             : json({ error: "invalid_account_key" }, 401);
         }
         if (url.endsWith("/v1/images/generations/async")) {
-          return json({ task_id: "image-task-1" }, 202);
+          return json({ error: { code: "not_found" } }, 404);
         }
-        if (url.endsWith("/v1/images/tasks/image-task-1")) {
+        if (url.endsWith("/v1/images/generations") && init?.method === "POST") {
+          return json({ id: "image-task-1", status: "pending" }, 202);
+        }
+        if (url.endsWith("/v1/tasks/image-task-1")) {
           return json({
-            status: "completed",
-            result: {
-              data: [{ b64_json: Buffer.alloc(64, 1).toString("base64") }],
-            },
+            id: "image-task-1",
+            status: "success",
+            progress: 100,
+            artifacts: [
+              {
+                id: "image-artifact-1",
+                role: "image",
+                media_type: "image/png",
+                url: "/v1/tasks/image-task-1/artifacts/image-artifact-1",
+              },
+            ],
+          });
+        }
+        if (url.endsWith("/v1/tasks/image-task-1/artifacts/image-artifact-1")) {
+          return new Response(Buffer.alloc(64, 1), {
+            status: 200,
+            headers: { "content-type": "image/png" },
           });
         }
         if (url.endsWith("/v1/models")) {
@@ -267,20 +283,29 @@ describe("FrostFox first-party SaaS", () => {
       images: [{ kind: "bytes", mime: "image/png" }],
     });
     const imageRequest = requests.find((request) =>
-      request.url.endsWith("/v1/images/generations/async"),
+      request.url.endsWith("/v1/images/generations"),
     );
     expect(imageRequest?.init?.headers).toMatchObject({
       authorization: `Bearer ${deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel")}`,
       "X-FrostFox-Channel-Id": CHANNEL_ID,
+      "Idempotency-Key": expect.any(String),
     });
     expect(JSON.parse(String(imageRequest?.init?.body))).toMatchObject({
       model: "openai/gpt-image-2-2k",
       prompt: "A lighthouse above a silver sea",
       size: "2048x2048",
+      n: 1,
     });
     expect(
       requests.some((request) =>
-        request.url.endsWith("/v1/images/tasks/image-task-1"),
+        request.url.endsWith("/v1/tasks/image-task-1"),
+      ),
+    ).toBe(true);
+    expect(
+      requests.some((request) =>
+        request.url.endsWith(
+          "/v1/tasks/image-task-1/artifacts/image-artifact-1",
+        ),
       ),
     ).toBe(true);
 
