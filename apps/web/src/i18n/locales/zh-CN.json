@@ -13,7 +13,23 @@
     "mainLoginRequiredBody": "自动登录未完成。请先在主站登录账号，再返回重新连接。",
     "openMainSite": "前往霜狐主站登录",
     "retryAutoLogin": "我已登录，重新连接",
-    "enteringWorld": "正在进入世界…"
+    "enteringWorld": "正在进入世界…",
+    "startHere": "从这里开始",
+    "startHereSubtitle": "选择一种方式，马上开始使用 FrostFox；不需要先理解全部设置。",
+    "interactiveStory": "互动故事",
+    "chooseWorldTitle": "选择世界，开始你的故事",
+    "chooseWorldDesc": "在雾港、学园与未知世界之间推进章节，每一次选择都会改变剧情走向。",
+    "enterStoryGame": "进入剧情游戏",
+    "featureCodingTitle": "进行编程构筑",
+    "featureCodingDesc": "在 Agent 编排引擎中编写、运行并持续推进复杂任务。",
+    "enterOrchestration": "进入编排引擎",
+    "featureMediaTitle": "进行图片视频创作",
+    "featureMediaDesc": "查看可用渠道和模型，为后续图片或视频生成准备接入。",
+    "viewChannels": "查看可用渠道",
+    "featureApiTitle": "直接使用 API",
+    "featureApiDesc": "创建一把 Gateway API Key，接入兼容 OpenAI / Anthropic 的客户端。",
+    "manageApiKey": "管理 API Key",
+    "footerNotice": "随时可以从菜单进入总览、用量、账单和日志。"
   },
   "nav": {
     "home": "首页",
@@ -307,7 +323,13 @@
     "blockLabel": "区块",
     "exportEmpty": "暂无可导出的消息",
     "exportSuccess": "聊天记录已导出",
-    "exportFailed": "导出聊天记录失败"
+    "exportFailed": "导出聊天记录失败",
+    "filterTags": "标签",
+    "worldDocument": "世界观文档",
+    "loreDoc": "设定文档",
+    "pluginsActive": "个插件已激活",
+    "deleteSession": "删除会话",
+    "deleteConfirm": "确定要删除此会话吗？此操作无法撤销。"
   },
   "blocks": {
     "actionPlaceholder": "或输入自定义行动...",
@@ -1108,7 +1130,9 @@
     "new": "新增",
     "newUpper": "新增",
     "active": "生效中",
-    "retry": "重试"
+    "retry": "重试",
+    "reset": "重置",
+    "chars": "字符"
   },
   "debugger": {
     "title": "追踪检查器",

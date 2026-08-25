@@ -13,7 +13,23 @@
     "mainLoginRequiredBody": "Automatic sign-in could not finish. Sign in on the main site, then return and reconnect.",
     "openMainSite": "Open FrostFox main site",
     "retryAutoLogin": "I’m signed in — reconnect",
-    "enteringWorld": "Entering the world…"
+    "enteringWorld": "Entering the world…",
+    "startHere": "Get Started",
+    "startHereSubtitle": "Choose a way to start using FrostFox right away; no need to configure all settings first.",
+    "interactiveStory": "Interactive Story",
+    "chooseWorldTitle": "Choose a World, Start Your Story",
+    "chooseWorldDesc": "Advance through chapters across Mistport, Academy, and unknown worlds; every choice shapes the journey.",
+    "enterStoryGame": "Enter Story Game",
+    "featureCodingTitle": "Agent Orchestration",
+    "featureCodingDesc": "Compose, execute, and continuously advance complex tasks in the Agent engine.",
+    "enterOrchestration": "Open Engine",
+    "featureMediaTitle": "Media & Visual Creation",
+    "featureMediaDesc": "Explore available channels and models for image and video generation.",
+    "viewChannels": "View Channels",
+    "featureApiTitle": "Direct API Integration",
+    "featureApiDesc": "Generate a Gateway API Key to connect any OpenAI- or Anthropic-compatible client.",
+    "manageApiKey": "Manage API Keys",
+    "footerNotice": "You can access overview, usage, billing, and logs from the menu at any time."
   },
   "nav": {
     "home": "Home",
@@ -308,7 +324,13 @@
     "blockLabel": "Block",
     "exportEmpty": "No messages to export yet",
     "exportSuccess": "Chat exported",
-    "exportFailed": "Failed to export chat"
+    "exportFailed": "Failed to export chat",
+    "filterTags": "Tags",
+    "worldDocument": "World Document",
+    "loreDoc": "Knowledge Base",
+    "pluginsActive": "plugins active",
+    "deleteSession": "Delete Session",
+    "deleteConfirm": "Are you sure you want to delete this session? This action cannot be undone."
   },
   "blocks": {
     "actionPlaceholder": "Or type your own action...",
@@ -1109,7 +1131,9 @@
     "new": "new",
     "newUpper": "NEW",
     "active": "Active",
-    "retry": "Retry"
+    "retry": "Retry",
+    "reset": "Reset",
+    "chars": "characters"
   },
   "debugger": {
     "title": "Trace Inspector",
