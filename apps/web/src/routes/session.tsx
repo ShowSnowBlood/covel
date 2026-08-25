@@ -9,7 +9,6 @@ import { getStreamingText } from "@/stores/streaming-text-store.js";
 import { emitToast } from "@/lib/toast-channel.js";
 import { useSlotConfig } from "@/hooks/use-slot-config.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
-import { resolveI18n } from "@/lib/catalog/helpers.js";
 import { initDesktopBridge } from "@/lib/desktop-bridge.js";
 import { WorldSelectScreen } from "@/components/session/world-select-screen.js";
 import { SessionPrepScreen } from "@/components/session/session-prep-screen.js";
@@ -170,12 +169,6 @@ function SessionPage() {
       });
     }
   }, [state.booted, sid, state.session, resumeSessionById, navigate]);
-
-  // Update document.title for Electron window title sync
-  useEffect(() => {
-    const worldName = state.world ? resolveI18n(state.world.name) : "";
-    document.title = worldName ? `Covel \u2014 ${worldName}` : "Covel";
-  }, [state.world]);
 
   // Desktop bridge: translate Electron menu events into app actions
   const navigateRef = useRef(navigate);

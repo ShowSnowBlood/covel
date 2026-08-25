@@ -1,5 +1,3 @@
-import { FROSTFOX_LEVEL_COUNT } from "@covel/shared";
-
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.js";
@@ -14,10 +12,7 @@ import { SettingsDialog } from "@/settings/SettingsDialog.js";
 import { WorldDetailView } from "@/components/world/world-detail-view.js";
 import { WorldEditor } from "@/components/world/world-editor.js";
 import { AiWorldGenerator } from "@/components/world/ai-world-generator.js";
-import {
-  WorldListView,
-  type LevelProgressionMode,
-} from "@/components/world/world-list-view.js";
+import { WorldListView } from "@/components/world/world-list-view.js";
 
 import * as api from "@/services/api.js";
 import type { WorldRecord, PackageSummary } from "@/services/api.js";
@@ -91,63 +86,6 @@ export function WorldSelectScreen({
   const [enteringWorldId, setEnteringWorldId] = useState<string | null>(null);
   const [deletingWorldId, setDeletingWorldId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [progressionMode, setProgressionMode] =
-    useState<LevelProgressionMode>("loading");
-  const [progression, setProgression] =
-    useState<api.FrostFoxProgressionStatus | null>(null);
-  const [unlockingLevel, setUnlockingLevel] = useState<number | null>(() => {
-    const stored = Number.parseInt(
-      sessionStorage.getItem(api.FROSTFOX_RECENT_UNLOCK_STORAGE_KEY) ?? "",
-      10,
-    );
-    return Number.isInteger(stored) &&
-      stored >= 1 &&
-      stored <= FROSTFOX_LEVEL_COUNT
-      ? stored
-      : null;
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadProgression() {
-      try {
-        const account = await api.fetchFrostFoxAccount(true);
-        if (cancelled) return;
-        if (!account.enabled) {
-          setProgressionMode("disabled");
-          return;
-        }
-        if (!account.authenticated) {
-          setProgressionMode("account-required");
-          return;
-        }
-        const next = await api.fetchFrostFoxProgression(true);
-        if (cancelled) return;
-        setProgression(next);
-        setProgressionMode("ready");
-      } catch {
-        if (!cancelled) setProgressionMode("error");
-      }
-    }
-    void loadProgression();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  useEffect(() => {
-    if (progressionMode !== "ready" || unlockingLevel === null) return;
-    sessionStorage.removeItem(api.FROSTFOX_RECENT_UNLOCK_STORAGE_KEY);
-    if (
-      !progression ||
-      progression.unlockedLevel !== unlockingLevel ||
-      progression.completedLevel >= progression.totalLevels
-    ) {
-      setUnlockingLevel(null);
-      return;
-    }
-    const timer = window.setTimeout(() => setUnlockingLevel(null), 1700);
-    return () => window.clearTimeout(timer);
-  }, [progression, progressionMode, unlockingLevel]);
 
   // Entering a world used to defer the actual navigation to
   // `requestAnimationFrame`, so the busy state could paint one frame first.
@@ -294,14 +232,7 @@ export function WorldSelectScreen({
         enteringWorldId={enteringWorldId}
         storageLabel={worldStorageLabel}
         onOpenGenerator={() => setGeneratorOpen(true)}
-        progressionMode={progressionMode}
-        progression={progression}
-        unlockingLevel={unlockingLevel}
-
-        onOpenSettings={() => onSettingsOpenChange(true)}
         onEnterWorld={handleEnterWorld}
-        onConnectAccount={() => window.location.assign("/auth/frostfox/start")}
-
         onViewDetails={handleViewDetails}
         onDeleteWorld={handleDeleteClick}
       />

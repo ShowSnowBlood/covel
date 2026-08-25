@@ -35,18 +35,14 @@ vi.mock("@/hooks/use-settings-dialog.js", () => ({
 vi.mock("@/settings/SettingsDialog.js", () => ({
   SettingsDialog: () => null,
 }));
-vi.mock("@/components/visual-effects/balatro-transition.js", () => ({
-  BalatroTransition: () => null,
+vi.mock("@/components/visual-effects/SceneLoadingTransition.js", () => ({
+  SceneLoadingTransition: () => null,
 }));
 vi.mock("@/components/reactbits/index.js", () => ({
   Particles: () => null,
   ShinyText: ({ children }: { children: React.ReactNode }) => children,
-  DecryptedText: ({ text }: { text: string }) => text,
   Magnet: ({ children }: { children: React.ReactNode }) => children,
   StarBorder: ({ children }: { children: React.ReactNode }) => children,
-}));
-vi.mock("@/services/api.js", () => ({
-  fetchFrostFoxProgression: vi.fn(),
 }));
 
 const { GameHome } = await import("../GameHome.js");
@@ -69,6 +65,12 @@ describe("GameHome", () => {
         .hasAttribute("disabled"),
     ).toBe(false);
     expect(screen.queryByText("home.mainLoginRequired")).toBeNull();
+    expect(
+      document.querySelector(
+        'img[src="/visuals/backgrounds/frostfox-game-cover-image2.png"]',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^Level /)).toBeNull();
   });
 
   it("opens settings from the restored secondary action", () => {

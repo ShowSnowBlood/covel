@@ -110,7 +110,7 @@ afterEach(() => {
   else process.env.COVEL_DESKTOP_REST_TOKEN = originalOperatorToken;
 });
 
-describe("FrostFox managed model ping", () => {
+describe("FrostFox account model ping", () => {
   it("allows a connected account to test its managed slot without operator auth", async () => {
     const { app, frostFox, streamCalls } = makeHarness();
     const response = await app.request("/api/ai/ping", {
@@ -135,17 +135,24 @@ describe("FrostFox managed model ping", () => {
     });
   });
 
-  it("does not let an account probe a local provider through the managed route", async () => {
+  it("allows a connected account to test any configured model", async () => {
     const { app, streamCalls } = makeHarness();
     const response = await app.request("/api/ai/ping", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ presetId: "local-story" }),
     });
-    const body = (await response.json()) as { code?: string };
+    const body = (await response.json()) as {
+      ok: boolean;
+      testedTarget?: { provider: string; model: string };
+    };
 
-    expect(response.status).toBe(403);
-    expect(body.code).toBe("frostfox_managed_model_required");
-    expect(streamCalls).toHaveLength(0);
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.testedTarget).toMatchObject({
+      provider: "openai",
+      model: "gpt-5",
+    });
+    expect(streamCalls).toHaveLength(1);
   });
 });

@@ -1,18 +1,14 @@
-import { FROSTFOX_LEVEL_WORLD_IDS } from "@covel/shared";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
-import { worldVisualForId } from "@/lib/world-visuals.js";
-import { fetchFrostFoxProgression } from "@/services/api.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
 import {
   Particles,
   ShinyText,
-  DecryptedText,
   Magnet,
   StarBorder,
 } from "@/components/reactbits/index.js";
@@ -31,30 +27,7 @@ export function GameHome() {
   const [currentLevel, setCurrentLevel] = useState(1);
   const [transitioning, setTransitioning] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!status?.authenticated) {
-      setCurrentLevel(1);
-      return;
-    }
-    fetchFrostFoxProgression(true)
-      .then((progression) => {
-        if (!cancelled) setCurrentLevel(progression.unlockedLevel);
-      })
-      .catch(() => {
-        if (!cancelled) setCurrentLevel(1);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [status?.account?.id, status?.authenticated]);
-
-  const currentWorldId = FROSTFOX_LEVEL_WORLD_IDS[currentLevel - 1];
-  const currentWorldVisual = worldVisualForId(currentWorldId);
-  const homeCover =
-    currentWorldVisual?.image ||
-    "/visuals/backgrounds/home-hero.webp" ||
-    "/visuals/backgrounds/frostfox-game-cover-image2.png";
+  const homeCover = "/visuals/backgrounds/frostfox-game-cover-image2.png";
 
   function handleStartGame() {
     if (status?.enabled && !status.authenticated) {
@@ -113,7 +86,7 @@ export function GameHome() {
           {/* Logo Mark with Floating Animation */}
           <div className="relative animate-[float-gentle_4s_ease-in-out_infinite]">
             <img
-              src="/icon.png"
+              src="/icon.png?v=frostfox-game"
               alt=""
               width={160}
               height={160}
@@ -136,19 +109,6 @@ export function GameHome() {
           <p className="mt-5 max-w-xl text-sm leading-relaxed tracking-[0.06em] text-zinc-300/90 sm:text-base font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,.5)]">
             {t("home.gameBody")}
           </p>
-
-          {/* Level Progress Indicator with DecryptedText */}
-          {status?.authenticated && (
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3.5 py-1 text-xs text-zinc-300 backdrop-blur-md">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <DecryptedText
-                text={`Level ${currentLevel} : ${currentWorldVisual?.label ?? "FrostFox World"}`}
-                speed={40}
-                animateOn="view"
-                className="font-mono text-xs font-medium text-zinc-200"
-              />
-            </div>
-          )}
 
           {/* Action Buttons Section */}
           <div className="mt-8 flex w-full max-w-[23rem] flex-col items-center gap-3.5">

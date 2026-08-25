@@ -366,16 +366,6 @@ export function createMiscApiRoutes(
           "No LLM provider configured. Add a slot to llm.toml or via Settings.",
       });
     }
-    const managedOnly = !!frostFoxContext && !operator;
-    if (managedOnly && !preset.provider.startsWith("frostfox-")) {
-      cleanupTransient();
-      return c.json(
-        errorBody("Only FrostFox managed models may be tested", {
-          code: "frostfox_managed_model_required",
-        }),
-        403,
-      );
-    }
 
     // Resolve the effective baseUrl/protocol once so error + success paths
     // both report the exact target. Unknown providers can still ping via
