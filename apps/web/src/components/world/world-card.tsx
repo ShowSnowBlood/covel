@@ -72,7 +72,7 @@ export function WorldCard({
         if (locked) onLocked?.();
         else onEnter(world.id);
       }}
-      className={`group relative min-h-[280px] sm:min-h-[320px] md:min-h-[332px] overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl ${
+      className={`group relative min-h-[260px] sm:min-h-[320px] md:min-h-[332px] overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl ${
         unlocking
           ? "cursor-wait"
           : locked
@@ -135,7 +135,7 @@ export function WorldCard({
         style={{ background: "var(--world-accent)" }}
       />
 
-      <div className="relative z-10 flex min-h-[280px] sm:min-h-[320px] md:min-h-[332px] flex-col justify-between p-4 sm:p-5 md:p-6 text-white">
+      <div className="relative z-10 flex min-h-[260px] sm:min-h-[320px] md:min-h-[332px] flex-col justify-between p-3.5 sm:p-5 md:p-6 text-white">
         <div className="flex items-start justify-between gap-3">
           <span className="ui-meta text-[10px] text-white/70 font-mono tracking-wider tabular-nums">
             {levelNumber
@@ -181,12 +181,12 @@ export function WorldCard({
         <div className="space-y-3.5">
           <div className="max-w-[31rem] space-y-2">
             <h2
-              className="ui-title text-2xl sm:text-3xl md:text-[2.35rem] font-bold leading-[1.08] sm:leading-[1.05] tracking-tight text-white transition-colors"
+              className="ui-title text-xl sm:text-3xl md:text-[2.35rem] font-bold leading-[1.08] sm:leading-[1.05] tracking-tight text-white transition-colors"
               style={isEntering ? { color: "var(--world-accent)" } : undefined}
             >
               {text(world.name)}
             </h2>
-            <p className="text-[13px] sm:text-[14px] leading-relaxed text-white/80 line-clamp-2 sm:line-clamp-3 break-words [overflow-wrap:anywhere]">
+            <p className="text-xs sm:text-[14px] leading-relaxed text-white/80 line-clamp-2 sm:line-clamp-3 break-words [overflow-wrap:anywhere]">
               {text(world.description)}
             </p>
           </div>

@@ -81,8 +81,8 @@ export function GameHome() {
         className="opacity-70 mix-blend-screen"
       />
 
-      <div className="relative z-10 flex h-full items-center justify-center px-6 py-20 text-center sm:px-10">
-        <div className="flex w-full max-w-3xl -translate-y-[2vh] flex-col items-center">
+      <div className="relative z-10 flex h-full items-center justify-center px-4 py-14 pt-[max(4.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center sm:px-10 sm:py-20">
+        <div className="flex w-full max-w-3xl -translate-y-[1vh] sm:-translate-y-[2vh] flex-col items-center">
           {/* Logo Mark with Floating Animation */}
           <div className="relative animate-[float-gentle_4s_ease-in-out_infinite]">
             <img
@@ -91,14 +91,14 @@ export function GameHome() {
               width={160}
               height={160}
               aria-hidden="true"
-              className="h-24 w-24 drop-shadow-[0_8px_24px_rgba(0,0,0,.6)] sm:h-28 sm:w-28"
+              className="h-20 w-20 drop-shadow-[0_8px_24px_rgba(0,0,0,.6)] sm:h-28 sm:w-28"
             />
           </div>
 
           {/* React Bits ShinyText Title */}
           <h1
             id="game-home-title"
-            className="mt-5 font-display text-[clamp(2.8rem,7.5vw,5.4rem)] font-bold leading-none tracking-[0.06em] text-white [text-shadow:0_4px_24px_rgba(0,0,0,.6)]"
+            className="mt-4 sm:mt-5 font-display text-[clamp(2.2rem,6.8vw,5.4rem)] font-bold leading-none tracking-[0.06em] text-white [text-shadow:0_4px_24px_rgba(0,0,0,.6)] [text-wrap:balance]"
           >
             <ShinyText speed={4.5} shineColor="rgba(255, 255, 255, 0.9)">
               {t("home.gameTitle")}
@@ -106,12 +106,12 @@ export function GameHome() {
           </h1>
 
           {/* Subtitle / Narrative Body */}
-          <p className="mt-5 max-w-xl text-sm leading-relaxed tracking-[0.06em] text-zinc-300/90 sm:text-base font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,.5)]">
+          <p className="mt-3.5 sm:mt-5 max-w-xl text-xs sm:text-base leading-relaxed tracking-[0.04em] sm:tracking-[0.06em] text-zinc-300/90 font-sans drop-shadow-[0_2px_8px_rgba(0,0,0,.5)] px-2">
             {t("home.gameBody")}
           </p>
 
           {/* Action Buttons Section */}
-          <div className="mt-8 flex w-full max-w-[23rem] flex-col items-center gap-3.5">
+          <div className="mt-6 sm:mt-8 flex w-full max-w-[20rem] sm:max-w-[23rem] flex-col items-center gap-3 sm:gap-3.5">
             <Magnet padding={80} magnetStrength={3} className="w-full">
               <StarBorder
                 color="rgba(255, 255, 255, 0.6)"

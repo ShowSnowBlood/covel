@@ -194,6 +194,7 @@ describe("Navigation loading progress transitions", () => {
     const session: SessionRecord = {
       id: "sess_1",
       worldId: "fog-port",
+      status: "active",
       turnCount: 2,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -218,6 +219,7 @@ describe("Navigation loading progress transitions", () => {
     const session: SessionRecord = {
       id: "sess_1",
       worldId: "fog-port",
+      status: "active",
       turnCount: 2,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -243,6 +245,7 @@ describe("Navigation loading progress transitions", () => {
       id: "fog-port",
       name: "雾港·裂潮纪",
       description: "一座被永恒浓雾包裹的港口城市。",
+      createdAt: new Date().toISOString(),
     };
 
     render(
@@ -250,7 +253,7 @@ describe("Navigation loading progress transitions", () => {
         world={world}
         packages={[]}
         presets={[]}
-        llmConfig={{}}
+        llmConfig={{ configured: true, slots: {}, providers: [] }}
         onBack={onBack}
         onStart={vi.fn()}
         onResume={vi.fn()}

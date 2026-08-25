@@ -70,7 +70,7 @@ export function SessionCanvasHero({
         style={{ background: "var(--world-accent)" }}
       />
 
-      <div className="relative z-10 flex min-h-[360px] flex-col justify-between p-5 text-white md:min-h-[420px] md:p-7">
+      <div className="relative z-10 flex min-h-[280px] sm:min-h-[360px] flex-col justify-between p-4 sm:p-5 text-white md:min-h-[420px] md:p-7">
         <div className="flex flex-wrap items-center gap-2">
           <span className="ui-eyebrow text-white/62">§ SESSION CANVAS</span>
           {chips.map((chip, i) => (
@@ -85,7 +85,7 @@ export function SessionCanvasHero({
 
         <div className="max-w-2xl">
           <h2
-            className="ui-title text-3xl leading-tight tracking-tight text-white md:text-[2.65rem]"
+            className="ui-title text-xl sm:text-3xl leading-tight tracking-tight text-white md:text-[2.65rem]"
             style={{ textWrap: "balance" } as React.CSSProperties}
           >
             {hook || hintLabel}
@@ -99,7 +99,7 @@ export function SessionCanvasHero({
 
           <Button
             size="lg"
-            className="mt-7 px-7 py-5 text-sm font-bold uppercase tracking-widest"
+            className="mt-5 sm:mt-7 px-5 sm:px-7 py-3.5 sm:py-5 text-xs sm:text-sm font-bold uppercase tracking-widest"
             style={{ background: "var(--world-accent)", color: "black" }}
             onClick={onBegin}
           >

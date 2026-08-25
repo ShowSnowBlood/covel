@@ -251,12 +251,12 @@ export function SessionPrepScreen({
       />
 
       {/* Main Responsive Cockpit Area */}
-      <div className="flex-1 w-full max-w-[1700px] mx-auto p-3 sm:p-5 md:p-6 lg:p-7 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-4 sm:gap-5 ui-scroll">
+      <div className="flex-1 w-full max-w-[1700px] mx-auto p-2.5 sm:p-5 md:p-6 lg:p-7 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-3 sm:gap-5 ui-scroll">
         {/* Left Column (40%): 4K World Hero + World Lore / Dimensions */}
         <section className="w-full lg:w-[42%] xl:w-[40%] flex flex-col gap-4 shrink-0 lg:h-full lg:overflow-hidden">
           {/* Card 1: 4K World Cover Poster */}
           <article
-            className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card shadow-xl overflow-hidden flex flex-col justify-between p-4 sm:p-6 shrink-0 min-h-[190px] sm:min-h-[220px] lg:max-h-[48%]"
+            className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card shadow-xl overflow-hidden flex flex-col justify-between p-3.5 sm:p-6 shrink-0 min-h-[170px] sm:min-h-[220px] lg:max-h-[48%]"
             style={{ "--world-accent": visual.accent } as CSSProperties}
           >
             {/* 4K/2K Artwork Background */}
@@ -311,7 +311,7 @@ export function SessionPrepScreen({
               <span className="ui-eyebrow text-[10px] text-white/60 font-mono tracking-widest block">
                 {t("session.preparation", "SESSION SETUP")}
               </span>
-              <h1 className="ui-title text-2xl sm:text-3xl font-bold leading-tight text-white tracking-tight">
+              <h1 className="ui-title text-xl sm:text-3xl font-bold leading-tight text-white tracking-tight">
                 <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.9)">
                   {text(world.name)}
                 </ShinyText>
@@ -323,7 +323,7 @@ export function SessionPrepScreen({
           </article>
 
           {/* Card 2: World Lore & Dimensions */}
-          <article className="rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-lg p-5 flex-1 flex flex-col justify-between overflow-hidden">
+          <article className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-lg p-3.5 sm:p-5 flex-1 flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-primary" />
@@ -375,7 +375,7 @@ export function SessionPrepScreen({
         {/* Right Column (60%): Cockpit Control Console with Tabs & CTA */}
         <section className="w-full lg:w-[58%] xl:w-[60%] flex flex-col gap-3 min-h-[480px] lg:h-full lg:overflow-hidden flex-1">
           {/* Cockpit Card Shell */}
-          <div className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/90 backdrop-blur-2xl shadow-xl sm:shadow-2xl flex-1 flex flex-col overflow-hidden p-4 sm:p-5 md:p-6">
+          <div className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/90 backdrop-blur-2xl shadow-xl sm:shadow-2xl flex-1 flex flex-col overflow-hidden p-3 sm:p-5 md:p-6">
             {/* Cockpit Header with Tab Switches */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3.5 sm:pb-4 shrink-0">
               {/* Tabs */}

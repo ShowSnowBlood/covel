@@ -93,7 +93,7 @@ export function SceneLoadingTransition({
       role="status"
       aria-live="polite"
       className={cn(
-        "fixed inset-0 z-[100] flex flex-col justify-between p-4 sm:p-8 md:p-12 bg-zinc-950 text-white overflow-hidden select-none animate-in fade-in-0 duration-300",
+        "fixed inset-0 z-[100] flex flex-col justify-between p-4 sm:p-8 md:p-12 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] bg-zinc-950 text-white overflow-hidden select-none animate-in fade-in-0 duration-300",
         className,
       )}
     >
@@ -144,7 +144,7 @@ export function SceneLoadingTransition({
       {/* Center Title / Narrative text */}
       <div className="relative z-10 flex flex-col items-center text-center space-y-2.5 sm:space-y-3 my-auto max-w-2xl mx-auto px-3">
         {title && (
-          <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
+          <h2 className="text-xl sm:text-3xl md:text-5xl font-bold tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)] [text-wrap:balance]">
             <ShinyText speed={4} shineColor="rgba(255, 255, 255, 0.95)">
               {title}
             </ShinyText>

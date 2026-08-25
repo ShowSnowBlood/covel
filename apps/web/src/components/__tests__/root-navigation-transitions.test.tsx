@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
 import type { SessionRecord, WorldRecord } from "@/services/api.js";
-import { Route } from "../__root.js";
+import { Route } from "@/routes/__root.js";
 
 const navigate = vi.hoisted(() => vi.fn());
 const locationState = vi.hoisted(() => ({
@@ -128,6 +128,10 @@ vi.mock("@/components/reactbits/index.js", () => ({
   StarBorder: ({ children }: { children: ReactNode }) => children,
 }));
 
+function getRouteComponent(): () => React.JSX.Element {
+  return (Route.options?.component ?? (Route as { component?: unknown }).component) as () => React.JSX.Element;
+}
+
 describe("Root layout navigation transitions", () => {
   beforeEach(() => {
     navigate.mockClear();
@@ -138,6 +142,7 @@ describe("Root layout navigation transitions", () => {
     mockSessionState.session = {
       id: "sess_1",
       worldId: "fog-port",
+      status: "active",
       turnCount: 1,
       createdAt: "",
       updatedAt: "",
@@ -146,6 +151,7 @@ describe("Root layout navigation transitions", () => {
       id: "fog-port",
       name: "雾港·裂潮纪",
       description: "海港世界",
+      createdAt: "",
     };
 
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -161,7 +167,7 @@ describe("Root layout navigation transitions", () => {
   });
 
   it("shows loading progress transition when clicking 'Home' (首页) and completes navigation", () => {
-    const Component = Route.component as () => React.JSX.Element;
+    const Component = getRouteComponent();
     render(<Component />);
 
     const homeBtn = screen.getByRole("button", { name: "Home" });
@@ -176,7 +182,7 @@ describe("Root layout navigation transitions", () => {
   });
 
   it("shows loading progress transition when clicking logo and completes navigation to home", () => {
-    const Component = Route.component as () => React.JSX.Element;
+    const Component = getRouteComponent();
     render(<Component />);
 
     const logoLink = screen.getByTestId("router-link");
@@ -192,7 +198,7 @@ describe("Root layout navigation transitions", () => {
   });
 
   it("shows loading progress transition when clicking 'World' (世界) and completes backToWorldSelect", () => {
-    const Component = Route.component as () => React.JSX.Element;
+    const Component = getRouteComponent();
     render(<Component />);
 
     const worldBtn = screen.getByRole("button", { name: "World" });

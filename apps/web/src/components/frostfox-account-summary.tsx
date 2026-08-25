@@ -271,7 +271,7 @@ export function FrostFoxAccountSummary({
           role="dialog"
           aria-modal="false"
           aria-label={t("nav.frostfoxAccountSummary", "Account and balance")}
-          className="absolute right-0 top-full mt-2 w-[320px] sm:w-[340px] rounded-2xl border border-border/80 dark:border-white/15 bg-card/95 dark:bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-2xl p-4 text-foreground z-50 animate-in fade-in-0 zoom-in-95 duration-150 space-y-3.5"
+          className="absolute right-0 top-full mt-2 w-[min(calc(100vw-1.5rem),340px)] rounded-2xl border border-border/80 dark:border-white/15 bg-card/95 dark:bg-zinc-950/95 shadow-2xl shadow-black/40 backdrop-blur-2xl p-4 text-foreground z-50 animate-in fade-in-0 zoom-in-95 duration-150 space-y-3.5"
         >
           {/* Profile Header */}
           <div className="flex items-start justify-between gap-3">

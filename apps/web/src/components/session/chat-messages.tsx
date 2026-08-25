@@ -236,7 +236,7 @@ export function ChatMessages({
     <>
       <div className="relative flex-1 min-h-0 flex flex-col">
         <ScrollArea ref={scrollRootRef} className="flex-1 min-h-0">
-          <div className="ui-session-column p-4 md:p-6 space-y-6 md:space-y-7 mx-auto w-full">
+          <div className="ui-session-column p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 md:space-y-7 mx-auto w-full">
             {/* 顶部哨兵（零高度）：进入视口触发游标分页向上加载。放在滚动内容流内，
                 但不产生高度，避免影响加载后的 scrollHeight 差值补偿。 */}
             <div ref={topSentinelRef} aria-hidden="true" />

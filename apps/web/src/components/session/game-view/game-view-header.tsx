@@ -116,7 +116,7 @@ export function GameViewHeader({
             pressed={viewMode === "detailed"}
             onPressedChange={() => onViewModeChange("detailed")}
             size="sm"
-            className="rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
+            className="hidden sm:inline-flex rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
             aria-label={t("session.viewDetailedAria")}
             title={t("session.viewDetailed")}
           >
@@ -126,7 +126,7 @@ export function GameViewHeader({
             pressed={viewMode === "raw"}
             onPressedChange={() => onViewModeChange("raw")}
             size="sm"
-            className="rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
+            className="hidden sm:inline-flex rounded-lg border-0 h-6 px-2 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground transition-all"
             aria-label={t("session.viewRawAria")}
             title={t("session.viewRaw")}
           >
@@ -176,12 +176,14 @@ export function GameViewHeader({
           </Button>
         )}
 
-        <ThemeToggle />
+        <div className="hidden sm:flex items-center">
+          <ThemeToggle />
+        </div>
 
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+          className="hidden sm:inline-flex h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
           onClick={onOpenSettings}
           aria-label={t("nav.settings")}
           title={t("nav.settings")}
