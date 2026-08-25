@@ -280,6 +280,14 @@ export async function runImageGeneration(
       },
     }));
 
+    // `ctx.pluginData.set` participates in the runtime's ordered write buffer.
+    // Replace the pending placeholder there as well as in the returned effects;
+    // otherwise the earlier pending write can win deduplication and leave the
+    // gallery spinning after the media asset has already been persisted.
+    for (const record of imageRecords) {
+      await ctx.pluginData?.set(IMAGES_NAMESPACE, record.key, record.value);
+    }
+
     await ctx.logger?.info?.("image.generate.completed", {
       imageId,
       durationMs: imageRecords[0]!.value.durationMs,

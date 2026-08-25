@@ -152,5 +152,15 @@ describe("runImageGeneration", () => {
         value: expect.objectContaining({ ref: refs[1], status: "done" }),
       }),
     ]);
+    expect(set).toHaveBeenCalledTimes(3);
+    expect(set.mock.calls[0]?.[2]).toMatchObject({ status: "pending" });
+    expect(set.mock.calls[1]?.[2]).toMatchObject({
+      status: "done",
+      ref: refs[0],
+    });
+    expect(set.mock.calls[2]?.[2]).toMatchObject({
+      status: "done",
+      ref: refs[1],
+    });
   });
 });
