@@ -25,6 +25,7 @@ interface PluginSelectionCardProps {
   selectedPackages: api.PackageSummary[];
   expanded: boolean;
   onToggleExpanded: () => void;
+  bare?: boolean;
   pluginPacks: PluginPack[];
   activePluginPack: PluginPack | null;
   activePluginTags: ReadonlySet<string>;
@@ -118,6 +119,7 @@ export function PluginSelectionCard({
   selectedPackages,
   expanded,
   onToggleExpanded,
+  bare = false,
   pluginPacks,
   activePluginPack,
   activePluginTags,
@@ -147,6 +149,71 @@ export function PluginSelectionCard({
     0,
   );
 
+  const innerContent = (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <PluginPackSelector
+          pluginPacks={pluginPacks}
+          activePluginPack={activePluginPack}
+          onApplyPack={onApplyPack}
+        />
+        <PluginFilterBar
+          pluginSearch={pluginSearch}
+          onPluginSearchChange={onPluginSearchChange}
+          availablePluginTags={availablePluginTags}
+          activePluginTags={activePluginTags}
+          onTogglePluginTag={onTogglePluginTag}
+        />
+
+        {pluginGroups.map((group) => (
+          <div key={group.id} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest font-mono">
+                {group.label}
+              </h4>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {group.packages.length}
+              </span>
+            </div>
+            {group.packages.map((pkg) => (
+              <PluginPackageRow
+                key={pkg.name}
+                pkg={pkg}
+                world={world}
+                activePluginPack={activePluginPack}
+                selectedPluginIdSet={selectedPluginIdSet}
+                corePluginIds={corePluginIds}
+                lockedPluginIds={lockedPluginIds}
+                bindingState={bindingState}
+                resolvedSlots={resolvedSlots}
+                resolveDeclaredSlot={resolveDeclaredSlot}
+                isMissingDeclaredSlot={isMissingDeclaredSlot}
+                onTogglePlugin={onTogglePlugin}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <WorldDataPreflightPanel
+        result={worldDataPreflight}
+        status={worldDataPreflightStatus}
+        error={worldDataPreflightError}
+        onRetry={onRetryWorldDataPreflight}
+      />
+
+      <ExecutionFlowPreview
+        flowData={flowData}
+        selectedFlowSteps={selectedFlowSteps}
+        bindingState={bindingState}
+      />
+    </div>
+  );
+
+  if (bare) {
+    return innerContent;
+  }
+
   return (
     <Card>
       <CollapsibleCardHeader
@@ -156,68 +223,13 @@ export function PluginSelectionCard({
       >
         <Puzzle className="w-4 h-4" />
         {t("session.plugins", "Plugins & Runtimes")}
-        <Badge variant="secondary" className="text-[10px] ml-1">
+        <Badge variant="secondary" className="text-[10px] ml-1 font-mono">
           {selectedPluginIds.length}/{packages.length}
         </Badge>
       </CollapsibleCardHeader>
       {expanded && (
         <CardContent className="space-y-4 px-4 pb-4">
-          <div className="space-y-1.5">
-            <PluginPackSelector
-              pluginPacks={pluginPacks}
-              activePluginPack={activePluginPack}
-              onApplyPack={onApplyPack}
-            />
-            <PluginFilterBar
-              pluginSearch={pluginSearch}
-              onPluginSearchChange={onPluginSearchChange}
-              availablePluginTags={availablePluginTags}
-              activePluginTags={activePluginTags}
-              onTogglePluginTag={onTogglePluginTag}
-            />
-
-            {pluginGroups.map((group) => (
-              <div key={group.id} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3 pt-2">
-                  <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
-                    {group.label}
-                  </h4>
-                  <span className="text-[10px] text-muted-foreground">
-                    {group.packages.length}
-                  </span>
-                </div>
-                {group.packages.map((pkg) => (
-                  <PluginPackageRow
-                    key={pkg.name}
-                    pkg={pkg}
-                    world={world}
-                    activePluginPack={activePluginPack}
-                    selectedPluginIdSet={selectedPluginIdSet}
-                    corePluginIds={corePluginIds}
-                    lockedPluginIds={lockedPluginIds}
-                    bindingState={bindingState}
-                    resolvedSlots={resolvedSlots}
-                    resolveDeclaredSlot={resolveDeclaredSlot}
-                    isMissingDeclaredSlot={isMissingDeclaredSlot}
-                    onTogglePlugin={onTogglePlugin}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-
-          <WorldDataPreflightPanel
-            result={worldDataPreflight}
-            status={worldDataPreflightStatus}
-            error={worldDataPreflightError}
-            onRetry={onRetryWorldDataPreflight}
-          />
-
-          <ExecutionFlowPreview
-            flowData={flowData}
-            selectedFlowSteps={selectedFlowSteps}
-            bindingState={bindingState}
-          />
+          {innerContent}
         </CardContent>
       )}
     </Card>

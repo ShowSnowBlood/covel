@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
-import { BalatroTransition } from "@/components/visual-effects/balatro-transition.js";
+import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
 import { worldVisualForId } from "@/lib/world-visuals.js";
@@ -17,7 +17,7 @@ import {
   StarBorder,
 } from "@/components/reactbits/index.js";
 
-const HOME_TRANSITION_MS = 1_280;
+const HOME_TRANSITION_MS = 1_500;
 const HOME_PRIMARY_ACTION_CLASS =
   "group h-14 w-full rounded-xl border border-white/20 bg-white/95 px-7 text-sm font-semibold text-zinc-900 shadow-xl shadow-black/25 backdrop-blur-md transition-all duration-300 hover:bg-white hover:scale-[1.02] hover:shadow-2xl active:scale-[0.98] dark:bg-zinc-100 dark:text-zinc-900";
 const HOME_SECONDARY_ACTION_CLASS =
@@ -51,7 +51,10 @@ export function GameHome() {
 
   const currentWorldId = FROSTFOX_LEVEL_WORLD_IDS[currentLevel - 1];
   const currentWorldVisual = worldVisualForId(currentWorldId);
-  const homeCover = "/visuals/backgrounds/frostfox-game-cover-image2.png";
+  const homeCover =
+    currentWorldVisual?.image ||
+    "/visuals/backgrounds/home-hero.webp" ||
+    "/visuals/backgrounds/frostfox-game-cover-image2.png";
 
   function handleStartGame() {
     if (status?.enabled && !status.authenticated) {
@@ -64,9 +67,6 @@ export function GameHome() {
       return;
     }
     setTransitioning(true);
-    window.setTimeout(() => {
-      void navigate({ to: "/session" });
-    }, HOME_TRANSITION_MS);
   }
 
   return (
@@ -187,24 +187,17 @@ export function GameHome() {
         </div>
       </div>
 
+      {/* Entering World Scene Loading Transition with Progress Bar */}
       {transitioning && (
-        <div
-          className="fixed inset-0 z-[100] bg-black"
-          role="status"
-          aria-live="polite"
-        >
-          <BalatroTransition />
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,.3)_46%,rgba(0,0,0,.85)_100%)]"
-          />
-          <div className="absolute inset-x-0 bottom-[12vh] flex justify-center px-6">
-            <span className="rounded-full border border-white/20 bg-black/70 px-6 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white backdrop-blur-md shadow-2xl">
-              {t("home.enteringWorld")}
-            </span>
-          </div>
-          <span className="sr-only">{t("home.enteringWorld")}</span>
-        </div>
+        <SceneLoadingTransition
+          image={homeCover}
+          title={t("home.gameTitle")}
+          subtitle={t("home.gameBody")}
+          durationMs={HOME_TRANSITION_MS}
+          onComplete={() => {
+            void navigate({ to: "/session" });
+          }}
+        />
       )}
 
       <SettingsDialog

@@ -43,20 +43,21 @@ import {
 } from "./session-prep/session-actions.js";
 import { SessionHistoryCard } from "./session-prep/session-history-card.js";
 import { DimensionActions } from "./session-prep/dimension-actions.js";
-import { ActiveModelSlots } from "./active-model-slots.js";
-import { PluginSelectionCard } from "./session-prep/plugin-selection-card.js";
-import type { SessionPrepScreenProps } from "./session-prep/types.js";
-import { worldVisual } from "@/lib/world-visuals.js";
-import { usePluginSelection } from "./session-prep/use-plugin-selection.js";
-import { useWorldDataPreflight } from "./session-prep/use-world-data-preflight.js";
-import { usePrepRuntimeBindings } from "./session-prep/use-prep-runtime-bindings.js";
-import { ignoreError } from "@/lib/ignore-error.js";
 import {
   defaultSelectedPluginIdsForWorld,
   isLockedCorePackage,
 } from "./session-prep/plugin-selection-helpers.js";
 import { ShinyText, Magnet, StarBorder } from "@/components/reactbits/index.js";
+import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { cn } from "@/lib/utils.js";
+import { ignoreError } from "@/lib/ignore-error.js";
+import type { SessionPrepScreenProps } from "./session-prep/types.js";
+import { worldVisual } from "@/lib/world-visuals.js";
+import { usePluginSelection } from "./session-prep/use-plugin-selection.js";
+import { useWorldDataPreflight } from "./session-prep/use-world-data-preflight.js";
+import { usePrepRuntimeBindings } from "./session-prep/use-prep-runtime-bindings.js";
+import { PluginSelectionCard } from "./session-prep/plugin-selection-card.js";
+import { ActiveModelSlots } from "./active-model-slots.js";
 
 export { defaultSelectedPluginIdsForWorld, isLockedCorePackage };
 
@@ -465,6 +466,7 @@ export function SessionPrepScreen({
                     selectedPackages={selectedPackages}
                     expanded={true}
                     onToggleExpanded={() => {}}
+                    bare={true}
                     pluginPacks={pluginPacks}
                     activePluginPack={activePluginPack}
                     activePluginTags={activePluginTags}
@@ -616,6 +618,26 @@ export function SessionPrepScreen({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Starting Game Scene Loading Transition */}
+      {isStarting && (
+        <SceneLoadingTransition
+          image={visual.image}
+          title={text(world.name)}
+          subtitle={text(world.description)}
+          durationMs={1800}
+        />
+      )}
+
+      {/* Resuming Session Scene Loading Transition */}
+      {resumingId && (
+        <SceneLoadingTransition
+          image={visual.image}
+          title={text(world.name)}
+          subtitle={t("session.resuming", "Resuming session…")}
+          durationMs={1400}
+        />
+      )}
     </div>
   );
 }

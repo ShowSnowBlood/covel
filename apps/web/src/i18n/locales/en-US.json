@@ -10,6 +10,12 @@
     "gameBody": "Shape a living world, one decision at a time.",
     "enteringWorld": "Entering the world…"
   },
+  "transition": {
+    "syncRules": "Synchronizing world rules & lore…",
+    "loadPlugins": "Loading narrative pipeline & plugins…",
+    "connectModels": "Connecting neural model endpoints…",
+    "ready": "Ready, entering world…"
+  },
   "nav": {
     "home": "Home",
     "play": "Play",

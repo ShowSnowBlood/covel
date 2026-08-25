@@ -10,6 +10,12 @@
     "gameBody": "每一次选择，都会让世界继续生长。",
     "enteringWorld": "正在进入世界…"
   },
+  "transition": {
+    "syncRules": "正在同步世界设定与法则…",
+    "loadPlugins": "正在装载剧情管线与插件…",
+    "connectModels": "正在连接神经网络模型…",
+    "ready": "准备就绪，即将进入世界…"
+  },
   "nav": {
     "home": "首页",
     "play": "游玩",
