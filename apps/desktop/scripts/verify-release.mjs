@@ -127,7 +127,7 @@ function collectResourceDirs() {
         path.join(
           releaseRoot,
           entry.name,
-          "Covel.app",
+          "FrostFox Game.app",
           "Contents",
           "Resources",
         ),

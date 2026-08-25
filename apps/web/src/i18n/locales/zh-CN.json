@@ -1,13 +1,13 @@
 {
   "app": {
-    "title": "Covel",
-    "description": "插件式文字 RPG 框架"
+    "title": "FrostFox Game",
+    "description": "AI 驱动的互动叙事游戏"
   },
   "home": {
     "startPlaying": "开始游戏",
     "openSettings": "设置",
-    "gameTitle": "月隐天阙",
-    "gameBody": "她于月下醒来，诸天从此有了回声。",
+    "gameTitle": "FrostFox Game",
+    "gameBody": "每一次选择，都会让世界继续生长。",
     "autoLogin": "正在自动登录…",
     "mainLoginRequired": "请先登录霜狐主站",
     "mainLoginRequiredBody": "自动登录未完成。请先在主站登录账号，再返回重新连接。",
@@ -34,7 +34,7 @@
   "account": {
     "checking": "正在检查账号状态",
     "checkFailed": "无法获取账号状态",
-    "checkFailedDescription": "Covel 暂时无法验证账号，请重试后再进入游戏。",
+    "checkFailedDescription": "FrostFox Game 暂时无法验证账号，请重试后再进入游戏。",
     "retry": "重试",
     "loginRequired": "登录后才能开始游玩",
     "loginRequiredDescription": "创建或继续游戏会话前，必须先连接账号。",
@@ -603,7 +603,7 @@
     "desktopOpenLogs": "打开日志目录",
     "desktopChangeData": "更改数据位置…",
     "desktopEditFiles": "编辑配置文件",
-    "desktopEditFilesHint": "在默认编辑器中打开。保存后请重启 Covel 使改动生效。",
+    "desktopEditFilesHint": "在默认编辑器中打开。保存后请重启 FrostFox Game 使改动生效。",
     "desktopEditLlm": "编辑 llm.toml",
     "desktopEditKeys": "编辑 keys.env",
     "desktopServer": "后端服务器",
@@ -615,7 +615,7 @@
     "desktopRestartWebHint": "当前非桌面端运行。请刷新浏览器手动重载。",
     "desktopRefresh": "刷新信息",
     "desktopTutorial": "教程",
-    "desktopResetOnboardingHint": "下次启动 Covel 时重新进入引导。",
+    "desktopResetOnboardingHint": "下次启动 FrostFox Game 时重新进入引导。",
     "desktopResetOnboarding": "重置引导",
     "desktopAbout": "关于",
     "desktopVersion": "版本",
@@ -740,9 +740,9 @@
       "loadFailed": "无法读取 FrostFox 账号状态",
       "retry": "重试",
       "hostedOnlyTitle": "托管 Web 账号",
-      "hostedOnlyDescription": "FrostFox 账号和托管模型只在受信任的 Covel Web 部署中可用。桌面端与本地部署继续使用模型设置中的本地服务商密钥。",
+      "hostedOnlyDescription": "FrostFox 账号和托管模型只在受信任的 FrostFox Game Web 部署中可用。桌面端与本地部署继续使用模型设置中的本地服务商密钥。",
       "connectTitle": "连接 FrostFox 账号",
-      "connectDescription": "连接后，Covel 使用你的 FrostFox 账号余额和所属分组可用的模型渠道。账号凭据只保存在双方后端。",
+      "connectDescription": "连接后，FrostFox Game 使用你的 FrostFox 账号余额和所属分组可用的模型渠道。账号凭据只保存在双方后端。",
       "routerAccount": "FrostFox Router 账号",
       "credentialBoundary": "浏览器只参与一次性授权跳转；Client Secret、账号 Key 和派生 Gateway Key 不会发送到浏览器。",
       "connectAction": "连接 FrostFox 账号",
@@ -752,9 +752,9 @@
       "balance": "Router 余额",
       "lastVerified": "最近验证",
       "recoveryDescription": "Router 无法确认当前账号 Key。请重新连接；旧绑定不会因一次失败而自动删除。",
-      "signOutAction": "退出 Covel",
+      "signOutAction": "退出 FrostFox Game",
       "disconnectAction": "解除账号绑定",
-      "disconnectConfirm": "这会删除 Covel 服务端保存的账号 Key 和本地绑定，并退出当前会话。不会轮转 Router 账号 Key，也不会影响其他第一方应用。",
+      "disconnectConfirm": "这会删除 FrostFox Game 服务端保存的账号 Key 和本地绑定，并退出当前会话。不会轮转 Router 账号 Key，也不会影响其他第一方应用。",
       "cancel": "取消",
       "managedModelsTitle": "FrostFox 托管模型",
       "managedModelsDescription": "模型按同步渠道读取，请求仍由 Router 按分组货架、余额、限流和计费规则执行。可在“用途分配”中选用这些模型。",
@@ -852,11 +852,11 @@
     "source": {
       "builtin": {
         "label": "核心",
-        "tooltip": "Covel 框架内置的核心插件"
+        "tooltip": "FrostFox Game 框架内置的核心插件"
       },
       "official": {
         "label": "官方",
-        "tooltip": "Covel 官方收录的插件"
+        "tooltip": "FrostFox Game 官方收录的插件"
       },
       "community": {
         "label": "第三方",
@@ -940,12 +940,12 @@
     "generationFailed": "图像生成失败"
   },
   "onboarding": {
-    "welcome": "欢迎来到 Covel",
-    "tagline": "AI 驱动的 RPG 引擎。用大语言模型构建交互式故事。",
+    "welcome": "欢迎来到 FrostFox Game",
+    "tagline": "AI 驱动的 RPG 游戏，让世界与故事随你的选择生长。",
     "language": "语言",
     "getStarted": "开始使用",
     "configureProvider": "配置 AI 服务商",
-    "providerDesc": "Covel 需要模型服务商的 API 密钥来生成故事。选择服务商并填写密钥。",
+    "providerDesc": "FrostFox Game 需要模型服务商的 API 密钥来生成故事。选择服务商并填写密钥。",
     "selectProvider": "服务商",
     "customProvider": "自定义服务商（OpenAI 兼容）",
     "providerName": "服务商名称",
@@ -973,7 +973,7 @@
     "step1Desc": "从内置世界中选择，或创建你自己的。",
     "step2Label": "开始冒险",
     "step2Desc": "AI 叙事员将围绕你构建故事。",
-    "enter": "进入 Covel",
+    "enter": "进入 FrostFox Game",
     "baseUrl": "Base URL"
   },
   "character": {

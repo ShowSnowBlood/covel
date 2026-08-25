@@ -269,7 +269,7 @@ export function createMainWindow(titleSuffix?: string): BrowserWindow {
     height: restored.height,
     minWidth: 1024,
     minHeight: 680,
-    title: titleSuffix ? `Covel ${titleSuffix}` : "Covel",
+    title: titleSuffix ? `FrostFox Game ${titleSuffix}` : "FrostFox Game",
     backgroundColor: "#09090b",
     show: false,
     icon: icon && fs.existsSync(icon) ? icon : undefined,

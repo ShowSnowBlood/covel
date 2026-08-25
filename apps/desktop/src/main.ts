@@ -1,5 +1,5 @@
 /**
- * Covel Desktop — Electron main process.
+ * FrostFox Game Desktop — Electron main process.
  *
  * Architecture: sidecar pattern.
  *   1. Resolve paths, ensure userData directories exist
@@ -37,8 +37,8 @@ import {
 
 // Name matters on macOS (app menu "About …") and Windows (DPAPI service
 // label if we ever re-introduce secure-storage). Derived default would be
-// "@covel/desktop" from package.json — override to the friendly product name.
-app.setName("Covel");
+// "@covel/desktop" from package.json, so keep the friendly product name here.
+app.setName("FrostFox Game");
 import { registerDesktopIpcHandlers } from "./ipc-handlers.js";
 import {
   buildAppMenu,

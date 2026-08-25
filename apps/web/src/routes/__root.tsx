@@ -168,7 +168,7 @@ function RootLayout() {
                 draggable={false}
               />
               <span className="font-display font-bold tracking-tight text-foreground">
-                FrostFox
+                FrostFox Game
               </span>
             </Link>
           )}

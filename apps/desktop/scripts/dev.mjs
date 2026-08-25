@@ -1,5 +1,5 @@
 /**
- * Dev script for Covel Desktop.
+ * Dev script for FrostFox Game Desktop.
  *
  * 1. Build main process with esbuild (watch mode)
  * 2. Launch Electron pointing at existing dev servers

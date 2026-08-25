@@ -9,7 +9,7 @@
  *   **Keeps unpacked directories** (`mac-arm64/`, `win-unpacked/`, …) because
  *   downstream steps in the same workflow run still need them — notably
  *   `apps/desktop/scripts/verify-release.mjs`, which inspects
- *   `mac-arm64/Covel.app/Contents/Resources/server/{worlds,plugins,prompts}`
+ *   `mac-arm64/FrostFox Game.app/Contents/Resources/server/{worlds,plugins,prompts}`
  *   to catch over-broad electron-builder filters.
  *
  * Phase 2 — CLI invocation (`node cleanup-artifacts.mjs --strip-unpacked`):

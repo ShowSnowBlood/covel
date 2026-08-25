@@ -13,7 +13,7 @@ const DEFAULT_VISUAL: WorldVisual = {
   image4k: "/visuals/backgrounds/studio-shell.webp",
   image2k: "/visuals/backgrounds/moonveil-home-2k.webp",
   accent: "var(--accent-primary)",
-  label: "Covel Studio",
+  label: "FrostFox Game",
 };
 
 const VISUALS_BY_ID: Record<string, WorldVisual> = {

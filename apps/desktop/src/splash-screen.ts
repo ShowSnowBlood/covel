@@ -11,7 +11,7 @@ export function buildSplashHtml(): string {
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Covel</title>
+<title>FrostFox Game</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -70,7 +70,7 @@ export function buildSplashHtml(): string {
 </style>
 </head>
 <body>
-  <div class="brand">COVEL</div>
+  <div class="brand">FROSTFOX GAME</div>
   <div class="spinner-wrap" id="spinner">
     <div class="ring ring-1"></div><div class="ring ring-2"></div>
     <div class="ring ring-3"></div><div class="dot"></div>

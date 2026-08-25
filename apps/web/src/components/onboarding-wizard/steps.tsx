@@ -34,7 +34,7 @@ export function WelcomeStep({ locale, setLocale, onNext }: WelcomeStepProps) {
           </div>
         </div>
         <h1 className="text-2xl font-bold tracking-tight">
-          {t("onboarding.welcome", "Welcome to Covel")}
+          {t("onboarding.welcome", "Welcome to FrostFox Game")}
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
           {t(
@@ -370,7 +370,7 @@ export function ReadyStep({ onDismiss }: ReadyStepProps) {
         onClick={onDismiss}
         className="w-full text-xs uppercase tracking-widest"
       >
-        {t("onboarding.enter", "Enter Covel")}
+        {t("onboarding.enter", "Enter FrostFox Game")}
         <ChevronRight className="w-3.5 h-3.5" />
       </Button>
     </div>

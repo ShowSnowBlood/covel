@@ -9,10 +9,10 @@ const messages: Record<DesktopLocale, Messages> = {
   "en-US": {
     "startup.portConflict.title": "Port conflict",
     "startup.portConflict.hint":
-      "Another process is using the required port. Close other Covel instances or restart your computer.",
+      "Another process is using the required port. Close other FrostFox Game instances or restart your computer.",
     "startup.permissionDenied.title": "Permission denied",
     "startup.permissionDenied.hint":
-      "Covel could not access a required directory. Check that the app has permission to write to its data folder.",
+      "FrostFox Game could not access a required directory. Check that the app has permission to write to its data folder.",
     "startup.timeout.title": "Server timed out",
     "startup.timeout.hint":
       "The backend took too long to boot. Check the logs. A missing llm.toml or slow disk can cause this.",
@@ -31,7 +31,7 @@ const messages: Record<DesktopLocale, Messages> = {
     "splash.viewLogs": "View Logs",
     "splash.openLogsFolder": "Open Logs Folder",
     "splash.openDataFolder": "Open Data Folder",
-    "menu.about": "About Covel",
+    "menu.about": "About FrostFox Game",
     "menu.settings": "Settings...",
     "menu.file": "File",
     "menu.newWorld": "New World",
@@ -49,7 +49,7 @@ const messages: Record<DesktopLocale, Messages> = {
     "dialog.externalLink.message": "Open {host} in your browser?",
     "dialog.externalLink.detail":
       "{url}\n\nThis link uses unencrypted http. Only proceed if you trust the source.",
-    "dialog.dataDir.title": "Choose Covel data directory",
+    "dialog.dataDir.title": "Choose FrostFox Game data directory",
     "dialog.importPlugin.title": "Import Plugin",
     "dialog.importWorld.title": "Import World Package",
     "dialog.filter.zipArchives": "Zip archives",
@@ -71,10 +71,10 @@ const messages: Record<DesktopLocale, Messages> = {
   "zh-CN": {
     "startup.portConflict.title": "端口冲突",
     "startup.portConflict.hint":
-      "另一个进程正在使用所需端口。请关闭其他 Covel 实例，或重启电脑。",
+      "另一个进程正在使用所需端口。请关闭其他 FrostFox Game 实例，或重启电脑。",
     "startup.permissionDenied.title": "权限不足",
     "startup.permissionDenied.hint":
-      "Covel 无法访问所需目录。请确认应用有权限写入数据文件夹。",
+      "FrostFox Game 无法访问所需目录。请确认应用有权限写入数据文件夹。",
     "startup.timeout.title": "服务器启动超时",
     "startup.timeout.hint":
       "后端启动耗时过长。请检查日志。缺少 llm.toml 或磁盘较慢都可能导致这个问题。",
@@ -93,7 +93,7 @@ const messages: Record<DesktopLocale, Messages> = {
     "splash.viewLogs": "查看日志",
     "splash.openLogsFolder": "打开日志文件夹",
     "splash.openDataFolder": "打开数据文件夹",
-    "menu.about": "关于 Covel",
+    "menu.about": "关于 FrostFox Game",
     "menu.settings": "设置...",
     "menu.file": "文件",
     "menu.newWorld": "新建世界",
@@ -111,7 +111,7 @@ const messages: Record<DesktopLocale, Messages> = {
     "dialog.externalLink.message": "在浏览器中打开 {host}？",
     "dialog.externalLink.detail":
       "{url}\n\n此链接使用未加密的 http。请只在信任来源时继续。",
-    "dialog.dataDir.title": "选择 Covel 数据目录",
+    "dialog.dataDir.title": "选择 FrostFox Game 数据目录",
     "dialog.importPlugin.title": "导入插件",
     "dialog.importWorld.title": "导入世界包",
     "dialog.filter.zipArchives": "Zip 压缩包",

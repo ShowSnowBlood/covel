@@ -1,13 +1,13 @@
 {
   "app": {
-    "title": "Covel",
-    "description": "A plugin-based text RPG framework"
+    "title": "FrostFox Game",
+    "description": "An AI-powered interactive storytelling game"
   },
   "home": {
     "startPlaying": "Start Game",
     "openSettings": "Settings",
-    "gameTitle": "Moonveil Citadel",
-    "gameBody": "She wakes beneath the moon, and the heavens answer.",
+    "gameTitle": "FrostFox Game",
+    "gameBody": "Shape a living world, one decision at a time.",
     "autoLogin": "Signing in automatically…",
     "mainLoginRequired": "Sign in to FrostFox first",
     "mainLoginRequiredBody": "Automatic sign-in could not finish. Sign in on the main site, then return and reconnect.",
@@ -34,7 +34,7 @@
   "account": {
     "checking": "Checking account status",
     "checkFailed": "Account status unavailable",
-    "checkFailedDescription": "Covel could not verify your account. Retry before entering the game.",
+    "checkFailedDescription": "FrostFox Game could not verify your account. Retry before entering the game.",
     "retry": "Retry",
     "loginRequired": "Sign in to start playing",
     "loginRequiredDescription": "A connected account is required to create or continue a game session.",
@@ -604,7 +604,7 @@
     "desktopOpenLogs": "Open logs folder",
     "desktopChangeData": "Change data location…",
     "desktopEditFiles": "Edit config files",
-    "desktopEditFilesHint": "Opens in your default editor. Restart Covel after saving for changes to take effect.",
+    "desktopEditFilesHint": "Opens in your default editor. Restart FrostFox Game after saving for changes to take effect.",
     "desktopEditLlm": "Edit llm.toml",
     "desktopEditKeys": "Edit keys.env",
     "desktopServer": "Backend Server",
@@ -616,7 +616,7 @@
     "desktopRestartWebHint": "Not running in desktop — refresh your browser to reload manually.",
     "desktopRefresh": "Refresh info",
     "desktopTutorial": "Tutorial",
-    "desktopResetOnboardingHint": "Re-run the onboarding wizard the next time Covel launches.",
+    "desktopResetOnboardingHint": "Re-run the onboarding wizard the next time FrostFox Game launches.",
     "desktopResetOnboarding": "Reset onboarding",
     "desktopAbout": "About",
     "desktopVersion": "Version",
@@ -741,9 +741,9 @@
       "loadFailed": "Could not load the FrostFox account status",
       "retry": "Retry",
       "hostedOnlyTitle": "Hosted Web account",
-      "hostedOnlyDescription": "FrostFox accounts and managed models are available only in trusted Covel Web deployments. Desktop and self-hosted installations continue using local provider keys in Model settings.",
+      "hostedOnlyDescription": "FrostFox accounts and managed models are available only in trusted FrostFox Game Web deployments. Desktop and self-hosted installations continue using local provider keys in Model settings.",
       "connectTitle": "Connect a FrostFox account",
-      "connectDescription": "Covel will use your FrostFox balance and the model channels available to your account group. Account credentials stay on the two backends.",
+      "connectDescription": "FrostFox Game will use your FrostFox balance and the model channels available to your account group. Account credentials stay on the two backends.",
       "routerAccount": "FrostFox Router account",
       "credentialBoundary": "The browser only participates in the one-time authorization redirect. The Client Secret, account Key, and derived Gateway Key never reach it.",
       "connectAction": "Connect FrostFox account",
@@ -753,9 +753,9 @@
       "balance": "Router balance",
       "lastVerified": "Last verified",
       "recoveryDescription": "Router could not verify the current account Key. Reconnect the account; one failure never deletes the existing binding.",
-      "signOutAction": "Sign out of Covel",
+      "signOutAction": "Sign out of FrostFox Game",
       "disconnectAction": "Disconnect account",
-      "disconnectConfirm": "This deletes the account Key and local binding stored by Covel, then ends this session. It does not rotate the Router account Key or affect other first-party apps.",
+      "disconnectConfirm": "This deletes the account Key and local binding stored by FrostFox Game, then ends this session. It does not rotate the Router account Key or affect other first-party apps.",
       "cancel": "Cancel",
       "managedModelsTitle": "FrostFox managed models",
       "managedModelsDescription": "Models are read through synchronized channels. Router still enforces the account group's catalog, balance, limits, and billing. Assign these models under Model Roles.",
@@ -853,11 +853,11 @@
     "source": {
       "builtin": {
         "label": "Core",
-        "tooltip": "Builtin core plugin shipped with Covel"
+        "tooltip": "Builtin core plugin shipped with FrostFox Game"
       },
       "official": {
         "label": "Official",
-        "tooltip": "Official plugin curated by Covel"
+        "tooltip": "Official plugin curated by FrostFox Game"
       },
       "community": {
         "label": "Third-party",
@@ -941,12 +941,12 @@
     "generationFailed": "Image generation failed"
   },
   "onboarding": {
-    "welcome": "Welcome to Covel",
-    "tagline": "AI-driven RPG engine. Craft interactive stories powered by large language models.",
+    "welcome": "Welcome to FrostFox Game",
+    "tagline": "An AI-powered RPG for living worlds and interactive stories.",
     "language": "Language",
     "getStarted": "Get Started",
     "configureProvider": "Configure AI Provider",
-    "providerDesc": "Covel needs an LLM API key to generate stories. Pick a provider and paste your key.",
+    "providerDesc": "FrostFox Game needs an LLM API key to generate stories. Pick a provider and paste your key.",
     "selectProvider": "Provider",
     "customProvider": "Custom (OpenAI Compatible)",
     "providerName": "Provider Name",
@@ -974,7 +974,7 @@
     "step1Desc": "Choose from built-in worlds or create your own.",
     "step2Label": "Start your adventure",
     "step2Desc": "The AI narrator will build a story around you.",
-    "enter": "Enter Covel",
+    "enter": "Enter FrostFox Game",
     "baseUrl": "Base URL"
   },
   "character": {

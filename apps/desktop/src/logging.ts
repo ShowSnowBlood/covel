@@ -112,7 +112,7 @@ export function initPersistentLog(
     logMaxFiles = Math.max(1, rotation.maxFiles);
     desktopChannel = openChannel(path.join(logsDir, "desktop.log"));
     serverChannel = openChannel(path.join(logsDir, "server.log"));
-    writeLog("info", `--- Covel desktop start (v${appVersion}) ---`);
+    writeLog("info", `--- FrostFox Game desktop start (v${appVersion}) ---`);
   } catch (err) {
     console.error("[desktop] Could not open log files:", err);
   }

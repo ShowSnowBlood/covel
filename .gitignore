@@ -108,6 +108,7 @@ tmp/
 *.png
 !apps/web/public/icon.png
 !apps/desktop/resources/icon.png
+!apps/web/public/visuals/backgrounds/frostfox-game-cover-image2.png
 # World character portraits and scene backdrops are tracked assets (generated once, reused).
 !worlds/**/media/portraits/*.png
 !worlds/**/media/scenes/*.png

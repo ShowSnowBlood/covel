@@ -1,6 +1,6 @@
 appId: com.covel.app
-productName: Covel
-copyright: Copyright © 2026 Covel
+productName: FrostFox Game
+copyright: Copyright © 2026 FrostFox Game
 
 # ── Signing / notarization: KNOWN, DELIBERATE gap ──────────────────
 # TODO(S-11): No code-signing certs are provisioned yet, so release builds
@@ -105,8 +105,8 @@ mac:
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
-    NSCameraUsageDescription: "Covel does not use the camera."
-    NSMicrophoneUsageDescription: "Covel does not use the microphone."
+    NSCameraUsageDescription: "FrostFox Game does not use the camera."
+    NSMicrophoneUsageDescription: "FrostFox Game does not use the microphone."
   # Auto-signing: electron-builder picks up CSC_LINK from env. `identity` can
   # be set explicitly to disambiguate when multiple certs are installed:
   # identity: "Developer ID Application: Your Name (TEAMID)"
@@ -170,10 +170,10 @@ linux:
   maintainer: covel@example.com
   desktop:
     entry:
-      Name: Covel
-      Comment: AI-powered interactive storytelling
+      Name: FrostFox Game
+      Comment: AI-powered interactive storytelling game
       Categories: Game;RolePlaying;
-      StartupWMClass: Covel
+      StartupWMClass: FrostFoxGame
 
 # ── Auto-update (electron-updater) ────────────────────────────────
 # Uncomment once a release channel is wired up:

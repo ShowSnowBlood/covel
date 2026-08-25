@@ -1,5 +1,5 @@
 /**
- * Build script for Covel Desktop.
+ * Build script for FrostFox Game Desktop.
  *
  * Steps:
  *   1. Build the web frontend (pnpm --filter @covel/web build)
@@ -21,7 +21,7 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const desktopRoot = path.resolve(__dirname, "..");
 const projectRoot = path.resolve(desktopRoot, "../..");
 
-console.log("=== Covel Desktop Build ===\n");
+console.log("=== FrostFox Game Desktop Build ===\n");
 
 // Step 1: Build web frontend
 //

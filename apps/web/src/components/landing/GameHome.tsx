@@ -93,8 +93,7 @@ export function GameHome() {
 
   const currentWorldId = FROSTFOX_LEVEL_WORLD_IDS[currentLevel - 1];
   const currentWorldVisual = worldVisualForId(currentWorldId);
-  const homeCover =
-    currentWorldVisual?.image ?? "/visuals/backgrounds/moonveil-home-2k.webp";
+  const homeCover = "/visuals/backgrounds/frostfox-game-cover-image2.png";
   const requiresLogin = Boolean(status?.enabled && !status.authenticated);
   const loginPending =
     loginState === "checking" || loginState === "redirecting";
@@ -167,7 +166,7 @@ export function GameHome() {
           {/* Logo Mark with Floating Animation */}
           <div className="relative animate-[float-gentle_4s_ease-in-out_infinite]">
             <img
-              src="/visuals/ui/moonveil-mark.svg"
+              src="/icon.png"
               alt=""
               width={160}
               height={160}
@@ -196,7 +195,7 @@ export function GameHome() {
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3.5 py-1 text-xs text-zinc-300 backdrop-blur-md">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <DecryptedText
-                text={`Level ${currentLevel} : ${currentWorldVisual?.label ?? "Covel World"}`}
+                text={`Level ${currentLevel} : ${currentWorldVisual?.label ?? "FrostFox World"}`}
                 speed={40}
                 animateOn="view"
                 className="font-mono text-xs font-medium text-zinc-200"
@@ -307,9 +306,7 @@ export function GameHome() {
               {t("home.enteringWorld")}
             </span>
           </div>
-          <span className="sr-only">
-            {t("home.enteringWorld")}
-          </span>
+          <span className="sr-only">{t("home.enteringWorld")}</span>
         </div>
       )}
 
