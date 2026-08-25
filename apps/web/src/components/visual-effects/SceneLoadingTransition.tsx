@@ -93,7 +93,7 @@ export function SceneLoadingTransition({
       role="status"
       aria-live="polite"
       className={cn(
-        "fixed inset-0 z-[100] flex flex-col justify-between p-6 sm:p-10 md:p-14 bg-zinc-950 text-white overflow-hidden select-none animate-in fade-in-0 duration-300",
+        "fixed inset-0 z-[100] flex flex-col justify-between p-4 sm:p-8 md:p-12 bg-zinc-950 text-white overflow-hidden select-none animate-in fade-in-0 duration-300",
         className,
       )}
     >
@@ -142,24 +142,24 @@ export function SceneLoadingTransition({
       </div>
 
       {/* Center Title / Narrative text */}
-      <div className="relative z-10 flex flex-col items-center text-center space-y-3 my-auto max-w-2xl mx-auto px-4">
+      <div className="relative z-10 flex flex-col items-center text-center space-y-2.5 sm:space-y-3 my-auto max-w-2xl mx-auto px-3">
         {title && (
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
             <ShinyText speed={4} shineColor="rgba(255, 255, 255, 0.95)">
               {title}
             </ShinyText>
           </h2>
         )}
         {subtitle && (
-          <p className="text-xs sm:text-sm text-zinc-300/90 leading-relaxed font-light drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+          <p className="text-xs sm:text-sm text-zinc-300/90 leading-relaxed font-light drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] line-clamp-3">
             {subtitle}
           </p>
         )}
       </div>
 
       {/* Bottom Progress Bar Card HUD */}
-      <div className="relative z-10 w-full max-w-lg mx-auto">
-        <div className="rounded-2xl border border-white/15 bg-black/60 backdrop-blur-2xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] space-y-3.5">
+      <div className="relative z-10 w-full max-w-lg mx-auto px-2 sm:px-0">
+        <div className="rounded-2xl border border-white/15 bg-black/65 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] space-y-3">
           <div className="flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 min-w-0">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400 shrink-0" />

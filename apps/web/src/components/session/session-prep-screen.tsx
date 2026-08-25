@@ -248,13 +248,13 @@ export function SessionPrepScreen({
         initialKey={settingsInitialKey}
       />
 
-      {/* Main One-Screen Cockpit Area */}
-      <div className="flex-1 w-full max-w-[1700px] mx-auto p-4 sm:p-5 md:p-6 lg:p-7 overflow-hidden flex flex-col lg:flex-row gap-5">
+      {/* Main Responsive Cockpit Area */}
+      <div className="flex-1 w-full max-w-[1700px] mx-auto p-3 sm:p-5 md:p-6 lg:p-7 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-4 sm:gap-5 ui-scroll">
         {/* Left Column (40%): 4K World Hero + World Lore / Dimensions */}
-        <section className="w-full lg:w-[42%] xl:w-[40%] flex flex-col gap-4 h-full overflow-hidden shrink-0">
+        <section className="w-full lg:w-[42%] xl:w-[40%] flex flex-col gap-4 shrink-0 lg:h-full lg:overflow-hidden">
           {/* Card 1: 4K World Cover Poster */}
           <article
-            className="relative rounded-3xl border border-border/80 bg-card shadow-xl overflow-hidden flex flex-col justify-between p-6 shrink-0 min-h-[220px] max-h-[48%]"
+            className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card shadow-xl overflow-hidden flex flex-col justify-between p-4 sm:p-6 shrink-0 min-h-[190px] sm:min-h-[220px] lg:max-h-[48%]"
             style={{ "--world-accent": visual.accent } as CSSProperties}
           >
             {/* 4K/2K Artwork Background */}
@@ -371,18 +371,17 @@ export function SessionPrepScreen({
         </section>
 
         {/* Right Column (60%): Cockpit Control Console with Tabs & CTA */}
-        <section className="w-full lg:w-[58%] xl:w-[60%] flex flex-col gap-3 h-full overflow-hidden flex-1">
+        <section className="w-full lg:w-[58%] xl:w-[60%] flex flex-col gap-3 min-h-[480px] lg:h-full lg:overflow-hidden flex-1">
           {/* Cockpit Card Shell */}
-          <div className="rounded-3xl border border-border/80 bg-card/90 backdrop-blur-2xl shadow-2xl flex-1 flex flex-col overflow-hidden p-5 md:p-6">
+          <div className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/90 backdrop-blur-2xl shadow-xl sm:shadow-2xl flex-1 flex flex-col overflow-hidden p-4 sm:p-5 md:p-6">
             {/* Cockpit Header with Tab Switches */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-4 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3.5 sm:pb-4 shrink-0">
               {/* Tabs */}
-              <div className="flex items-center gap-1 p-1 rounded-2xl bg-background/60 border border-border/80 backdrop-blur-xs">
+              <div className="flex items-center gap-1 p-1 rounded-2xl bg-background/60 border border-border/80 backdrop-blur-xs overflow-x-auto max-w-full ui-scroll">
                 <button
                   type="button"
                   onClick={() => setActiveTab("plugins")}
                   className={cn(
-                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
                     activeTab === "plugins"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
@@ -542,31 +541,31 @@ export function SessionPrepScreen({
               )}
             </div>
 
-            {/* Bottom Cockpit Action Bar (Fixed, never pushed off-screen) */}
-            <div className="pt-3.5 border-t border-border/80 flex items-center justify-between gap-4 shrink-0 bg-card/60 backdrop-blur-md rounded-2xl p-3 mt-auto">
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-foreground">
+            {/* Bottom Cockpit Action Bar */}
+            <div className="pt-3 border-t border-border/80 flex items-center justify-between gap-3 sm:gap-4 shrink-0 bg-card/90 backdrop-blur-md rounded-xl sm:rounded-2xl p-2.5 sm:p-3 mt-auto sticky bottom-0 z-10">
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-semibold text-foreground truncate">
                   {text(world.name)}
                 </span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate">
                   {selectedPluginIds.length} {t("session.plugins", "plugins")} ·{" "}
                   {resolvedSlots.length}{" "}
                   {t("session.activeModels", "models ready")}
                 </span>
               </div>
 
-              <Magnet padding={60} magnetStrength={3}>
+              <Magnet padding={40} magnetStrength={3} className="shrink-0">
                 <Button
-                  size="lg"
+                  size="default"
                   radius="full"
-                  className="h-12 px-8 font-bold uppercase tracking-wider text-zinc-950 bg-white hover:bg-zinc-100 shadow-xl shadow-black/30 hover:scale-105 active:scale-95 transition-all text-sm"
+                  className="h-10 sm:h-12 px-5 sm:px-8 font-bold uppercase tracking-wider text-zinc-950 bg-white hover:bg-zinc-100 shadow-lg sm:shadow-xl shadow-black/30 hover:scale-105 active:scale-95 transition-all text-xs sm:text-sm"
                   disabled={isStarting}
                   onClick={() => void handleStart()}
                 >
                   {isStarting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-1.5 sm:mr-2 animate-spin" />
                   ) : (
-                    <Play className="w-4 h-4 mr-2 fill-current" />
+                    <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 fill-current" />
                   )}
                   {isStarting
                     ? t("session.startingGame", "Creating…")
