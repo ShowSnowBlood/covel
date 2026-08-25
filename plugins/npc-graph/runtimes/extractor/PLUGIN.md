@@ -9,6 +9,7 @@ pluginType: plugin
 stage: post-turn
 model: plugin
 timeoutMs: 240000
+callTimeoutMs: 90000
 capabilities: [npc-graph, relationship-tracking]
 tags:
   - role:memory
@@ -69,7 +70,7 @@ postHistory:
     - 已有节点见 `<existing-npcs>`、已有关系见 `<existing-relations>`（框架构建 prompt 时自动注入，直接读）
     - 有新节点或新关系时，调用一次 `upsert-npc-graph`（按 name 提交，工具内部映射 id）
     - 没有显著人物互动时，不调用 `upsert-npc-graph`
-    - 完成（或决定不更新）后，立即调用 `runtime-done` 结束
+    - `upsert-npc-graph` 成功后 runtime 自动完成；若决定不更新，调用 `runtime-done` 或返回空对象
 ---
 
 你是 NPC 关系图谱分析师（NPC Graph Analyst）。你的任务是持续维护一张会话级的人物-关系图：从叙事中识别新出现的人物、群体和势力，更新它们之间的关系事实。

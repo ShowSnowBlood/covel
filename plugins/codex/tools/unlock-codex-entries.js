@@ -19,7 +19,7 @@
  */
 
 import { makeProposal } from "@covel/plugin-handlers-utils";
-import { withPendingProposals } from "@covel/tools";
+import { terminalToolResult, withPendingProposals } from "@covel/tools";
 import { getCategoryMetadata } from "../category-metadata.js";
 
 export default function ({ tool, z, shortIdBatch, store }) {
@@ -112,13 +112,15 @@ export default function ({ tool, z, shortIdBatch, store }) {
         },
       }));
 
-      return withPendingProposals(
-        {
-          unlocked: results.length,
-          entries: results,
-          ui,
-        },
-        [makeProposal(context, now, "plugin.data.batch", { items })],
+      return terminalToolResult(
+        withPendingProposals(
+          {
+            unlocked: results.length,
+            entries: results,
+            ui,
+          },
+          [makeProposal(context, now, "plugin.data.batch", { items })],
+        ),
       );
     },
   });

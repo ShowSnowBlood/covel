@@ -54,7 +54,7 @@ export default async function imageGeneratorHandler(ctx) {
       const n = optionalNumber(settings.n);
       return {
         prompt: finalPrompt,
-        presetId: optionalString(settings.modelPresetId) ?? "openai-image",
+        presetId: optionalString(settings.modelPresetId) ?? "image",
         size: normalizeImageSize(optionalString(settings.imageSize)),
         n: n !== undefined && n >= 1 ? Math.floor(n) : 1,
         requestTimeoutMs:

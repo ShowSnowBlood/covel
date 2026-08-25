@@ -6,6 +6,8 @@ export {
   withPendingProposals,
   getEmittedEvents,
   withEmittedEvents,
+  terminalToolResult,
+  isTerminalToolResult,
 } from "./result.js";
 export type { ToolExecutionEnvelope, EmittedEvent } from "./result.js";
 

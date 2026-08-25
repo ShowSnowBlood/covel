@@ -6,6 +6,7 @@ import {
   type ProviderModelProfile,
 } from "./provider-model-profiles.js";
 import { getManagedFrostFoxPresets } from "./frostfox-models.js";
+import type { ModelCapabilityInfo } from "./llm.js";
 
 /** Routes that need the provider API keys header. */
 const AI_ROUTES = ["/api/actions", "/api/ai/", "/api/kernel/"];
@@ -263,6 +264,7 @@ export interface CustomPreset {
   baseUrl: string;
   model: string;
   protocol?: string;
+  capability?: ModelCapabilityInfo;
   apiKey?: string;
 }
 

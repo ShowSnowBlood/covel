@@ -3,6 +3,7 @@ import type { Proposal } from "@covel/shared";
 const TOOL_PENDING_PROPOSALS = Symbol.for("covel.tools.pendingProposals");
 const TOOL_EMITTED_EVENTS = Symbol.for("covel.tools.emittedEvents");
 const TOOL_EXECUTION_ENVELOPE = Symbol.for("covel.tools.executionEnvelope");
+const TOOL_TERMINAL_RESULT = Symbol.for("covel.tools.terminalResult");
 
 /** A domain event emitted by an agent tool call via `emit-event`. */
 export interface EmittedEvent {
@@ -25,6 +26,10 @@ interface PendingProposalCarrier {
 interface EmittedEventCarrier {
   readonly [TOOL_EMITTED_EVENTS]?: readonly EmittedEvent[];
   readonly [TOOL_EXECUTION_ENVELOPE]?: true;
+}
+
+interface TerminalResultCarrier {
+  readonly [TOOL_TERMINAL_RESULT]?: true;
 }
 
 export function withPendingProposals<T extends object>(
@@ -66,6 +71,30 @@ export function withPendingProposals<T>(
     writable: false,
   });
   return envelope;
+}
+
+/**
+ * Mark a successful business-tool result as terminal for the current agent
+ * runtime. The executor still records the tool call and buffered proposals,
+ * then ends the loop without spending a second LLM call on `runtime-done`.
+ */
+export function terminalToolResult<T extends object>(content: T): T {
+  Object.defineProperty(content, TOOL_TERMINAL_RESULT, {
+    value: true,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+  return content;
+}
+
+/** Type guard used after tool execution; the marker is never exposed to LLMs. */
+export function isTerminalToolResult(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (value as TerminalResultCarrier)[TOOL_TERMINAL_RESULT] === true
+  );
 }
 
 function isExecutionEnvelope<T>(

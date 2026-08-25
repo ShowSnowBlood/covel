@@ -1,4 +1,5 @@
 import type {
+  ModelCapabilityInfo,
   PackageSummary,
   PresetSummary,
   SlotConfigEntry,
@@ -77,32 +78,42 @@ export function autoBindDiscoveredSlots(
 }
 
 export function collectLlmSlotPresetCandidates(
-  builtInPresets: readonly Pick<
+  builtInPresets: readonly (Pick<
     PresetSummary,
-    "id" | "name" | "provider" | "model" | "baseUrl" | "protocol"
-  >[],
+    | "id"
+    | "name"
+    | "provider"
+    | "model"
+    | "baseUrl"
+    | "protocol"
+    | "slotBindings"
+  > & { readonly capability?: ModelCapabilityInfo })[],
   customPresets: readonly Pick<
-    PresetSummary,
-    "id" | "name" | "provider" | "model" | "baseUrl" | "protocol"
+    PresetSummary & { readonly capability?: ModelCapabilityInfo },
+    "id" | "name" | "provider" | "model" | "baseUrl" | "protocol" | "capability"
   >[],
 ): Array<
   Pick<
     PresetSummary,
     "id" | "name" | "provider" | "model" | "baseUrl" | "protocol"
   > & {
+    readonly capability?: ModelCapabilityInfo;
     readonly isCustom: boolean;
   }
 > {
   return [
-    ...builtInPresets.map((p) => ({
-      id: p.id,
-      name: p.name,
-      provider: p.provider,
-      model: p.model,
-      baseUrl: p.baseUrl,
-      protocol: p.protocol,
-      isCustom: false,
-    })),
+    ...builtInPresets
+      .filter((p) => !p.slotBindings?.length)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        provider: p.provider,
+        model: p.model,
+        baseUrl: p.baseUrl,
+        protocol: p.protocol,
+        capability: p.capability,
+        isCustom: false,
+      })),
     ...customPresets.map((p) => ({
       id: p.id,
       name: p.name,
@@ -110,6 +121,7 @@ export function collectLlmSlotPresetCandidates(
       model: p.model,
       baseUrl: p.baseUrl,
       protocol: p.protocol,
+      capability: p.capability,
       isCustom: true,
     })),
   ];

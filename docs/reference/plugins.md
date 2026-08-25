@@ -1463,7 +1463,9 @@ relations:
 
 Agent runtime 在调用 LLM 时会受到两个方向的约束：**单次调用时长**（`callTimeoutMs` / `firstTokenTimeoutMs`）和**运行总时长**（`timeoutMs`）。框架会自动在 transient 错误、call-timeout、first-token-timeout、tool-call 循环四种情形下重试，并在每次重试时向 prompt 追加一条短 system 提示打破 KV-cache 命中。
 
-**LLM 并发闸门**：进程内所有 LLM 调用共享一个 FIFO 并发上限（`COVEL_LLM_MAX_CONCURRENT`，默认 4，`0` 关闭）——post-turn 阶段多个 agent 并行时不再裸并发打满 provider。排队等槽的时间**顺延**该 runtime 的 deadline（排队是框架的成本，不占 runtime 预算），流式调用在整个流消费期间持有槽位。实现见 `packages/runtime/src/retry/llm-slots.ts`。
+**LLM 并发闸门**：进程内所有 LLM 调用共享一个 FIFO 并发上限（`COVEL_LLM_MAX_CONCURRENT`，默认 2，`0` 关闭）——post-turn 阶段多个 agent 并行时不再裸并发打满 provider。排队等槽的时间**顺延**该 runtime 的 deadline（排队是框架的成本，不占 runtime 预算），流式调用在整个流消费期间持有槽位。实现见 `packages/runtime/src/retry/llm-slots.ts`。
+
+**单次写入工具终止**：唯一职责是写一次结构化结果的 agent 工具可返回 `terminalToolResult(...)`。工具成功后框架照常收集 proposal / trace / runtime output，并直接结束该 runtime；失败结果不会终止，仍会回填给模型纠正。这样无需再花一次 provider 调用只为生成 `runtime-done`。
 
 **Function runtime 只消费 `timeoutMs`**：handler 受同一运行总时长硬上限约束（默认 60000ms），超时该 runtime 以 failed 收场、turn 继续。function runtime 没有重试循环，其余字段（`maxRetries` / `callTimeoutMs` / `firstTokenTimeoutMs` / `loopDetectionThreshold` / `requireToolUse`）对其无效。注意超时只解除 turn 阻塞，已发出的 handler 调用无法被取消。超时后框架会**吊销 handler 的全部副作用能力**——`store`、`pluginData`、`media`、`images`、`speech`、`gateway`、`utils`、`recursiveCall`、`logger`、`assetProgress`——脱离的 handler 再调用会同步抛出 `capability ... is revoked`，避免它在本次执行已经收场之后仍然写入。吊销挂在超时本身、不挂在任何锁上，因此对持锁与不持锁的执行路径一样有效。协作式 handler 应监听 `ctx.signal` 主动取消。
 

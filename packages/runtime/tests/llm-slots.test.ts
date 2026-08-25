@@ -9,6 +9,32 @@ afterEach(() => {
 });
 
 describe("acquireLLMSlot", () => {
+  it("defaults to two in-flight calls so shared channels are not flooded", async () => {
+    const previous = process.env.COVEL_LLM_MAX_CONCURRENT;
+    delete process.env.COVEL_LLM_MAX_CONCURRENT;
+    setLLMSlotCapForTests(undefined);
+
+    const first = await acquireLLMSlot();
+    const second = await acquireLLMSlot();
+    let thirdStarted = false;
+    const third = acquireLLMSlot().then((slot) => {
+      thirdStarted = true;
+      return slot;
+    });
+    try {
+      expect(thirdStarted).toBe(false);
+      first.release();
+      const thirdSlot = await third;
+      expect(thirdStarted).toBe(true);
+      second.release();
+      thirdSlot.release();
+    } finally {
+      first.release();
+      second.release();
+      if (previous === undefined) delete process.env.COVEL_LLM_MAX_CONCURRENT;
+      else process.env.COVEL_LLM_MAX_CONCURRENT = previous;
+    }
+  });
   it("serializes callers beyond the cap in FIFO order", async () => {
     // Arrange
     setLLMSlotCapForTests(1);

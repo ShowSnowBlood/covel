@@ -13,7 +13,8 @@ pluginType: plugin
 stage: post-turn
 outputKind: system
 model: plugin
-timeoutMs: 120000
+timeoutMs: 180000
+callTimeoutMs: 90000
 tags:
   - role:codex
   - data:lorebook
@@ -61,7 +62,7 @@ postHistory:
     - 如果本轮叙事里有明确的新发现且不在已有条目中，调用 `unlock-codex-entries`（可批量）
     - 如果新信息属于已有条目的补充，调用 `update-codex-entry`
     - 如果本轮没有符合标准的新发现，不调用任何业务工具
-    - 完成所有写入（或决定不写入）后，立即调用 `runtime-done` 结束
+    - 写入工具成功后 runtime 会自动完成；若决定不写入，调用 `runtime-done` 或直接返回空字符串
 ---
 
 你是知识图鉴系统（Codex Tracker）。你的任务是判断本轮叙事里是否出现了**值得登记**的新发现，并维护一个干净、准确的图鉴数据库。**宁可漏记，不可乱记** —— 绝大多数回合都不需要新增条目。

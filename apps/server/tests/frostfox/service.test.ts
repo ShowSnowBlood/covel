@@ -14,6 +14,7 @@ const CLIENT_SECRET = "ffsc_test_secret";
 const CREDENTIAL_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const ACCOUNT_KEY = "ffak_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const CHANNEL_ID = "01a031bd-3263-72eb-802b-419902b8165f";
+const IMAGE_CHANNEL_ID = "01a031bd-3263-72eb-802b-419902b8165e";
 
 const HOST_ENV: FrostFoxHostEnvironment = {
   storeBackend: "sqlite",
@@ -68,6 +69,13 @@ describe("FrostFox first-party SaaS", () => {
                 routerChannelDisplayName: "DeepSeek",
                 enabled: true,
               },
+              {
+                channelKey: "image",
+                routerChannelId: IMAGE_CHANNEL_ID,
+                routerChannelName: "image",
+                routerChannelDisplayName: "Image",
+                enabled: true,
+              },
             ],
           });
         }
@@ -107,12 +115,21 @@ describe("FrostFox first-party SaaS", () => {
           });
         }
         if (url.endsWith("/v1/models")) {
+          const headers = new Headers(init?.headers);
+          if (headers.get("X-FrostFox-Channel-Id") === IMAGE_CHANNEL_ID) {
+            return json({
+              object: "list",
+              data: [
+                { id: "openai/gpt-image-2-2k", name: "GPT Image 2 · 2K" },
+                { id: "banana-pro-4k", name: "ZZ Banana Pro · 4K" },
+              ],
+            });
+          }
           return json({
             object: "list",
             data: [
               { id: "openai/gpt-5.6-sol", name: "GPT 5.6" },
               { id: "openai/gpt-5.6-sol", name: "duplicate" },
-              { id: "openai/gpt-image-2-2k", name: "GPT Image 2 · 2K" },
               {
                 id: "vendor-art-v1",
                 name: "Vendor Art",
@@ -185,7 +202,14 @@ describe("FrostFox first-party SaaS", () => {
     ).toMatchObject({ completedLevel: 2, unlockedLevel: 3 });
 
     const context = await service!.prepareAiContext(connected.principal);
-    const providerId = service!.clientConfig.providers()[0]!.providerId;
+    const models = await service!.listModels(connected.principal);
+    const providers = service!.clientConfig.providers();
+    const providerId = providers.find(
+      (provider) => provider.channelKey === "deepseek",
+    )!.providerId;
+    const imageProviderId = providers.find(
+      (provider) => provider.channelKey === "image",
+    )!.providerId;
     expect(context?.apiKeys[providerId]).toBe(
       deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel"),
     );
@@ -200,7 +224,6 @@ describe("FrostFox first-party SaaS", () => {
       plugin: managedPresetId,
       default: managedPresetId,
       image: managedImagePresetId,
-      "openai-image": managedImagePresetId,
     });
     expect(context?.managedSlotDefaults?.customPresets).toEqual(
       expect.arrayContaining([
@@ -213,7 +236,7 @@ describe("FrostFox first-party SaaS", () => {
         }),
         expect.objectContaining({
           id: managedImagePresetId,
-          provider: providerId,
+          provider: imageProviderId,
           baseUrl: "https://market.example/v1",
           model: "openai/gpt-image-2-2k",
           protocol: "openai-chat-v1",
@@ -234,11 +257,9 @@ describe("FrostFox first-party SaaS", () => {
       headers: { "X-FrostFox-Channel-Id": CHANNEL_ID },
     });
 
-    const models = await service!.listModels(connected.principal);
     expect(models.channels).toEqual([
       expect.objectContaining({
         channelKey: "deepseek",
-        providerId,
         models: [
           expect.objectContaining({
             id: "openai/gpt-5.6-sol",
@@ -246,14 +267,28 @@ describe("FrostFox first-party SaaS", () => {
             capability: expect.objectContaining({ output: ["text"] }),
           }),
           expect.objectContaining({
-            id: "openai/gpt-image-2-2k",
-            name: "GPT Image 2 · 2K",
-            capability: expect.objectContaining({ output: ["image"] }),
-          }),
-          expect.objectContaining({
             id: "vendor-art-v1",
             name: "Vendor Art",
             capability: expect.objectContaining({ output: ["image"] }),
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        channelKey: "image",
+        models: [
+          expect.objectContaining({
+            id: "openai/gpt-image-2-2k",
+            capability: {
+              input: ["text", "image"],
+              output: ["image"],
+            },
+          }),
+          expect.objectContaining({
+            id: "banana-pro-4k",
+            capability: {
+              input: ["text", "image"],
+              output: ["image"],
+            },
           }),
         ],
       }),
@@ -268,7 +303,7 @@ describe("FrostFox first-party SaaS", () => {
 
     const generated = await ai.gateway.generateImage(
       {
-        presetId: "openai-image",
+        presetId: "image",
         prompt: "A lighthouse above a silver sea",
         size: "1024x1024",
       },
@@ -279,7 +314,7 @@ describe("FrostFox first-party SaaS", () => {
     );
     expect(generated).toMatchObject({
       model: "openai/gpt-image-2-2k",
-      provider: providerId,
+      provider: imageProviderId,
       images: [{ kind: "bytes", mime: "image/png" }],
     });
     const imageRequest = requests.find((request) =>
@@ -287,7 +322,7 @@ describe("FrostFox first-party SaaS", () => {
     );
     expect(imageRequest?.init?.headers).toMatchObject({
       authorization: `Bearer ${deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel")}`,
-      "X-FrostFox-Channel-Id": CHANNEL_ID,
+      "X-FrostFox-Channel-Id": IMAGE_CHANNEL_ID,
       "Idempotency-Key": expect.any(String),
     });
     expect(JSON.parse(String(imageRequest?.init?.body))).toMatchObject({

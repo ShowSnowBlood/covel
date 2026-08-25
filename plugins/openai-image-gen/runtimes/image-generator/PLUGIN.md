@@ -18,13 +18,13 @@ trigger:
 userSettings:
   - key: modelPresetId
     type: slot
-    default: openai-image
+    default: image
     label:
       zh: 服务配置
       en: Service setup
     description:
-      zh: 选择设置里用于生成图片的服务配置。默认使用 openai-image。
-      en: Choose the service setup used for image generation. Defaults to openai-image.
+      zh: 选择设置里用于生成图片的模型。默认使用统一的 image 用途。
+      en: Choose the model used for image generation. Defaults to the shared image role.
   - key: imageSize
     type: text
     default: 1024x1024

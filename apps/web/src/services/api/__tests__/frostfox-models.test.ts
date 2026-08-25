@@ -63,6 +63,7 @@ describe("FrostFox managed model projection", () => {
         baseUrl: "https://market.example/v1",
         model: "openai/gpt-5.6-sol",
         protocol: "openai-chat-v1",
+        capability: { input: ["text"], output: ["text"] },
       },
     ]);
   });

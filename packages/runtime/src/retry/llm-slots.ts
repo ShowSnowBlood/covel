@@ -9,12 +9,12 @@
  * not the runtime's budget).
  *
  * Cap resolution: COVEL_LLM_MAX_CONCURRENT env (0 or negative disables the
- * gate) → default 4.
+ * gate) → conservative default 2 for shared OpenAI-compatible channels.
  */
 // ponytail: process-wide cap; split into per-provider buckets if parallel
 // multi-provider sessions ever make a shared gate too coarse.
 
-const DEFAULT_MAX_CONCURRENT = 4;
+const DEFAULT_MAX_CONCURRENT = 2;
 
 let capOverride: number | undefined;
 let active = 0;

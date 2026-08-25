@@ -9,7 +9,7 @@
  */
 
 import { makeProposal } from "@covel/plugin-handlers-utils";
-import { withPendingProposals } from "@covel/tools";
+import { terminalToolResult, withPendingProposals } from "@covel/tools";
 
 const STYLE_CONFIG = {
   safe: { zh: "稳妥", en: "Safe", icon: "shield", color: "blue" },
@@ -101,12 +101,14 @@ export default function ({ tool, z }) {
         }
       }
 
-      return withPendingProposals(
-        {
-          topic,
-          categories: resolvedCategories,
-        },
-        [makeProposal(context, now, "plugin.data.batch", { items })],
+      return terminalToolResult(
+        withPendingProposals(
+          {
+            topic,
+            categories: resolvedCategories,
+          },
+          [makeProposal(context, now, "plugin.data.batch", { items })],
+        ),
       );
     },
   });

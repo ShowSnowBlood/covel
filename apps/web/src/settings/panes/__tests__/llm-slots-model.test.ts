@@ -114,8 +114,31 @@ describe("llm slots model", () => {
   it("marks collected presets with their source", () => {
     expect(
       collectLlmSlotPresetCandidates(
-        [{ id: "builtin", name: "Built-in", provider: "openai", model: "gpt" }],
-        [{ id: "custom", name: "Custom", provider: "local", model: "m" }],
+        [
+          {
+            id: "builtin",
+            name: "Built-in",
+            provider: "openai",
+            model: "gpt",
+            capability: { input: ["text"], output: ["image"] },
+          },
+          {
+            id: "slot-image",
+            name: "Deployment image slot",
+            provider: "july",
+            model: "gpt-image-2-2k",
+            slotBindings: ["image"],
+          },
+        ],
+        [
+          {
+            id: "custom",
+            name: "Custom",
+            provider: "local",
+            model: "m",
+            capability: { input: ["text", "image"], output: ["image"] },
+          },
+        ],
       ),
     ).toEqual([
       {
@@ -124,6 +147,7 @@ describe("llm slots model", () => {
         provider: "openai",
         model: "gpt",
         isCustom: false,
+        capability: { input: ["text"], output: ["image"] },
       },
       {
         id: "custom",
@@ -131,6 +155,7 @@ describe("llm slots model", () => {
         provider: "local",
         model: "m",
         isCustom: true,
+        capability: { input: ["text", "image"], output: ["image"] },
       },
     ]);
   });

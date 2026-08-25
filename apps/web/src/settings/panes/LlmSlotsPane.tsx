@@ -129,13 +129,6 @@ export function LlmSlotsPane() {
     setCapabilityOverrides(next);
   };
 
-  const getEffectiveCapability = (
-    slotId: string,
-  ): ModelCapabilityInfo | undefined => {
-    const serverCap = isConfigured ? llm!.slots[slotId]?.capability : undefined;
-    return mergeCapability(serverCap, capOverrides[slotId]);
-  };
-
   const handleReloadConfig = async () => {
     setReloading(true);
     try {
@@ -310,24 +303,33 @@ export function LlmSlotsPane() {
         const effectiveModel = selectedPreset?.model ?? serverSlot?.model ?? "";
         const effectiveProtocol =
           selectedPreset?.protocol ?? serverSlot?.protocol ?? "";
+        const requiredOutput =
+          (serverSlot?.tag ?? (slotId === "image" ? "image" : "text")) ===
+          "image"
+            ? "image"
+            : "text";
+        const compatiblePresets = allPresets.filter(
+          (preset) =>
+            !preset.capability ||
+            preset.capability.output.includes(requiredOutput),
+        );
         const providerChoices = Array.from(
           new Set(
             [
-              ...allPresets.map((preset) => preset.provider),
+              ...compatiblePresets.map((preset) => preset.provider),
               effectiveProvider,
             ].filter(Boolean),
           ),
         );
-        const modelChoices = allPresets.filter(
+        const modelChoices = compatiblePresets.filter(
           (preset) => preset.provider === effectiveProvider,
         );
         const isRequired = !isConfigured && slotId === "default";
         const isFirst = isConfigured && slotId === configuredSlots[0];
         const isDiscovered = discoveredSlotIds.includes(slotId);
         const isVirtualSlot = isDiscovered && !serverSlot;
-        const effectiveCap = isConfigured
-          ? getEffectiveCapability(slotId)
-          : null;
+        const baseCapability =
+          selectedPreset?.capability ?? serverSlot?.capability;
         const hasCapOverride = isConfigured && !!capOverrides[slotId];
         const isEditing = editingSlot === slotId;
 
@@ -386,7 +388,7 @@ export function LlmSlotsPane() {
                 <select
                   value={effectiveProvider}
                   onChange={(event) => {
-                    const first = allPresets.find(
+                    const first = compatiblePresets.find(
                       (preset) => preset.provider === event.target.value,
                     );
                     if (!first) return;
@@ -427,7 +429,7 @@ export function LlmSlotsPane() {
                       commitSlot(updated);
                       return;
                     }
-                    const candidate = allPresets.find(
+                    const candidate = compatiblePresets.find(
                       (preset) => preset.id === value,
                     );
                     if (!candidate) return;
@@ -491,7 +493,7 @@ export function LlmSlotsPane() {
                 model={effectiveModel}
                 provider={effectiveProvider}
                 protocol={effectiveProtocol}
-                baseCapability={effectiveCap}
+                baseCapability={baseCapability}
                 override={capOverrides[slotId]}
               />
             )}
@@ -525,7 +527,7 @@ export function LlmSlotsPane() {
 
             {isConfigured && isEditing && (
               <CapabilityEditor
-                serverCap={serverSlot?.capability}
+                serverCap={baseCapability}
                 override={capOverrides[slotId]}
                 onUpdate={(patch) => updateCapOverride(slotId, patch)}
               />
@@ -612,7 +614,7 @@ function ResolvedCapability({
   }, [model, provider, protocol]);
 
   const capability = mergeCapability(
-    lookup?.capability ?? baseCapability ?? undefined,
+    baseCapability ?? lookup?.capability ?? undefined,
     override,
   );
   if (!capability) return null;
@@ -624,7 +626,7 @@ function ResolvedCapability({
   return (
     <div className="space-y-1.5">
       <CapabilityTags capability={capability} />
-      {lookup && (
+      {lookup && !baseCapability && (
         <div className="text-[10px] leading-relaxed text-muted-foreground">
           {lookup.matchKind && lookup.matchedModelId ? (
             <span>

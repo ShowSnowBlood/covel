@@ -9,7 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { RuntimeManifest, TurnInput } from "@covel/shared";
 import type { LoadedRuntime } from "@covel/plugin-loader";
-import { tool, withPendingProposals } from "@covel/tools";
+import { terminalToolResult, tool, withPendingProposals } from "@covel/tools";
 import { z } from "zod";
 import { runAgentToolLoop } from "../src/agent-loop/turn-agent-tool-loop.js";
 import type { AgentToolLoopCompleted } from "../src/agent-loop/turn-agent-tool-loop.js";
@@ -212,6 +212,41 @@ describe("runAgentToolLoop core", () => {
     // Sentinel stripped: only the business tool remains.
     expect(result.collectedToolCalls.map((c) => c.toolName)).toEqual(["mark"]);
     // No prose was produced → JSON envelope over business calls.
+    expect(result.finalContent).toContain("mark");
+  });
+
+  it("terminal business tool exits without a runtime-done LLM call", async () => {
+    const terminalMark = tool({
+      name: "mark",
+      description: "records a terminal marker",
+      parameters: z.object({ note: z.string() }),
+      async execute(args: { note: string }) {
+        return terminalToolResult(
+          withPendingProposals({ marked: args.note }, [
+            {
+              type: "plugin.data",
+              payload: { namespace: "loop", key: "mark", value: args.note },
+            },
+          ] as never),
+        );
+      },
+    });
+    const executor = createToolExecutor({
+      findTool: (name) => (name === "mark" ? terminalMark : undefined),
+    });
+    const llm = new ScriptedLLM([
+      toolCall("mark", { note: "complete" }),
+      prose("should never be reached"),
+    ]);
+
+    const result = await run({ llm, deps: { toolExecutor: executor } });
+
+    expect(llm.calls).toBe(1);
+    expect(result.stoppedWithResponse).toBe(true);
+    expect(result.collectedToolCalls.map((call) => call.toolName)).toEqual([
+      "mark",
+    ]);
+    expect(result.pendingProposals).toHaveLength(1);
     expect(result.finalContent).toContain("mark");
   });
 

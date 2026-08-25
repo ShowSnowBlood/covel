@@ -5,14 +5,14 @@
  * without the framework having to round-trip another LLM call just so the
  * model can write a terminator message.
  *
- * Single-shot plugins (guide / codex / character-tracker / npc-graph
- * extractor / world-init schema-gen) follow this pattern:
- *   1. Call their business tool once (e.g. `generate-guide`)
- *   2. Immediately call `runtime-done` to finish
+ * Runtimes that make no business write, or whose tools are not terminal,
+ * call this sentinel to stop without emitting another prose response. A
+ * single-shot business tool may instead return `terminalToolResult(...)`;
+ * successful terminal tools end the loop directly while failed calls still
+ * flow back to the model for correction.
  *
- * The turn-executor detects the sentinel after each tool execution and
- * breaks out of the agent loop, using the preceding business tool calls as
- * the runtime's final output.
+ * The turn-executor strips this sentinel from business outputs before
+ * finalization.
  *
  * Pattern mirrors `suspend` — sentinel + type guard + early exit.
  */

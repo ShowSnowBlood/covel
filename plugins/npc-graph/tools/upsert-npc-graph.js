@@ -25,7 +25,7 @@
  * @param {{ tool: Function, z: import('zod'), shortIdBatch: Function, store: any }} injection
  */
 import { makeProposal } from "@covel/plugin-handlers-utils";
-import { withPendingProposals } from "@covel/tools";
+import { terminalToolResult, withPendingProposals } from "@covel/tools";
 
 export default function ({ tool, z, shortIdBatch, store }) {
   const nodeInputSchema = z.object({
@@ -407,26 +407,28 @@ export default function ({ tool, z, shortIdBatch, store }) {
       }
 
       // ── 6. Persist everything in one batch ──
-      return withPendingProposals(
-        {
-          nodes: {
-            created: nodeResults.filter((r) => r.status === "created").length,
-            updated: nodeResults.filter((r) => r.status === "updated").length,
-            results: nodeResults,
+      return terminalToolResult(
+        withPendingProposals(
+          {
+            nodes: {
+              created: nodeResults.filter((r) => r.status === "created").length,
+              updated: nodeResults.filter((r) => r.status === "updated").length,
+              results: nodeResults,
+            },
+            edges: {
+              created: edgeResults.filter((r) => !r.skipped).length,
+              skipped: edgeResults.filter((r) => r.skipped).length,
+              results: edgeResults,
+            },
           },
-          edges: {
-            created: edgeResults.filter((r) => !r.skipped).length,
-            skipped: edgeResults.filter((r) => r.skipped).length,
-            results: edgeResults,
-          },
-        },
-        pluginDataWrites.length > 0
-          ? [
-              makeProposal(context, now, "plugin.data.batch", {
-                items: pluginDataWrites,
-              }),
-            ]
-          : [],
+          pluginDataWrites.length > 0
+            ? [
+                makeProposal(context, now, "plugin.data.batch", {
+                  items: pluginDataWrites,
+                }),
+              ]
+            : [],
+        ),
       );
     },
   });

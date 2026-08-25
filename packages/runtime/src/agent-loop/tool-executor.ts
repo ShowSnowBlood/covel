@@ -15,6 +15,7 @@ import {
   getEmittedEvents,
   getPendingProposals,
   getToolContent,
+  isTerminalToolResult,
   type EmittedEvent,
   type ToolModule,
 } from "@covel/tools";
@@ -85,6 +86,8 @@ export interface ToolCallResult {
   readonly pendingProposals?: readonly Proposal[];
   /** Domain events emitted via the `emit-event` builtin tool (see @covel/tools result.ts). */
   readonly emittedEvents?: readonly EmittedEvent[];
+  /** Successful business tool completed the runtime; no terminator LLM call. */
+  readonly terminal?: boolean;
   readonly success: boolean;
   readonly approvalStatus?: ApprovalStatus;
 }
@@ -164,10 +167,12 @@ function emitToolCalling(
   call: ToolCall,
   source: "builtin" | "local" | "third-party",
   approvalStatus: ApprovalStatus,
+  argumentsRepaired: boolean,
 ): Promise<void> {
   return emitToolEvent(ctx, call, "tool.calling", approvalStatus, {
     arguments: call.arguments,
     source,
+    ...(argumentsRepaired ? { argumentsRepaired: true } : {}),
   });
 }
 
@@ -370,11 +375,11 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
         }
       }
 
-      // 3. Parse arguments
-      let params: unknown;
-      try {
-        params = JSON.parse(call.arguments);
-      } catch {
+      // 3. Parse arguments. Some OpenAI-compatible gateways truncate only the
+      // final closing delimiters of an otherwise complete tool payload. Repair
+      // that narrow shape locally; arbitrary malformed JSON still fails.
+      const parsedArguments = parseToolArguments(call.arguments);
+      if (!parsedArguments) {
         const errorResult = toolError(
           "INVALID_ARGS",
           `Arguments for tool "${call.name}" are not valid JSON. Ensure the arguments object is properly formatted JSON.`,
@@ -406,9 +411,19 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
           approvalStatus,
         };
       }
+      const params = parsedArguments.value;
+      const executedCall = parsedArguments.repaired
+        ? { ...call, arguments: parsedArguments.json }
+        : call;
 
-      // Emit calling AFTER arg-parse so the trace carries the real arguments
-      await emitToolCalling(context, call, toolSource, approvalStatus);
+      // Emit calling AFTER arg-parse so the trace carries the actual arguments.
+      await emitToolCalling(
+        context,
+        executedCall,
+        toolSource,
+        approvalStatus,
+        parsedArguments.repaired,
+      );
 
       // 4. Execute
       try {
@@ -427,6 +442,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
         const parsedResult = getToolContent(rawResult);
         const pendingProposals = getPendingProposals(rawResult);
         const emittedEvents = getEmittedEvents(rawResult);
+        const terminal = isTerminalToolResult(rawResult);
 
         // Text-first convention: if the tool result is an object with a
         // `_text` string field, send ONLY the text as the LLM-facing payload
@@ -444,7 +460,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
         const durationMs = Date.now() - startTime;
         await recordCall(
           config.store,
-          call,
+          executedCall,
           context,
           resultStr,
           startTime,
@@ -453,7 +469,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
         );
         await emitToolCompleted(
           context,
-          call,
+          executedCall,
           resultStr,
           parsedResult,
           durationMs,
@@ -466,6 +482,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
           parsedResult,
           pendingProposals,
           emittedEvents,
+          terminal,
           success: true,
           approvalStatus,
         };
@@ -510,7 +527,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
         }
         await recordCall(
           config.store,
-          call,
+          executedCall,
           context,
           errorResult,
           startTime,
@@ -519,7 +536,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
         );
         await emitToolFailed(
           context,
-          call,
+          executedCall,
           code,
           message,
           details,
@@ -539,11 +556,102 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
   };
 }
 
-function tryParseJson(json: string): Record<string, unknown> {
+interface ParsedToolArguments {
+  readonly value: unknown;
+  readonly json: string;
+  readonly repaired: boolean;
+}
+
+function parseToolArguments(json: string): ParsedToolArguments | null {
   try {
-    return JSON.parse(json) as Record<string, unknown>;
+    return { value: JSON.parse(json), json, repaired: false };
   } catch {
-    return {};
+    const repaired = repairTruncatedJson(json);
+    if (!repaired) return null;
+    return { value: repaired.value, json: repaired.json, repaired: true };
+  }
+}
+
+function tryParseJson(json: string): Record<string, unknown> {
+  const parsed = parseToolArguments(json)?.value;
+  return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Repair only omitted closing delimiters at the JSON suffix. A mismatch is
+ * repairable only when the rest of the payload contains closing delimiters;
+ * malformed content in the middle remains an INVALID_ARGS failure.
+ */
+function repairTruncatedJson(
+  raw: string,
+): { readonly json: string; readonly value: unknown } | null {
+  const source = raw.trimEnd();
+  if (!(source.startsWith("{") || source.startsWith("["))) return null;
+
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  let repaired = "";
+  let changed = false;
+
+  const closerFor = (opener: string): string => (opener === "{" ? "}" : "]");
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index]!;
+    if (inString) {
+      repaired += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      repaired += char;
+      continue;
+    }
+    if (char === "{" || char === "[") {
+      stack.push(char);
+      repaired += char;
+      continue;
+    }
+    if (char === "}" || char === "]") {
+      const expectedOpener = char === "}" ? "{" : "[";
+      if (stack.at(-1) !== expectedOpener) {
+        const suffix = source.slice(index).replace(/\s/gu, "");
+        if (!stack.includes(expectedOpener) || !/^[\]}]+$/u.test(suffix)) {
+          return null;
+        }
+        while (stack.at(-1) !== expectedOpener) {
+          repaired += closerFor(stack.pop()!);
+          changed = true;
+        }
+      }
+      stack.pop();
+      repaired += char;
+      continue;
+    }
+    repaired += char;
+  }
+
+  if (inString) return null;
+  if (stack.length > 0) {
+    repaired = repaired.replace(/,\s*$/u, "");
+    while (stack.length > 0) repaired += closerFor(stack.pop()!);
+    changed = true;
+  }
+  if (!changed) return null;
+
+  try {
+    return { json: repaired, value: JSON.parse(repaired) };
+  } catch {
+    return null;
   }
 }
 

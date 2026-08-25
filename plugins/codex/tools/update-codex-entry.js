@@ -12,7 +12,7 @@
  */
 
 import { makeProposal } from "@covel/plugin-handlers-utils";
-import { withPendingProposals } from "@covel/tools";
+import { terminalToolResult, withPendingProposals } from "@covel/tools";
 import { getCategoryMetadata } from "../category-metadata.js";
 
 export default function ({ tool, z, store }) {
@@ -62,39 +62,41 @@ export default function ({ tool, z, store }) {
         updatedAt: now,
       };
 
-      return withPendingProposals(
-        {
-          updated: true,
-          entryId: params.entryId,
-          appendedContent: params.appendContent,
-          ui: [
-            {
-              type: "ui-spec",
-              entryId: params.entryId,
-              spec: {
-                type: "EntryCard",
-                props: {
-                  title: updatedValue.title,
-                  category: updatedValue.category,
-                  content: params.appendContent,
-                  tags: params.newTags ?? [],
-                  rarity: updatedValue.rarity,
+      return terminalToolResult(
+        withPendingProposals(
+          {
+            updated: true,
+            entryId: params.entryId,
+            appendedContent: params.appendContent,
+            ui: [
+              {
+                type: "ui-spec",
+                entryId: params.entryId,
+                spec: {
+                  type: "EntryCard",
+                  props: {
+                    title: updatedValue.title,
+                    category: updatedValue.category,
+                    content: params.appendContent,
+                    tags: params.newTags ?? [],
+                    rarity: updatedValue.rarity,
+                  },
+                },
+                meta: {
+                  entryId: params.entryId,
+                  rarityUpgrade: params.rarityUpgrade,
                 },
               },
-              meta: {
-                entryId: params.entryId,
-                rarityUpgrade: params.rarityUpgrade,
-              },
-            },
+            ],
+          },
+          [
+            makeProposal(context, now, "plugin.data", {
+              namespace: "entries",
+              key: params.entryId,
+              value: updatedValue,
+            }),
           ],
-        },
-        [
-          makeProposal(context, now, "plugin.data", {
-            namespace: "entries",
-            key: params.entryId,
-            value: updatedValue,
-          }),
-        ],
+        ),
       );
     },
   });

@@ -70,6 +70,15 @@ describe("image-generator handler (openai)", () => {
     expect(call.prompt).toBe("manual prompt");
   });
 
+  it("uses the canonical image role by default", async () => {
+    const ctx = makeCtx();
+
+    await handler(ctx);
+
+    const [call] = ctx.images.generate.mock.calls[0];
+    expect(call.presetId).toBe("image");
+  });
+
   it('normalizes a DashScope-style "*" size to lowercase x-separated form', async () => {
     const ctx = makeCtx({ userSettings: { imageSize: "1024*1536" } });
 
@@ -92,7 +101,7 @@ describe("image-generator handler (openai)", () => {
   it("passes preset, count, quality, timeout signal, and metadata through", async () => {
     const ctx = makeCtx({
       userSettings: {
-        modelPresetId: "openai-image",
+        modelPresetId: "image",
         imageSize: "1024x1024",
         n: 2,
         quality: "high",
@@ -111,7 +120,7 @@ describe("image-generator handler (openai)", () => {
 
     const [call] = ctx.images.generate.mock.calls[0];
     expect(call).toMatchObject({
-      presetId: "openai-image",
+      presetId: "image",
       prompt: "a koi pond at dusk",
       size: "1024x1024",
       quality: "high",

@@ -5,9 +5,9 @@ import {
   resolveProviderSlot,
 } from "../model-slot-helpers.js";
 
-// The configured slots in this scenario: the user has `gpt-image` but NOT the
-// plugin's manifest default `openai-image`.
-const configured = new Set(["story", "plugin", "gpt-image"]);
+// The configured slots in this scenario include one image role but not an
+// optional second image role.
+const configured = new Set(["story", "plugin", "image"]);
 const isMissing = (slot: string) => !configured.has(slot);
 
 const slots = [
@@ -46,34 +46,33 @@ describe("agent runtime slot fallback", () => {
 describe("resolveProviderSlot", () => {
   it("uses the manifest default when there is no override", () => {
     const r = resolveProviderSlot({
-      manifestDefault: "gpt-image",
+      manifestDefault: "image",
       override: undefined,
       isMissing,
     });
-    expect(r.effectiveSlot).toBe("gpt-image");
+    expect(r.effectiveSlot).toBe("image");
     expect(r.missing).toBe(false);
     expect(r.isOverridden).toBe(false);
   });
 
   it("flags a manifest default that is not configured as missing", () => {
     const r = resolveProviderSlot({
-      manifestDefault: "openai-image",
+      manifestDefault: "image-secondary",
       override: undefined,
       isMissing,
     });
-    expect(r.effectiveSlot).toBe("openai-image");
+    expect(r.effectiveSlot).toBe("image-secondary");
     expect(r.missing).toBe(true);
   });
 
   it("clears the missing warning once overridden to a configured slot", () => {
-    // The reported bug: default `openai-image` is missing, but the player
-    // overrides to `gpt-image` which they do have configured.
+    // A plugin can still opt into a separately configured role explicitly.
     const r = resolveProviderSlot({
-      manifestDefault: "openai-image",
-      override: "gpt-image",
+      manifestDefault: "image-secondary",
+      override: "image",
       isMissing,
     });
-    expect(r.effectiveSlot).toBe("gpt-image");
+    expect(r.effectiveSlot).toBe("image");
     expect(r.missing).toBe(false);
     expect(r.isOverridden).toBe(true);
   });

@@ -10,7 +10,7 @@ This release rebuilds provider and model configuration around explicit connectio
 
 - **Provider connections are first-class settings.** Each connection has its own stable id, provider family, protocol, base URL, API-key namespace, and model list. Multiple proxies or accounts for one provider can coexist without sharing credentials, while existing presets migrate automatically.
 - **Reasoning effort follows model capabilities.** Settings expose only the effort values supported by the selected model and translate them into the provider-specific request fields used by OpenAI, Anthropic, DeepSeek, and Qwen-compatible endpoints.
-- **FrostFox SaaS accounts now expose their complete model catalog and image generation.** Account settings list every model from every synchronized channel with directional capabilities; the first entitled image-output model supplies managed `image` and `openai-image` roles, and image requests use the derived Gateway Key plus the channel selector through Router's OpenAI-compatible image endpoint.
+- **FrostFox SaaS accounts now expose their complete model catalog and image generation.** Account settings list every model from every synchronized channel with directional capabilities; the entitled image channel supplies the managed `image` role, and image requests use the derived Gateway Key plus the channel selector through Router's OpenAI-compatible image endpoint.
 
 ### Changed
 
@@ -24,6 +24,8 @@ This release rebuilds provider and model configuration around explicit connectio
 - **Provider migration preserves independent credentials and model references.** Canonical provider ids no longer collapse distinct connections, request routing uses the connection namespace, legacy family-level keys remain available as a fallback, and orphaned preset secrets are cleaned up.
 - **World setup controls keep their shape and model probes stay bounded.** The loaded-plugin tab now uses the same layout contract as the model and session tabs, while connectivity checks request a short non-reasoning response instead of inheriting production-sized reasoning and output settings.
 - **Submitted character names now complete setup exactly once.** `char-creator/player-init` keeps both form projection and submitted-player persistence inside its deterministic function handler; the previous manifest guard was unreachable for function runtimes, so every submission generated another form and left setup pending.
+- **Post-turn trackers no longer exhaust their deadlines after doing the work.** Codex, action guide, and NPC graph writes now terminate their runtime directly instead of requiring another provider call solely for `runtime-done`; EOF-truncated tool JSON can recover omitted closing delimiters; the default shared-channel concurrency cap drops from four to two; and the three affected runtimes have explicit 90-second call budgets.
+- **Image models now stay in the image role.** Metadata-light models from FrostFox's dedicated image channel are classified as image generators instead of text LLMs; model-role selectors exclude incompatible managed models and deployment-bound provider duplicates; existing `openai-image` assignments migrate into the single canonical `image` role.
 
 ## [0.0.25] - 2026-08-11
 

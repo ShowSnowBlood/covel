@@ -211,6 +211,9 @@ export async function runAgentToolLoop({
   // Set by a PostToolUse hook returning `terminate` — ends the loop after the
   // current response's tool calls are recorded.
   let terminatedByHook = false;
+  // A business tool can declare its result terminal, avoiding a second slow
+  // provider call whose only purpose would be to emit `runtime-done`.
+  let terminatedByTool = false;
   // requireToolUse: how many times we've already nudged a bare (no-tool-call)
   // finish back into the loop. Capped at one correction so a model that keeps
   // refusing to call its tool is released instead of burning maxSteps.
@@ -504,6 +507,11 @@ export async function runAgentToolLoop({
             }),
           );
 
+          if (toolResult.terminal && toolResult.success) {
+            terminatedByTool = true;
+            break;
+          }
+
           // PostToolUse hook requested loop termination. Stop processing
           // further tool calls in this response and exit the loop below.
           if (terminateAfterTool) {
@@ -558,6 +566,19 @@ export async function runAgentToolLoop({
                   })),
                 })
               : "";
+        }
+        stoppedWithResponse = true;
+        break;
+      }
+
+      if (terminatedByTool) {
+        if (!finalContent) {
+          finalContent = JSON.stringify({
+            toolCalls: collectedToolCalls.map((c) => ({
+              name: c.toolName,
+              output: c.output,
+            })),
+          });
         }
         stoppedWithResponse = true;
         break;

@@ -6,12 +6,12 @@ OpenAI 兼容图像生成插件。生成走框架统一的 `ctx.images.generate(
 
 ## 与 dashscope-image-gen 的差异
 
-| 维度       | openai-image-gen                                               | dashscope-image-gen                                     |
-| ---------- | -------------------------------------------------------------- | ------------------------------------------------------- |
-| 默认模型   | `gpt-image-2`                                                  | `wan2.7-image-pro`                                      |
-| 尺寸格式   | `1024x1024`（小写 x）                                          | `1024*1024`（星号）                                     |
-| 事件 topic | `openai-image.generate.requested`                              | `image.generate.requested`                              |
-| 凭据来源   | `~/.covel/llm.toml` 的 `[covel.<slot>]`（默认 `openai-image`） | `~/.covel/llm.toml` 的 `[covel.<slot>]`（默认 `image`） |
+| 维度       | openai-image-gen                       | dashscope-image-gen                    |
+| ---------- | -------------------------------------- | -------------------------------------- |
+| 默认模型   | `gpt-image-2`                          | `wan2.7-image-pro`                     |
+| 尺寸格式   | `1024x1024`（小写 x）                  | `1024*1024`（星号）                    |
+| 事件 topic | `openai-image.generate.requested`      | `image.generate.requested`             |
+| 凭据来源   | `~/.covel/llm.toml` 的 `[covel.image]` | `~/.covel/llm.toml` 的 `[covel.image]` |
 
 两个插件可以同时启用，事件 topic 不同所以不会双触发，画廊也各自独立（`pluginData` 按 `pluginId` 隔离）。两者的 wire 都由框架的 image-wire 注册表处理，插件本身没有任何 HTTP / SDK 依赖。
 
@@ -22,7 +22,7 @@ OpenAI 兼容图像生成插件。生成走框架统一的 `ctx.images.generate(
 加一个 slot：
 
 ```toml
-[covel.openai-image]
+[covel.image]
 provider = "openai"
 model    = "gpt-image-2"
 baseUrl  = "https://api.openai.com/v1"      # 第三方就改这一行
@@ -40,43 +40,9 @@ OPENAI_API_KEY=sk-xxx
 
 第三方 key + baseUrl **必须同时**给——两行同时改。
 
-JulyAPI 的固定 2K SKU 使用以下值（模型 ID **不要**加 `openai/` 前缀）：
-
-```toml
-[covel.openai-image]
-provider = "july"
-model = "gpt-image-2-2k"
-baseUrl = "https://julyapi.com/v1"
-apiKey = "${env:JULY_API_KEY}"
-protocol = "openai-chat-v1"
-tag = "image"
-output = ["image"]
-providerRequestMetadata = { imageWire = "openai-images" }
-```
-
 ### 同时启用两个图像插件
 
-```toml
-[covel.image]                              # dashscope wan2.7
-provider = "dashscope"
-model    = "wan2.7-image-pro"
-baseUrl  = "https://dashscope.aliyuncs.com"
-apiKey   = "${env:DASHSCOPE_API_KEY}"
-protocol = "openai-chat-v1"
-tag      = "image"
-output   = ["image"]
-
-[covel.openai-image]                       # OpenAI / 第三方 GPT-Image
-provider = "openai"
-model    = "gpt-image-2"
-baseUrl  = "https://api.openai.com/v1"
-apiKey   = "${env:OPENAI_API_KEY}"
-protocol = "openai-chat-v1"
-tag      = "image"
-output   = ["image"]
-```
-
-dashscope-image-gen 默认 `modelPresetId = "image"` → wan2.7；openai-image-gen 默认 `modelPresetId = "openai-image"` → gpt-image-2。前端右侧面板各有独立的「生成」按钮和画廊。
+两个插件默认共用 `image` 用途，因此设置页只显示一个图像模型用途；事件 topic 和画廊仍彼此独立，不会双触发或混写数据。若确实需要让两个插件使用不同供应商，再新增一个明确命名的 slot，并只覆盖其中一个插件的 `modelPresetId`。
 
 ## 组成
 
@@ -98,13 +64,13 @@ prompt-generator（与 dashscope 同构，便于熟悉的玩家无缝切换）�
 
 image-generator：
 
-| Key             | 类型   | 默认           | 说明                                                                                                                           |
-| --------------- | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `modelPresetId` | slot   | `openai-image` | 对应 `~/.covel/llm.toml` 里的 `[covel.<slot>]` 名字，UI 渲染成已配置槽的选择器。换第三方 / 换模型 = 加一个新 slot 然后改这个值 |
-| `imageSize`     | text   | `1024x1024`    | 请求画幅；固定 1K / 2K / 4K SKU 会按横图、竖图或方图自动映射到原生尺寸                                                         |
-| `n`             | number | `1`            | 一次生成几张图                                                                                                                 |
-| `quality`       | text   | _(空)_         | 可选；`standard` / `hd`；空 = 不传                                                                                             |
-| `style`         | text   | _(空)_         | 可选；没有独立的 wire 参数，会拼进 prompt 文案末尾（`<prompt>, style: <style>`）                                               |
+| Key             | 类型   | 默认        | 说明                                                                                                                                 |
+| --------------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `modelPresetId` | slot   | `image`     | 对应 `~/.covel/llm.toml` 里的 `[covel.<slot>]` 名字，UI 渲染成已配置槽的选择器。换第三方 / 换模型 = 更新 `image` 或显式选择其他 slot |
+| `imageSize`     | text   | `1024x1024` | 请求画幅；固定 1K / 2K / 4K SKU 会按横图、竖图或方图自动映射到原生尺寸                                                               |
+| `n`             | number | `1`         | 一次生成几张图                                                                                                                       |
+| `quality`       | text   | _(空)_      | 可选；`standard` / `hd`；空 = 不传                                                                                                   |
+| `style`         | text   | _(空)_      | 可选；没有独立的 wire 参数，会拼进 prompt 文案末尾（`<prompt>, style: <style>`）                                                     |
 
 > **画质保证**：4K / ultra detailed / masterpiece 等关键词写在 prompt-generator 的 PLUGIN.md 系统提示里，模型在每条 prompt 末尾或 `quality` 字段强制带上。漫画模式额外追加 `crisp ink lines, clean panel borders, professional manga / comic page composition`。
 
@@ -119,7 +85,7 @@ image-generator：
 - **`extraProviderOptions`**：不再有插件侧透传路径。改在 llm.toml 的 slot 里配置**静态**的 `providerRequestMetadata`（对所有走该 slot 的请求生效，不是 per-call）：
 
 ```toml
-[covel.openai-image]
+[covel.image]
 provider = "openai"
 model    = "gpt-image-2"
 baseUrl  = "https://api.openai.com/v1"
@@ -128,7 +94,7 @@ protocol = "openai-chat-v1"
 tag      = "image"
 output   = ["image"]
 
-[covel.openai-image.providerRequestMetadata]
+[covel.image.providerRequestMetadata]
 # 任意会被合并进 wire 请求体的额外字段，供应商相关
 moderation = "low"
 ```
@@ -140,7 +106,7 @@ moderation = "low"
 # ctx.images 不可用，预期 status: failed，这是正常现象，不是回归）
 pnpm test:runtime -- openai-image-gen --plugins-dir plugins --pretty
 
-# Live 模式 — 需要 keys.env 里有 OPENAI_API_KEY 且 llm.toml 配好 openai-image slot，
+# Live 模式 — 需要 keys.env 里有 OPENAI_API_KEY 且 llm.toml 配好 image slot，
 # 会真实出图保存到 tests/tmp/
 pnpm test:runtime -- openai-image-gen --plugins-dir plugins --mode live --pretty
 ```

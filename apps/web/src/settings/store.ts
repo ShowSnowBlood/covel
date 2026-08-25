@@ -15,6 +15,35 @@ import { getDesktopRestAuthHeaders, isDesktopApp } from "@/lib/desktop-bridge";
 let singleton: SettingsStore | null = null;
 let readyPromise: Promise<void> | null = null;
 
+const LEGACY_IMAGE_SLOT_ID = "openai-image";
+const IMAGE_SLOT_ID = "image";
+const OPENAI_IMAGE_MODEL_SETTING = "plugin.openai-image-gen.modelPresetId";
+
+type SlotConfigEntry = { presetId?: string; modelRef?: string };
+
+async function migrateCanonicalImageSlot(
+  store: SettingsStoreApi,
+): Promise<void> {
+  const current =
+    store.get<Record<string, SlotConfigEntry>>("llm.slotConfig") ?? {};
+  const legacyBinding = current[LEGACY_IMAGE_SLOT_ID];
+  if (legacyBinding) {
+    const next: Record<string, SlotConfigEntry> = {
+      ...current,
+      [IMAGE_SLOT_ID]: legacyBinding,
+    };
+    delete next[LEGACY_IMAGE_SLOT_ID];
+    await store.set("llm.slotConfig", next);
+  }
+
+  if (
+    store.has(OPENAI_IMAGE_MODEL_SETTING) &&
+    store.get<string>(OPENAI_IMAGE_MODEL_SETTING) === LEGACY_IMAGE_SLOT_ID
+  ) {
+    await store.set(OPENAI_IMAGE_MODEL_SETTING, IMAGE_SLOT_ID);
+  }
+}
+
 function createStore(): SettingsStore {
   // isDesktopApp() covers BOTH desktop signals: the Electron IPC bridge and
   // the REST-desktop probe (`/api/config/info` → isDesktop, self-host setups
@@ -47,7 +76,15 @@ export function initSettings(): Promise<void> {
   if (!readyPromise) {
     cleanupLegacyLocalStorage();
     const store = getSettings() as SettingsStore;
-    readyPromise = store.init();
+    readyPromise = store.init().then(async () => {
+      try {
+        await migrateCanonicalImageSlot(store);
+      } catch (error) {
+        // Keep boot available if persistence is temporarily unavailable. Reads
+        // retain the loaded snapshot and the migration retries next launch.
+        console.warn("[settings] image role migration failed", error);
+      }
+    });
   }
   return readyPromise;
 }

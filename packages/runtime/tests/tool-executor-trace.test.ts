@@ -98,6 +98,42 @@ describe("ToolExecutor trace emissions", () => {
     expect(emitter.events[0].payload.code).toBe("INVALID_ARGS");
   });
 
+  it("repairs only omitted JSON closing delimiters before tool execution", async () => {
+    const emitter = makeEmitterSpy();
+    let received: unknown;
+    const executor = createToolExecutor({
+      findTool: () =>
+        ({
+          name: "x",
+          description: "",
+          jsonSchema: {},
+          async execute(params: unknown) {
+            received = params;
+            return { ok: true };
+          },
+        }) as unknown as ToolModule,
+    });
+
+    const res = await executor.execute(
+      {
+        toolCallId: "c4",
+        name: "x",
+        arguments: '{"items":[{"values":["a"}]}',
+      },
+      { ...baseCtx, emitter },
+    );
+
+    expect(res.success).toBe(true);
+    expect(received).toEqual({ items: [{ values: ["a"] }] });
+    expect(emitter.events[0]).toMatchObject({
+      type: "tool.calling",
+      payload: { argumentsRepaired: true },
+    });
+    expect(JSON.parse(String(emitter.events[0].payload.arguments))).toEqual({
+      items: [{ values: ["a"] }],
+    });
+  });
+
   it("emits tool.failed with DENIED when approval denies the call", async () => {
     const emitter = makeEmitterSpy();
     const mockTool = {

@@ -141,6 +141,7 @@ export class FrostFoxService {
     private readonly store: FrostFoxCredentialStore,
     private readonly fetchImpl: typeof fetch,
     private readonly managedSlotDefaults: SlotOverridesInput | undefined,
+    private readonly preferredImageModel: string | undefined,
   ) {
     this.sessionSigningKey = deriveContextKey(
       runtimeConfig.credentialKey,
@@ -188,6 +189,9 @@ export class FrostFoxService {
         store,
         fetchImpl,
         buildManagedSlotDefaults(options.ai, clientConfig),
+        options.ai.config.presets.find(
+          (preset) => preset.enabled && preset.defaultSlot === "image",
+        )?.model,
       );
     } catch (error) {
       clientConfig.stop();
@@ -451,6 +455,7 @@ export class FrostFoxService {
       managedSlotDefaults = withManagedImageDefaults(
         managedSlotDefaults,
         await this.listModels(principal),
+        this.preferredImageModel,
       );
     } catch {
       // Catalog discovery is optional for ordinary text calls. Keep the
@@ -794,43 +799,60 @@ function buildManagedSlotDefaults(
 function withManagedImageDefaults(
   defaults: SlotOverridesInput | undefined,
   catalog: FrostFoxModelCatalog,
+  preferredModel: string | undefined,
 ): SlotOverridesInput | undefined {
   const slotPresetOverrides = { ...(defaults?.slotPresetOverrides ?? {}) };
   const customPresets = new Map(
     (defaults?.customPresets ?? []).map((preset) => [preset.id, preset]),
   );
-  let imagePresetId =
-    slotPresetOverrides.image ?? slotPresetOverrides["openai-image"];
+  let imagePresetId = slotPresetOverrides.image;
 
   if (!imagePresetId) {
+    let firstImage:
+      { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
+    let firstDedicatedImage:
+      { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
+    let selected:
+      { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
     findImage: for (const channel of catalog.channels) {
       if (!channel.enabled || channel.error) continue;
       for (const model of channel.models) {
         if (!model.capability.output.includes("image")) continue;
-        imagePresetId = managedPresetId(channel.channelKey, model.id);
-        customPresets.set(imagePresetId, {
-          id: imagePresetId,
-          name: `${channel.displayName} · ${model.name}`,
-          provider: channel.providerId,
-          baseUrl: channel.baseUrl,
-          model: model.id,
-          protocol: channel.protocol,
-        });
-        break findImage;
+        firstImage ??= { channel, model };
+        if (channel.channelKey.toLowerCase() === "image") {
+          firstDedicatedImage ??= { channel, model };
+        }
+        if (preferredModel && model.id === preferredModel) {
+          selected = { channel, model };
+          break findImage;
+        }
       }
+    }
+    selected ??= firstDedicatedImage ?? firstImage;
+    if (selected) {
+      imagePresetId = managedPresetId(
+        selected.channel.channelKey,
+        selected.model.id,
+      );
+      customPresets.set(imagePresetId, {
+        id: imagePresetId,
+        name: `${selected.channel.displayName} · ${selected.model.name}`,
+        provider: selected.channel.providerId,
+        baseUrl: selected.channel.baseUrl,
+        model: selected.model.id,
+        protocol: selected.channel.protocol,
+      });
     }
   }
 
   if (!imagePresetId) return defaults;
   slotPresetOverrides.image ??= imagePresetId;
-  slotPresetOverrides["openai-image"] ??= imagePresetId;
   return {
     ...(defaults ?? {}),
     slotPresetOverrides,
     customPresets: [...customPresets.values()],
   };
 }
-
 function managedPresetId(channelKey: string, model: string): string {
   return `frostfox-managed-${createHash("sha256")
     .update(`${channelKey}\n${model}`, "utf8")
@@ -902,15 +924,34 @@ function parseModelList(
         typeof item.name === "string" && item.name.trim()
           ? item.name.trim()
           : item.id,
-      capability: resolveCapabilityDetails(
-        item.id,
-        provider.channelKey,
-        provider.protocol,
-        readModelCapabilityOverride(item),
-      ).capability,
+      capability: resolveManagedModelCapability(item, provider),
     });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function resolveManagedModelCapability(
+  item: Record<string, unknown>,
+  provider: ManagedFrostFoxProvider,
+): ModelCapability {
+  const capability = resolveCapabilityDetails(
+    item.id as string,
+    provider.channelKey,
+    provider.protocol,
+    readModelCapabilityOverride(item),
+  ).capability;
+  if (provider.channelKey.toLowerCase() !== "image") return capability;
+
+  // FrostFox's image channel is the routing contract. Some OpenAI-compatible
+  // `/models` responses omit modality metadata, which otherwise makes the
+  // generic protocol fallback advertise every image generator as a text LLM.
+  // Image-channel models support prompt + reference-image input and produce
+  // image assets; token limits and chat-only feature flags are not applicable.
+  return {
+    input: ["text", "image"],
+    output: ["image"],
+    ...(capability.pricing ? { pricing: capability.pricing } : {}),
+  };
 }
 
 function readModelCapabilityOverride(
