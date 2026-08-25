@@ -382,6 +382,7 @@ export function SessionPrepScreen({
                   type="button"
                   onClick={() => setActiveTab("plugins")}
                   className={cn(
+                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
                     activeTab === "plugins"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent/40",

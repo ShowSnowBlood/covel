@@ -9,7 +9,7 @@ pluginType: plugin
 runtimeType: function
 handler: ./handler.js
 outputKind: plugin
-capabilities: [image-generation]
+capabilities: [image-generation, image-generator]
 execution: background
 timeoutMs: 360000
 trigger:
@@ -32,8 +32,8 @@ userSettings:
       zh: 尺寸
       en: Size
     description:
-      zh: 图片大小。默认是方图，也可以填写横图或竖图尺寸。
-      en: Image size. The default is square; you can also choose wide or tall sizes.
+      zh: 图片画幅。固定 1K、2K、4K 模型会按横图、竖图或方图自动匹配原生尺寸。
+      en: Image framing. Fixed 1K, 2K, and 4K models map it to their native landscape, portrait, or square size.
   - key: "n"
     type: number
     default: 1

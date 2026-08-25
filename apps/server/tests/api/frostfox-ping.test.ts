@@ -142,8 +142,15 @@ describe("FrostFox account model ping", () => {
       model: "openai/gpt-5.6-sol",
     });
     expect(frostFox.prepareAiContext).toHaveBeenCalledWith(principal);
+    expect(streamCalls[0]?.input).toMatchObject({
+      messages: [{ role: "user", content: "Reply with OK." }],
+    });
     expect(streamCalls[0]?.options).toMatchObject({
       apiKeys: { "frostfox-channel-1": "derived-gateway-key" },
+      parameterOverrides: {
+        maxOutputTokens: 64,
+        reasoningEffort: "disabled",
+      },
     });
   });
 

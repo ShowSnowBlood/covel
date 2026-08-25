@@ -768,6 +768,14 @@
       "managedModelsDescription": "Models are read through synchronized channels. Router still enforces the account group's catalog, balance, limits, and billing. Assign these models under Model Roles.",
       "channelError": "Channel unavailable: {{code}}",
       "noModels": "No models are available on this channel",
+      "modelCount": "{{count}} models",
+      "modelsLoadFailed": "Could not load the managed model catalog. Refresh the account to try again.",
+      "modality": {
+        "text": "Text",
+        "image": "Image",
+        "audio": "Audio",
+        "embedding": "Embedding"
+      },
       "connectedToast": "FrostFox account connected",
       "connectedToastDetail": "Managed models were synchronized for the current account.",
       "connectionFailedToast": "Could not connect the FrostFox account"

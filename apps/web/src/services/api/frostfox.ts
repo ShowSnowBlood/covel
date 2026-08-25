@@ -1,4 +1,5 @@
 import { request } from "./request.js";
+import type { ModelCapabilityInfo } from "./llm.js";
 export const FROSTFOX_RECENT_UNLOCK_STORAGE_KEY =
   "covel:frostfox:recent-unlock";
 
@@ -21,6 +22,7 @@ export interface FrostFoxAccountStatus {
 export interface FrostFoxManagedModel {
   readonly id: string;
   readonly name: string;
+  readonly capability: ModelCapabilityInfo;
 }
 
 export interface FrostFoxManagedChannel {

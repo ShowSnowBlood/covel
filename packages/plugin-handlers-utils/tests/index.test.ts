@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertEntityEnvelope,
   readManualEntity,
+  runImageGeneration,
   splitList,
 } from "../src/index.js";
 
@@ -107,5 +108,49 @@ describe("assertEntityEnvelope", () => {
     expect(() =>
       assertEntityEnvelope({ id: "r1", blob: "x".repeat(70_000) }, opts),
     ).toThrow("rule is too large");
+  });
+});
+
+describe("runImageGeneration", () => {
+  it("persists the generated MediaRef on every gallery record", async () => {
+    const refs = [
+      { id: "a".repeat(64), mime: "image/png", size: 123 },
+      { id: "b".repeat(64), mime: "image/png", size: 456 },
+    ];
+    const set = vi.fn(async () => undefined);
+
+    const result = await runImageGeneration(
+      {
+        turnId: "turn-1",
+        manualPayload: { prompt: "draw the harbour" },
+        pluginData: { set },
+        images: {
+          generate: vi.fn(async () => ({ refs, warnings: [], cached: false })),
+        },
+      },
+      {
+        source: "image-test",
+        triggerTopic: "image.generate.requested",
+        planRequest: (_settings, { prompt }) => ({
+          prompt,
+          presetId: "image",
+          size: "1024x1024",
+          n: 2,
+          requestTimeoutMs: 1_000,
+        }),
+      },
+    );
+
+    expect(result.status).toBe("done");
+    expect(result.pluginData).toEqual([
+      expect.objectContaining({
+        namespace: "images",
+        value: expect.objectContaining({ ref: refs[0], status: "done" }),
+      }),
+      expect.objectContaining({
+        namespace: "images",
+        value: expect.objectContaining({ ref: refs[1], status: "done" }),
+      }),
+    ]);
   });
 });

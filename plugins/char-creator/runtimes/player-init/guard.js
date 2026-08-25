@@ -7,16 +7,11 @@ const CHARACTER_PLUGIN_ID = "char-creator";
  * guard.js — Pre-execution gate for player-init runtime.
  *
  * Three branches:
- *   1. Player already exists → skip LLM; emit preGameDone=true so the
- *      kernel advances turnCount from 0 to 1.
- *   2. No player AND player has submitted the char-creation form
- *      → synthesise create-character deterministically from lastFormValues,
- *        skip LLM, emit preGameDone=true. The LLM version of "Step 2" is
- *        flaky on weaker models (e.g. qwen3.5-flash) — they often re-render
- *        the form instead of calling `create-character`. By doing it here
- *        we remove the non-determinism that blocks the whole turn pipeline.
- *   3. No player AND no submission yet → proceed to LLM so it generates
- *      the opening form (Step 1 in PLUGIN.md).
+ *   1. Player already exists → skip the handler and emit preGameDone=true.
+ *   2. A char-creation form was submitted → create the player
+ *      deterministically, skip the handler, and emit preGameDone=true.
+ *   3. Nothing submitted yet → run handler.js to project the world character
+ *      schema into a deterministic form. No provider call is involved.
  *
  * @param {import('@covel/plugin-loader').FunctionHandlerContext} ctx
  * @returns {Promise<Record<string, unknown>>}
@@ -99,15 +94,15 @@ export default async function guard(ctx) {
           };
         } catch (err) {
           await logger?.warn?.(
-            "player-init guard: deterministic create-character failed, falling back to LLM",
+            "player-init guard: deterministic character write failed; showing the form again",
             { error: err instanceof Error ? err.message : String(err) },
           );
-          // Fall through to LLM branch
+          // Fall through to deterministic form generation.
         }
       }
     }
 
-    // ── Branch 3: nothing submitted yet → let LLM generate the opening form
+    // ── Branch 3: nothing submitted yet → build the form locally
     await logger?.debug("player-init guard proceeding to form generation");
     return { skip: false };
   } catch (err) {

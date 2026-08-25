@@ -35,6 +35,7 @@ const services: FrostFoxService[] = [];
 afterEach(async () => {
   await Promise.all(services.splice(0).map((service) => service.close()));
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("FrostFox first-party SaaS", () => {
@@ -78,12 +79,29 @@ describe("FrostFox first-party SaaS", () => {
             ? json({ id: "account-1", name: "Player One", balance: 42.5 })
             : json({ error: "invalid_account_key" }, 401);
         }
+        if (url.endsWith("/v1/images/generations/async")) {
+          return json({ task_id: "image-task-1" }, 202);
+        }
+        if (url.endsWith("/v1/images/tasks/image-task-1")) {
+          return json({
+            status: "completed",
+            result: {
+              data: [{ b64_json: Buffer.alloc(64, 1).toString("base64") }],
+            },
+          });
+        }
         if (url.endsWith("/v1/models")) {
           return json({
             object: "list",
             data: [
               { id: "openai/gpt-5.6-sol", name: "GPT 5.6" },
               { id: "openai/gpt-5.6-sol", name: "duplicate" },
+              { id: "openai/gpt-image-2-2k", name: "GPT Image 2 · 2K" },
+              {
+                id: "vendor-art-v1",
+                name: "Vendor Art",
+                mode: "image_generation",
+              },
             ],
           });
         }
@@ -91,6 +109,7 @@ describe("FrostFox first-party SaaS", () => {
       },
     );
 
+    vi.stubGlobal("fetch", fetchImpl);
     const ai = createAiStack();
     const service = await FrostFoxService.create({
       env: HOST_ENV,
@@ -156,21 +175,35 @@ describe("FrostFox first-party SaaS", () => {
     );
     const managedPresetId =
       context?.managedSlotDefaults?.slotPresetOverrides?.story;
+    const managedImagePresetId =
+      context?.managedSlotDefaults?.slotPresetOverrides?.image;
     expect(managedPresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(managedImagePresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
     expect(context?.managedSlotDefaults?.slotPresetOverrides).toEqual({
       story: managedPresetId,
       plugin: managedPresetId,
       default: managedPresetId,
+      image: managedImagePresetId,
+      "openai-image": managedImagePresetId,
     });
-    expect(context?.managedSlotDefaults?.customPresets).toEqual([
-      expect.objectContaining({
-        id: managedPresetId,
-        provider: providerId,
-        baseUrl: "https://market.example/v1",
-        model: "deepseek-v4-flash",
-        protocol: "openai-chat-v1",
-      }),
-    ]);
+    expect(context?.managedSlotDefaults?.customPresets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: managedPresetId,
+          provider: providerId,
+          baseUrl: "https://market.example/v1",
+          model: "deepseek-v4-flash",
+          protocol: "openai-chat-v1",
+        }),
+        expect.objectContaining({
+          id: managedImagePresetId,
+          provider: providerId,
+          baseUrl: "https://market.example/v1",
+          model: "openai/gpt-image-2-2k",
+          protocol: "openai-chat-v1",
+        }),
+      ]),
+    );
     const resolvedStory = ai.gateway.resolveSlot("story", {
       apiKeys: context!.apiKeys,
       slotOverrides: context!.managedSlotDefaults,
@@ -190,7 +223,23 @@ describe("FrostFox first-party SaaS", () => {
       expect.objectContaining({
         channelKey: "deepseek",
         providerId,
-        models: [{ id: "openai/gpt-5.6-sol", name: "GPT 5.6" }],
+        models: [
+          expect.objectContaining({
+            id: "openai/gpt-5.6-sol",
+            name: "GPT 5.6",
+            capability: expect.objectContaining({ output: ["text"] }),
+          }),
+          expect.objectContaining({
+            id: "openai/gpt-image-2-2k",
+            name: "GPT Image 2 · 2K",
+            capability: expect.objectContaining({ output: ["image"] }),
+          }),
+          expect.objectContaining({
+            id: "vendor-art-v1",
+            name: "Vendor Art",
+            capability: expect.objectContaining({ output: ["image"] }),
+          }),
+        ],
       }),
     ]);
     const modelRequest = requests.find((request) =>
@@ -200,6 +249,40 @@ describe("FrostFox first-party SaaS", () => {
       authorization: `Bearer ${deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel")}`,
       "X-FrostFox-Channel-Id": CHANNEL_ID,
     });
+
+    const generated = await ai.gateway.generateImage(
+      {
+        presetId: "openai-image",
+        prompt: "A lighthouse above a silver sea",
+        size: "1024x1024",
+      },
+      {
+        apiKeys: context!.apiKeys,
+        slotOverrides: context!.managedSlotDefaults,
+      },
+    );
+    expect(generated).toMatchObject({
+      model: "openai/gpt-image-2-2k",
+      provider: providerId,
+      images: [{ kind: "bytes", mime: "image/png" }],
+    });
+    const imageRequest = requests.find((request) =>
+      request.url.endsWith("/v1/images/generations/async"),
+    );
+    expect(imageRequest?.init?.headers).toMatchObject({
+      authorization: `Bearer ${deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel")}`,
+      "X-FrostFox-Channel-Id": CHANNEL_ID,
+    });
+    expect(JSON.parse(String(imageRequest?.init?.body))).toMatchObject({
+      model: "openai/gpt-image-2-2k",
+      prompt: "A lighthouse above a silver sea",
+      size: "2048x2048",
+    });
+    expect(
+      requests.some((request) =>
+        request.url.endsWith("/v1/images/tasks/image-task-1"),
+      ),
+    ).toBe(true);
 
     await expect(
       service!.completeAuthorization({

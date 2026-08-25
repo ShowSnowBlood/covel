@@ -9,7 +9,7 @@ pluginType: plugin
 runtimeType: function
 handler: ./handler.js
 outputKind: plugin
-capabilities: [image-generation]
+capabilities: [image-generation, image-generator]
 execution: background
 timeoutMs: 360000
 trigger:

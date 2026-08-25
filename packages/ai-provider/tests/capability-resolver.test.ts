@@ -51,6 +51,24 @@ describe("model identity resolution", () => {
     );
   });
 
+  it("recognizes routed GPT Image 2 variants as image generators", () => {
+    const result = resolveCapabilityDetails(
+      "openai/gpt-image-2-2k",
+      "frostfox-images",
+      "openai-chat-v1",
+    );
+
+    expect(result).toMatchObject({
+      source: "known",
+      matchedModelId: "gpt-image-2",
+      matchKind: "prefix",
+    });
+    expect(result.capability).toMatchObject({
+      input: ["text", "image"],
+      output: ["image"],
+    });
+  });
+
   it("reports the database key and reference pricing for aggregator matches", () => {
     const data: ModelDbFile = {
       updatedAt: "2026-08-14T00:00:00.000Z",

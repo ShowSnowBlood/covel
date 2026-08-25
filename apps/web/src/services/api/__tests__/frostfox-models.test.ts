@@ -19,7 +19,13 @@ describe("FrostFox managed model projection", () => {
           enabled: true,
           protocol: "openai-chat-v1",
           baseUrl: "https://market.example/v1",
-          models: [{ id: "openai/gpt-5.6-sol", name: "GPT 5.6" }],
+          models: [
+            {
+              id: "openai/gpt-5.6-sol",
+              name: "GPT 5.6",
+              capability: { input: ["text"], output: ["text"] },
+            },
+          ],
         },
         {
           channelKey: "disabled",
@@ -28,7 +34,13 @@ describe("FrostFox managed model projection", () => {
           enabled: false,
           protocol: "openai-chat-v1",
           baseUrl: "https://market.example/v1",
-          models: [{ id: "should-not-appear", name: "Hidden" }],
+          models: [
+            {
+              id: "should-not-appear",
+              name: "Hidden",
+              capability: { input: ["text"], output: ["text"] },
+            },
+          ],
         },
         {
           channelKey: "blocked",

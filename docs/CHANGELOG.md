@@ -10,6 +10,7 @@ This release rebuilds provider and model configuration around explicit connectio
 
 - **Provider connections are first-class settings.** Each connection has its own stable id, provider family, protocol, base URL, API-key namespace, and model list. Multiple proxies or accounts for one provider can coexist without sharing credentials, while existing presets migrate automatically.
 - **Reasoning effort follows model capabilities.** Settings expose only the effort values supported by the selected model and translate them into the provider-specific request fields used by OpenAI, Anthropic, DeepSeek, and Qwen-compatible endpoints.
+- **FrostFox SaaS accounts now expose their complete model catalog and image generation.** Account settings list every model from every synchronized channel with directional capabilities; the first entitled image-output model supplies managed `image` and `openai-image` roles, and image requests use the derived Gateway Key plus the channel selector through Router's OpenAI-compatible image endpoint.
 
 ### Changed
 
@@ -21,6 +22,7 @@ This release rebuilds provider and model configuration around explicit connectio
 - **Thinking models no longer emit incompatible tool-call payloads.** DeepSeek V4 thinking requests omit `tool_choice`, tool-call assistant messages retain non-null content, and streaming and non-streaming paths share the same compatibility rules.
 - **Reasoning controls reject unsupported combinations before they reach providers.** Claude 4.0 no longer receives newer Anthropic effort fields, `gpt-5-pro` exposes only `high`, and Qwen thinking-only models cannot be forced into disabled thinking.
 - **Provider migration preserves independent credentials and model references.** Canonical provider ids no longer collapse distinct connections, request routing uses the connection namespace, legacy family-level keys remain available as a fallback, and orphaned preset secrets are cleaned up.
+- **World setup controls keep their shape and model probes stay bounded.** The loaded-plugin tab now uses the same layout contract as the model and session tabs, while connectivity checks request a short non-reasoning response instead of inheriting production-sized reasoning and output settings.
 
 ## [0.0.25] - 2026-08-11
 

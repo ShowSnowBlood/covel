@@ -84,6 +84,8 @@ fallback = "story"
 # tag       = "image"
 # output    = ["image"]
 # providerRequestMetadata = { imageWire = "openai-images" }
+# Fixed-resolution SKUs automatically map the requested aspect orientation to
+# their native size and use the provider's async image-task extension when available.
 
 # ── Embedding Slots (RAG / Graph-RAG) ────────────────────────────
 #

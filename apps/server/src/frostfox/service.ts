@@ -6,7 +6,14 @@ import {
   randomUUID,
   timingSafeEqual,
 } from "node:crypto";
-import type { SlotOverridesInput } from "@covel/ai-provider";
+import {
+  resolveCapabilityDetails,
+  type InputModality,
+  type ManualCapabilityOverride,
+  type ModelCapability,
+  type OutputModality,
+  type SlotOverridesInput,
+} from "@covel/ai-provider";
 import {
   FROSTFOX_LEVEL_COUNT,
   frostFoxLevelForWorld,
@@ -64,6 +71,7 @@ export interface FrostFoxAuthorizationResult {
 export interface FrostFoxModelEntry {
   readonly id: string;
   readonly name: string;
+  readonly capability: ModelCapability;
 }
 
 export interface FrostFoxModelChannel {
@@ -438,10 +446,20 @@ export class FrostFoxService {
         .providers()
         .map((provider) => [provider.providerId, gatewayKey]),
     );
+    let managedSlotDefaults = this.managedSlotDefaults;
+    try {
+      managedSlotDefaults = withManagedImageDefaults(
+        managedSlotDefaults,
+        await this.listModels(principal),
+      );
+    } catch {
+      // Catalog discovery is optional for ordinary text calls. Keep the
+      // configured managed defaults when Router model listing is unavailable.
+    }
     return {
       principal,
       apiKeys,
-      managedSlotDefaults: this.managedSlotDefaults,
+      managedSlotDefaults,
     };
   }
 
@@ -526,7 +544,23 @@ export class FrostFoxService {
             error: "channel_unavailable",
           };
         }
-        return this.fetchChannelModels(provider, gatewayKey);
+        try {
+          return await this.fetchChannelModels(provider, gatewayKey);
+        } catch (error) {
+          return {
+            channelKey: provider.channelKey,
+            providerId: provider.providerId,
+            displayName: provider.displayName,
+            enabled: true,
+            protocol: provider.protocol,
+            baseUrl: provider.baseUrl,
+            models: [],
+            error:
+              error instanceof FrostFoxServiceError
+                ? error.code
+                : "channel_request_failed",
+          };
+        }
       }),
     );
     const value = {
@@ -570,7 +604,7 @@ export class FrostFoxService {
       };
     }
     const body: unknown = await response.json();
-    const models = parseModelList(body);
+    const models = parseModelList(body, provider);
     return {
       channelKey: provider.channelKey,
       providerId: provider.providerId,
@@ -729,10 +763,7 @@ function buildManagedSlotDefaults(
     if (!preset.enabled || !preset.defaultSlot) continue;
     const provider = providersByChannel.get(preset.provider);
     if (!provider) continue;
-    const id = `frostfox-managed-${createHash("sha256")
-      .update(`${provider.channelKey}\n${preset.model}`, "utf8")
-      .digest("hex")
-      .slice(0, 24)}`;
+    const id = managedPresetId(provider.channelKey, preset.model);
     slotPresetOverrides[preset.defaultSlot] = id;
     if (!textFallbackPresetId && (preset.tag ?? "text") === "text") {
       textFallbackPresetId = id;
@@ -758,6 +789,53 @@ function buildManagedSlotDefaults(
         slotPresetOverrides,
         customPresets: [...customPresets.values()],
       };
+}
+
+function withManagedImageDefaults(
+  defaults: SlotOverridesInput | undefined,
+  catalog: FrostFoxModelCatalog,
+): SlotOverridesInput | undefined {
+  const slotPresetOverrides = { ...(defaults?.slotPresetOverrides ?? {}) };
+  const customPresets = new Map(
+    (defaults?.customPresets ?? []).map((preset) => [preset.id, preset]),
+  );
+  let imagePresetId =
+    slotPresetOverrides.image ?? slotPresetOverrides["openai-image"];
+
+  if (!imagePresetId) {
+    findImage: for (const channel of catalog.channels) {
+      if (!channel.enabled || channel.error) continue;
+      for (const model of channel.models) {
+        if (!model.capability.output.includes("image")) continue;
+        imagePresetId = managedPresetId(channel.channelKey, model.id);
+        customPresets.set(imagePresetId, {
+          id: imagePresetId,
+          name: `${channel.displayName} · ${model.name}`,
+          provider: channel.providerId,
+          baseUrl: channel.baseUrl,
+          model: model.id,
+          protocol: channel.protocol,
+        });
+        break findImage;
+      }
+    }
+  }
+
+  if (!imagePresetId) return defaults;
+  slotPresetOverrides.image ??= imagePresetId;
+  slotPresetOverrides["openai-image"] ??= imagePresetId;
+  return {
+    ...(defaults ?? {}),
+    slotPresetOverrides,
+    customPresets: [...customPresets.values()],
+  };
+}
+
+function managedPresetId(channelKey: string, model: string): string {
+  return `frostfox-managed-${createHash("sha256")
+    .update(`${channelKey}\n${model}`, "utf8")
+    .digest("hex")
+    .slice(0, 24)}`;
 }
 
 export function deriveFrostFoxGatewayKey(
@@ -805,7 +883,10 @@ function accountBindingAad(
   return `binding\n${issuer}\n${routerAccountId}\n${clientId}`;
 }
 
-function parseModelList(value: unknown): FrostFoxModelEntry[] {
+function parseModelList(
+  value: unknown,
+  provider: ManagedFrostFoxProvider,
+): FrostFoxModelEntry[] {
   if (!isRecord(value) || !Array.isArray(value.data)) {
     throw new FrostFoxServiceError("frostfox_models_response_invalid", 502);
   }
@@ -821,9 +902,104 @@ function parseModelList(value: unknown): FrostFoxModelEntry[] {
         typeof item.name === "string" && item.name.trim()
           ? item.name.trim()
           : item.id,
+      capability: resolveCapabilityDetails(
+        item.id,
+        provider.channelKey,
+        provider.protocol,
+        readModelCapabilityOverride(item),
+      ).capability,
     });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function readModelCapabilityOverride(
+  item: Record<string, unknown>,
+): ManualCapabilityOverride | undefined {
+  const declared = isRecord(item.capability)
+    ? item.capability
+    : isRecord(item.capabilities)
+      ? item.capabilities
+      : item;
+  const input = readModalities(declared, "input");
+  const output = readModalities(declared, "output");
+  const imageGenerationDeclared = [
+    declared.image_generation,
+    declared.imageGeneration,
+    declared.supports_image_generation,
+    declared.supportsImageGeneration,
+  ].some((value) => value === true);
+  const mode = [
+    item.mode,
+    item.type,
+    item.task,
+    item.modelType,
+    item.model_type,
+  ].find((value): value is string => typeof value === "string");
+  const normalizedMode = mode?.toLowerCase() ?? "";
+  const derivedOutput =
+    output ??
+    (imageGenerationDeclared || normalizedMode.includes("image")
+      ? (["image"] as OutputModality[])
+      : normalizedMode.includes("embedding")
+        ? (["embedding"] as OutputModality[])
+        : normalizedMode.includes("speech")
+          ? (["audio"] as OutputModality[])
+          : undefined);
+  const derivedInput =
+    input ??
+    (derivedOutput?.includes("image")
+      ? (["text"] as InputModality[])
+      : undefined);
+  if (!derivedInput && !derivedOutput) return undefined;
+  return {
+    ...(derivedInput ? { input: derivedInput } : {}),
+    ...(derivedOutput ? { output: derivedOutput } : {}),
+  };
+}
+
+function readModalities(
+  record: Record<string, unknown>,
+  direction: "input",
+): InputModality[] | undefined;
+function readModalities(
+  record: Record<string, unknown>,
+  direction: "output",
+): OutputModality[] | undefined;
+function readModalities(
+  record: Record<string, unknown>,
+  direction: "input" | "output",
+): InputModality[] | OutputModality[] | undefined {
+  const keys =
+    direction === "input"
+      ? [
+          "input",
+          "input_modalities",
+          "inputModalities",
+          "supported_input_modalities",
+          "supportedInputModalities",
+        ]
+      : [
+          "output",
+          "output_modalities",
+          "outputModalities",
+          "supported_output_modalities",
+          "supportedOutputModalities",
+        ];
+  const raw = keys.map((key) => record[key]).find(Array.isArray);
+  if (!Array.isArray(raw)) return undefined;
+  const allowed: readonly string[] =
+    direction === "input"
+      ? ["text", "image", "audio", "video", "file"]
+      : ["text", "image", "audio", "embedding"];
+  const values = raw.filter(
+    (value): value is string =>
+      typeof value === "string" && allowed.includes(value),
+  );
+  if (values.length === 0) return undefined;
+  return direction === "input"
+    ? (values as InputModality[])
+    : (values as OutputModality[]);
 }
 
 async function readGatewayErrorCode(response: Response): Promise<string> {

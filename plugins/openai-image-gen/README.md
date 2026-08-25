@@ -32,8 +32,6 @@ tag      = "image"
 output   = ["image"]
 ```
 
-`tag = "image"` 是关键——框架靠它把 `modelPresetId` 解析到 image wire。默认 wire 是 `openai-images`，无需额外声明；如果第三方响应体不是标准 OpenAI Images 形状，在 slot 里加 `providerRequestMetadata.imageWire = "<其他已注册的 wire id>"`。
-
 ### `~/.covel/keys.env`
 
 ```
@@ -41,6 +39,20 @@ OPENAI_API_KEY=sk-xxx
 ```
 
 第三方 key + baseUrl **必须同时**给——两行同时改。
+
+JulyAPI 的固定 2K SKU 使用以下值（模型 ID **不要**加 `openai/` 前缀）：
+
+```toml
+[covel.openai-image]
+provider = "july"
+model = "gpt-image-2-2k"
+baseUrl = "https://julyapi.com/v1"
+apiKey = "${env:JULY_API_KEY}"
+protocol = "openai-chat-v1"
+tag = "image"
+output = ["image"]
+providerRequestMetadata = { imageWire = "openai-images" }
+```
 
 ### 同时启用两个图像插件
 
@@ -86,15 +98,17 @@ prompt-generator（与 dashscope 同构，便于熟悉的玩家无缝切换）�
 
 image-generator：
 
-| Key             | 类型   | 默认           | 说明                                                                                                |
-| --------------- | ------ | -------------- | --------------------------------------------------------------------------------------------------- |
+| Key             | 类型   | 默认           | 说明                                                                                                                           |
+| --------------- | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `modelPresetId` | slot   | `openai-image` | 对应 `~/.covel/llm.toml` 里的 `[covel.<slot>]` 名字，UI 渲染成已配置槽的选择器。换第三方 / 换模型 = 加一个新 slot 然后改这个值 |
-| `imageSize`     | text   | `1024x1024`    | OpenAI Images API size 参数（小写 x）                                                               |
-| `n`             | number | `1`            | 一次生成几张图                                                                                      |
-| `quality`       | text   | _(空)_         | 可选；`standard` / `hd`；空 = 不传                                                                  |
-| `style`         | text   | _(空)_         | 可选；没有独立的 wire 参数，会拼进 prompt 文案末尾（`<prompt>, style: <style>`）                    |
+| `imageSize`     | text   | `1024x1024`    | 请求画幅；固定 1K / 2K / 4K SKU 会按横图、竖图或方图自动映射到原生尺寸                                                         |
+| `n`             | number | `1`            | 一次生成几张图                                                                                                                 |
+| `quality`       | text   | _(空)_         | 可选；`standard` / `hd`；空 = 不传                                                                                             |
+| `style`         | text   | _(空)_         | 可选；没有独立的 wire 参数，会拼进 prompt 文案末尾（`<prompt>, style: <style>`）                                               |
 
 > **画质保证**：4K / ultra detailed / masterpiece 等关键词写在 prompt-generator 的 PLUGIN.md 系统提示里，模型在每条 prompt 末尾或 `quality` 字段强制带上。漫画模式额外追加 `crisp ink lines, clean panel borders, professional manga / comic page composition`。
+
+固定分辨率 SKU 自动走 OpenAI 兼容的异步任务接口（`/images/generations/async` + `/images/tasks/:id`），避免高分辨率请求被反向代理超时截断；供应商未实现该扩展并返回 404/405 时，wire 会回退到标准同步接口。
 
 ### 废弃字段
 

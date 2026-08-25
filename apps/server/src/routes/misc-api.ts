@@ -424,9 +424,21 @@ export function createMiscApiRoutes(
 
     try {
       for await (const event of ai.gateway.streamText(
-        { presetId: preset.id, messages: [{ role: "user", content: "hi" }] },
+        {
+          presetId: preset.id,
+          messages: [{ role: "user", content: "Reply with OK." }],
+        },
         {
           apiKeys,
+          // Some OpenAI-compatible gateways reject an eight-token ceiling,
+          // and reasoning-capable models may consume that entire allowance
+          // before emitting visible text. The probe still aborts after eight
+          // received characters, so a 64-token ceiling remains cheap while
+          // leaving enough room for a standards-compliant proof of life.
+          parameterOverrides: {
+            maxOutputTokens: 64,
+            reasoningEffort: "disabled",
+          },
           signal: abort.signal,
           slotOverrides: {
             ...(slotConfig.slotPresetOverrides

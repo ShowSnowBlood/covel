@@ -1,6 +1,7 @@
 import {
   fetchFrostFoxAccount,
   fetchFrostFoxModels,
+  type FrostFoxAccountStatus,
   type FrostFoxModelCatalog,
 } from "./frostfox.js";
 import type { CustomPreset } from "./model-settings.js";
@@ -38,9 +39,11 @@ export function getManagedFrostFoxPresets(): CustomPreset[] {
   );
 }
 
-export async function hydrateManagedFrostFoxModels(): Promise<void> {
+export async function hydrateManagedFrostFoxModels(
+  accountStatus?: FrostFoxAccountStatus,
+): Promise<void> {
   try {
-    const account = await fetchFrostFoxAccount(true);
+    const account = accountStatus ?? (await fetchFrostFoxAccount(true));
     if (!account.enabled || !account.authenticated) {
       managedCatalog = null;
       return;

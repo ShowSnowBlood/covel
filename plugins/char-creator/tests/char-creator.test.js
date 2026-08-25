@@ -1,11 +1,10 @@
 /**
  * char-creator plugin discovery tests (multi-runtime).
  *
- * This plugin now hosts two runtimes:
- *   - player-init       — LLM agent, emits the opening char-creation form;
- *                         the real character record is written deterministically
- *                         by guard.js once the player submits, bypassing the LLM.
- *   - character-tracker — LLM agent, detects NPCs and state changes every turn
+ * This plugin hosts two runtimes:
+ *   - player-init       — deterministic function runtime that emits the
+ *                         opening form and writes the submitted player in its guard;
+ *   - character-tracker — LLM agent that detects NPC/state changes each turn.
  *
  * Full execution behavior is covered by E2E tests in apps/server and
  * Playwright tests in apps/web. This file only verifies the manifest
@@ -62,27 +61,29 @@ describe("char-creator plugin", () => {
       expect(manifest.pluginType).toBe("core-plugin");
     });
 
-    it("declares only create-form — character creation is performed by guard.js, not by the LLM", () => {
-      expect(manifest.tools?.builtin).toEqual(["create-form"]);
+    it("builds the opening interaction without an LLM", () => {
+      expect(manifest.runtimeType).toBe("function");
+      expect(manifest.handler).toBe("./handler.js");
+      expect(manifest.tags).toContain("cost:function");
+      expect(manifest.tags).not.toContain("cost:llm");
+      expect(manifest.tools?.builtin ?? []).toEqual([]);
+      expect(manifest.effects?.writes).toEqual(["interaction:*"]);
     });
 
-    it("injects the same-turn pregame opening and generated world schema", () => {
-      // Pre-Game band: narrator is NOT scheduled on turn 0, so player-init
-      // consumes the opening summary produced by pregame (priority 10)
-      // rather than the (missing) narrator output. See plugin README / the
-      // turn-executor scheduler band gate.
-      expect(manifest.input?.inject).toEqual([
-        expect.objectContaining({
-          from: "pregame",
-          field: "narrativeOutput",
-          as: "<pregame-opening>",
+    it("binds the same-turn pregame opening and generated world schema", () => {
+      expect(manifest.inputs).toEqual({
+        opening: expect.objectContaining({
+          from: { runtime: "pregame" },
+          select: "/narrativeOutput",
+          required: false,
         }),
-        expect.objectContaining({
-          from: "world-init/schema-gen",
-          field: "worldSchema",
-          as: "<same-turn-world-schema>",
+        worldSchema: expect.objectContaining({
+          from: { runtime: "world-init/schema-gen" },
+          select: "/worldSchema",
+          required: false,
         }),
-      ]);
+      });
+      expect(manifest.input?.inject ?? []).toEqual([]);
     });
 
     it("declares turn-scoped needs so it waits for pregame and schema init", () => {
@@ -96,14 +97,14 @@ describe("char-creator plugin", () => {
       expect(manifest.guard).toBeTruthy();
     });
 
-    it("has a guard.js file to skip after player exists", () => {
-      const guardPath = path.join(
-        discovery.rootPath,
-        "runtimes",
-        "player-init",
-        "guard.js",
-      );
-      expect(fs.existsSync(guardPath)).toBe(true);
+    it("ships both the guard and deterministic handler", () => {
+      for (const file of ["guard.js", "handler.js"]) {
+        expect(
+          fs.existsSync(
+            path.join(discovery.rootPath, "runtimes", "player-init", file),
+          ),
+        ).toBe(true);
+      }
     });
 
     it("declares the shared character-panel ui spec", () => {

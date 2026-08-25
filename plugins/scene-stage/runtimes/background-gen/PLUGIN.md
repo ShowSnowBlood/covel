@@ -8,7 +8,7 @@ runtimeType: function
 resultFormat: envelope-v1
 handler: ./handler.js
 outputKind: plugin
-capabilities: [image-generation]
+capabilities: [image-generation, image-generator]
 tags:
   - mode:dialogue
   - role:scene-state

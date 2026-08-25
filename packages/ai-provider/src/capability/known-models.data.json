@@ -212,6 +212,13 @@
         "outputPerMToken": 40
       }
     },
+    "gpt-image-2": {
+      "input": ["text", "image"],
+      "output": ["image"],
+      "features": [],
+      "contextWindow": 32000,
+      "maxOutputTokens": 0
+    },
     "tts-1": {
       "input": ["text"],
       "output": ["audio"],

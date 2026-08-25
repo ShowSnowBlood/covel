@@ -99,6 +99,8 @@ providerRequestMetadata = { speechWire = "mimo-tts/mimo" }
 
 每个同步渠道在请求内编译为保留的 `frostfox-*` provider，服务端固定其 Router `baseUrl`、`openai-chat-v1` 协议和 `X-FrostFox-Channel-Id`。浏览器只能提交模型 ID 与用途绑定，不能覆盖派生 Key、Router origin 或渠道 UUID。`X-Provider-Keys` 中伪造的同名 provider key 会被服务端托管凭据覆盖。
 
+模型目录条目携带输入/输出 modality。账号设置按渠道列出所有返回模型；输出包含 `image` 的模型会显示为图像模型。服务端把首个可用图像模型同时绑定为托管 `image` 与 `openai-image` 默认用途，使 `ctx.images.generate()` 和内置图像插件无需本地 `llm.toml` 即可走 Router 的 OpenAI 兼容图像接口。浏览器中的显式用途绑定始终覆盖该默认值。
+
 托管模型只在当前 FrostFox 账号会话中解析；退出或解绑后清除前端目录，未连接账号的 AI 执行请求 fail-closed。桌面端和 self-hosted 配置路径不变。
 
 ## API Key 流转

@@ -123,30 +123,45 @@ export function SettingsDialog({
 
   const [selected, setSelected] = useState<string>("");
   const contentRef = useRef<HTMLElement>(null);
+  const selectionRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [selected]);
 
   useEffect(() => {
-    if (!open) return;
-    if (initialKey) {
-      const exact = filtered.find((n) => n.id === initialKey);
-      if (exact && isSelectable(exact)) {
-        setSelected(exact.id);
+    if (!open) {
+      selectionRequestRef.current = null;
+      return;
+    }
+
+    const requestKey = initialKey ?? "";
+    if (selectionRequestRef.current !== requestKey) {
+      const exact = initialKey
+        ? filtered.find((node) => node.id === initialKey)
+        : undefined;
+      const byChild = initialKey
+        ? filtered.find((node) =>
+            node.children.some(
+              (entry) =>
+                entry.key === initialKey || entry.key.startsWith(initialKey),
+            ),
+          )
+        : undefined;
+      const requested = exact && isSelectable(exact) ? exact : byChild;
+      if (requested) {
+        selectionRequestRef.current = requestKey;
+        setSelected(requested.id);
         return;
       }
-      const byChild = filtered.find((n) =>
-        n.children.some(
-          (e) => e.key === initialKey || e.key.startsWith(initialKey),
-        ),
-      );
-      if (byChild) {
-        setSelected(byChild.id);
+      if (!initialKey) {
+        selectionRequestRef.current = requestKey;
+        setSelected(firstSelectable?.id ?? "");
         return;
       }
     }
-    if (!selected || !filtered.find((n) => n.id === selected)) {
+
+    if (!selected || !filtered.some((node) => node.id === selected)) {
       setSelected(firstSelectable?.id ?? "");
     }
   }, [open, initialKey, filtered, firstSelectable, selected]);
@@ -192,6 +207,7 @@ export function SettingsDialog({
                     key={node.id}
                     type="button"
                     onClick={() => setSelected(node.id)}
+                    aria-current={isSelected ? "page" : undefined}
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs whitespace-nowrap font-medium transition-all shrink-0 cursor-pointer select-none",
                       isSelected
@@ -249,6 +265,7 @@ export function SettingsDialog({
                       key={node.id}
                       type="button"
                       onClick={() => setSelected(node.id)}
+                      aria-current={isSelected ? "page" : undefined}
                       className={cn(
                         "group relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200 cursor-pointer select-none",
                         isSelected

@@ -767,6 +767,14 @@
       "managedModelsDescription": "模型按同步渠道读取，请求仍由 Router 按分组货架、余额、限流和计费规则执行。可在“用途分配”中选用这些模型。",
       "channelError": "渠道不可用：{{code}}",
       "noModels": "当前渠道没有可用模型",
+      "modelCount": "{{count}} 个模型",
+      "modelsLoadFailed": "无法读取托管模型目录，请刷新账号后重试。",
+      "modality": {
+        "text": "文本",
+        "image": "图像",
+        "audio": "音频",
+        "embedding": "向量"
+      },
       "connectedToast": "FrostFox 账号已连接",
       "connectedToastDetail": "托管模型已按当前账号权限同步。",
       "connectionFailedToast": "FrostFox 账号连接失败"

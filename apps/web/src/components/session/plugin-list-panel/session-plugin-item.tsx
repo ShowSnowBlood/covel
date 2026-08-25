@@ -94,7 +94,7 @@ export function SessionPluginItem({
 
   return (
     <div className="border border-border rounded-[var(--radius-card)] overflow-hidden">
-      <div className="flex flex-wrap items-center gap-y-1 hover:bg-muted/50 transition-colors">
+      <div className="flex items-center hover:bg-muted/50 transition-colors">
         <button
           type="button"
           className="flex-1 flex items-center gap-2 px-2.5 py-2 text-left min-w-0"
@@ -194,12 +194,12 @@ export function SessionPluginItem({
             />
           </button>
         )}
-        <SetupRecovery
-          pluginId={plugin.id}
-          sessionId={sessionId}
-          setupRuntimes={setupRuntimes}
-        />
       </div>
+      <SetupRecovery
+        pluginId={plugin.id}
+        sessionId={sessionId}
+        setupRuntimes={setupRuntimes}
+      />
 
       {expanded && (
         <div className="px-3 pb-2.5 pt-1 space-y-2 border-t border-border bg-muted/20">

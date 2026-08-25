@@ -16,6 +16,16 @@ function mockFetchOnce(status: number, json: unknown) {
   return fn;
 }
 
+function mockFetchSequence(responses: Response[]) {
+  const fn = vi.fn(async () => {
+    const response = responses.shift();
+    if (!response) throw new Error("unexpected fetch");
+    return response;
+  }) as unknown as typeof fetch;
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("openai-images wire", () => {
@@ -58,6 +68,117 @@ describe("openai-images wire", () => {
       n: 2,
       size: "1024x1536",
       quality: "high",
+    });
+  });
+
+  it("uses the async task protocol and remaps fixed 2K model sizes", async () => {
+    const fn = mockFetchSequence([
+      new Response(JSON.stringify({ task_id: "image-task-1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      }),
+      new Response(JSON.stringify({ status: "pending" }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": "0",
+        },
+      }),
+      new Response(
+        JSON.stringify({
+          status: "completed",
+          result: { data: [{ url: "/v1/images/files/result.png" }] },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ]);
+
+    const result = await openAiImagesWire.generate(
+      { baseUrl: "https://api.example.com/v1", apiKey: "k" },
+      {
+        model: "openai/gpt-image-2-2k",
+        prompt: "a lighthouse",
+        size: "1024x1024",
+        n: 3,
+        providerRequestMetadata: { imagePollIntervalMs: 1 },
+      },
+    );
+
+    expect(fn.mock.calls.map(([url]) => url)).toEqual([
+      "https://api.example.com/v1/images/generations/async",
+      "https://api.example.com/v1/images/tasks/image-task-1",
+      "https://api.example.com/v1/images/tasks/image-task-1",
+    ]);
+    expect(
+      JSON.parse((fn.mock.calls[0]![1] as RequestInit).body as string),
+    ).toMatchObject({
+      model: "openai/gpt-image-2-2k",
+      size: "2048x2048",
+      n: 1,
+    });
+    expect(result.images).toEqual([
+      {
+        kind: "url",
+        url: "https://api.example.com/v1/images/files/result.png",
+        mime: "image/png",
+      },
+    ]);
+    expect(result.warnings.join(" ")).toMatch(/remapped to 2048x2048/);
+    expect(result.warnings.join(" ")).toMatch(/n=3 remapped to n=1/);
+  });
+
+  it("rejects protocol-relative task images outside the provider origin", async () => {
+    mockFetchSequence([
+      new Response(JSON.stringify({ task_id: "image-task-1" }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      }),
+      new Response(
+        JSON.stringify({
+          status: "completed",
+          result: { data: [{ url: "//attacker.test/result.png" }] },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ]);
+
+    await expect(
+      openAiImagesWire.generate(
+        { baseUrl: "https://api.example.com/v1", apiKey: "k" },
+        {
+          model: "gpt-image-2-2k",
+          prompt: "a lighthouse",
+          providerRequestMetadata: { imagePollIntervalMs: 1 },
+        },
+      ),
+    ).rejects.toThrow(/completed without images/);
+  });
+
+  it("falls back to synchronous generation when async tasks are unsupported", async () => {
+    const fn = mockFetchSequence([
+      new Response(JSON.stringify({ message: "not found" }), { status: 404 }),
+      new Response(JSON.stringify({ data: [{ b64_json: PNG_B64 }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ]);
+
+    const result = await openAiImagesWire.generate(
+      { baseUrl: "https://api.example.com/v1", apiKey: "k" },
+      {
+        model: "gpt-image-2-2k",
+        prompt: "a lighthouse",
+        size: "2048x1152",
+      },
+    );
+
+    expect(fn.mock.calls.map(([url]) => url)).toEqual([
+      "https://api.example.com/v1/images/generations/async",
+      "https://api.example.com/v1/images/generations",
+    ]);
+    expect(result.images[0]).toMatchObject({
+      kind: "bytes",
+      mime: "image/png",
     });
   });
 
@@ -130,14 +251,19 @@ describe("openai-images wire", () => {
     ).rejects.toThrow(/no images/i);
   });
 
-  it("strips imageWire from providerRequestMetadata but keeps other keys", async () => {
+  it("strips wire-control metadata but keeps provider request fields", async () => {
     const fn = mockFetchOnce(200, { data: [{ b64_json: PNG_B64 }] });
     await openAiImagesWire.generate(
       { baseUrl: "https://x.test", apiKey: "k" },
       {
         model: "m",
         prompt: "p",
-        providerRequestMetadata: { imageWire: "openai-images", style: "vivid" },
+        providerRequestMetadata: {
+          imageWire: "openai-images",
+          imageAsync: false,
+          imagePollIntervalMs: 1,
+          style: "vivid",
+        },
       },
     );
     const body = JSON.parse(
@@ -145,6 +271,8 @@ describe("openai-images wire", () => {
     );
     expect(body.style).toBe("vivid");
     expect(body).not.toHaveProperty("imageWire");
+    expect(body).not.toHaveProperty("imageAsync");
+    expect(body).not.toHaveProperty("imagePollIntervalMs");
   });
 
   it("records a warning when negativePrompt is provided (unsupported field)", async () => {

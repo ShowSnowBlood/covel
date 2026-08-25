@@ -11,6 +11,7 @@ import { CircleUserRound, WalletCards } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   fetchFrostFoxAccount,
+  hydrateManagedFrostFoxModels,
   type FrostFoxAccountStatus,
 } from "@/services/api.js";
 
@@ -38,6 +39,7 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
     try {
       const next = await fetchFrostFoxAccount(true);
       if (mounted.current) setStatus(next);
+      await hydrateManagedFrostFoxModels(next);
     } catch {
       if (mounted.current) setError(true);
     } finally {
