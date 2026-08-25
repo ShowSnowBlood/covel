@@ -30,6 +30,15 @@ function makeHarness() {
     protocol: "openai-chat-v1",
   };
   const localPreset = {
+    id: "slot-story",
+    name: "Local Story Alias",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    baseUrl: "https://api.deepseek.com",
+    protocol: "openai-chat-v1",
+    enabled: true,
+  };
+  const directLocalPreset = {
     id: "local-story",
     name: "Local Story",
     provider: "openai",
@@ -38,13 +47,16 @@ function makeHarness() {
     protocol: "openai-chat-v1",
     enabled: true,
   };
-  const presets: Array<Record<string, unknown>> = [localPreset];
+  const presets: Array<Record<string, unknown>> = [
+    localPreset,
+    directLocalPreset,
+  ];
   const hasPreset = (id: string) => presets.some((preset) => preset.id === id);
   const ai = {
     slotRegistry: {
-      listSlots: () => ({ story: { presetId: "local-story" } }),
+      listSlots: () => ({ story: { presetId: "slot-story" } }),
       resolveSlot: (slotId: string) =>
-        slotId === "story" ? "local-story" : undefined,
+        slotId === "story" ? "slot-story" : undefined,
       listSlotsByTag: () => [],
     },
     presetRegistry: {

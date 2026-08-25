@@ -329,7 +329,13 @@ export function createMiscApiRoutes(
     // (i.e. the slot the user typed isn't actually configured).
     type ResolvedVia = "direct" | "slot" | "tag-fallback" | "any";
     let resolvedVia: ResolvedVia = "direct";
-    let preset = findPresetById(requested);
+    // `slot-<name>` is the browser's reserved slot request namespace. A
+    // server preset can also happen to use that string as its id, but letting
+    // the direct-preset branch win would bypass FrostFox managed slot
+    // defaults and test the wrong provider.
+    let preset = requested.startsWith("slot-")
+      ? undefined
+      : findPresetById(requested);
     if (!preset && requested.startsWith("slot-")) {
       const slotName = requested.slice("slot-".length);
       const overrideId = slotConfig.slotPresetOverrides?.[slotName];
@@ -344,6 +350,9 @@ export function createMiscApiRoutes(
           if (preset) resolvedVia = "slot";
         }
       }
+    }
+    if (!preset) {
+      preset = findPresetById(requested);
     }
     if (!preset) {
       const textSlots = ai.slotRegistry.listSlotsByTag("text");
