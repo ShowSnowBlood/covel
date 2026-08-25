@@ -72,7 +72,7 @@ export function WorldCard({
         if (locked) onLocked?.();
         else onEnter(world.id);
       }}
-      className={`group relative min-h-[320px] md:min-h-[332px] overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl ${
+      className={`group relative min-h-[280px] sm:min-h-[320px] md:min-h-[332px] overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl ${
         unlocking
           ? "cursor-wait"
           : locked
@@ -135,11 +135,8 @@ export function WorldCard({
         style={{ background: "var(--world-accent)" }}
       />
 
-      {(locked || unlocking) && <LevelLockOverlay unlocking={unlocking} />}
-
-      {/* Content Layer */}
-      <div className="relative z-10 flex min-h-[320px] md:min-h-[332px] flex-col justify-between p-5 md:p-6 text-white">
-        <div className="flex items-start justify-between gap-4">
+      <div className="relative z-10 flex min-h-[280px] sm:min-h-[320px] md:min-h-[332px] flex-col justify-between p-4 sm:p-5 md:p-6 text-white">
+        <div className="flex items-start justify-between gap-3">
           <span className="ui-meta text-[10px] text-white/70 font-mono tracking-wider tabular-nums">
             {levelNumber
               ? t("session.levelNumber", {
@@ -184,12 +181,12 @@ export function WorldCard({
         <div className="space-y-3.5">
           <div className="max-w-[31rem] space-y-2">
             <h2
-              className="ui-title text-3xl md:text-[2.35rem] font-bold leading-[1.05] tracking-tight text-white transition-colors"
+              className="ui-title text-2xl sm:text-3xl md:text-[2.35rem] font-bold leading-[1.08] sm:leading-[1.05] tracking-tight text-white transition-colors"
               style={isEntering ? { color: "var(--world-accent)" } : undefined}
             >
               {text(world.name)}
             </h2>
-            <p className="text-[14px] leading-relaxed text-white/80 line-clamp-3 break-words [overflow-wrap:anywhere]">
+            <p className="text-[13px] sm:text-[14px] leading-relaxed text-white/80 line-clamp-2 sm:line-clamp-3 break-words [overflow-wrap:anywhere]">
               {text(world.description)}
             </p>
           </div>
@@ -216,18 +213,18 @@ export function WorldCard({
                 type="button"
                 onClick={(e) => onViewDetails(e, world.id)}
                 aria-label={t("world.viewDetails", "View details")}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-black/25 text-white/80 backdrop-blur-md transition-all hover:bg-white/20 hover:text-white active:scale-95"
+                className="inline-flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-white/15 bg-black/25 text-white/80 backdrop-blur-md transition-all hover:bg-white/20 hover:text-white active:scale-95 cursor-pointer"
               >
-                <Eye className="w-3.5 h-3.5" />
+                <Eye className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               </button>
               {world.metadata?.source !== "file" && (
                 <button
                   type="button"
                   onClick={(e) => onDelete(e, world.id)}
                   aria-label={t("world.delete", "Delete world")}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-black/25 text-white/80 backdrop-blur-md transition-all hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 active:scale-95"
+                  className="inline-flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-white/15 bg-black/25 text-white/80 backdrop-blur-md transition-all hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 active:scale-95 cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                 </button>
               )}
             </div>

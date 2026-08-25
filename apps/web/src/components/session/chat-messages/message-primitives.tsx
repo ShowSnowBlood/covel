@@ -46,7 +46,7 @@ function NonMemoNarrativeMessageBody({
     <div
       className={`text-sm wrap-break-words w-full ${
         isUser
-          ? "ui-message-player prose prose-sm max-w-[90%] md:max-w-[85%] border border-border p-4 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+          ? "ui-message-player prose prose-sm max-w-[95%] sm:max-w-[85%] rounded-2xl border border-border/80 p-3 sm:p-4 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 bg-primary/10 shadow-xs"
           : isHiddenAssistantKind
             ? "ui-message-assistant max-w-none border-l-2 border-border/40 pl-3 py-1 font-mono text-[12px] text-muted-foreground/80 whitespace-pre-wrap"
             : "ui-message-assistant ui-narrative prose prose-sm max-w-none border-0 p-0"

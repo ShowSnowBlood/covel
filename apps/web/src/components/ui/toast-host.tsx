@@ -144,7 +144,7 @@ export function ToastHost() {
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+      className="pointer-events-none fixed bottom-4 left-3 right-3 sm:left-auto sm:right-4 z-[100] flex w-auto sm:w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 pb-[env(safe-area-inset-bottom)]"
     >
       {toasts.map((toast) => {
         const Icon = ICONS[toast.kind];
@@ -155,7 +155,7 @@ export function ToastHost() {
             onMouseEnter={() => pauseDismiss(toast.id)}
             onMouseLeave={() => resumeDismiss(toast.id)}
             className={cn(
-              "pointer-events-auto flex items-start gap-3 rounded-md border px-3 py-2.5 shadow-lg backdrop-blur-md",
+              "pointer-events-auto flex items-start gap-3 rounded-2xl border px-3.5 py-3 shadow-2xl backdrop-blur-2xl",
               "animate-in slide-in-from-bottom-2 fade-in",
               TONE_CLASS[toast.kind],
             )}

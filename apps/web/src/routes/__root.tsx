@@ -158,23 +158,23 @@ function RootLayout() {
           {!isHome && (
             <Link
               to="/"
-              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ui-title flex items-center gap-2.5 tracking-tight pointer-events-auto transition-transform hover:scale-105 ${isSession ? "text-base" : "text-xl font-bold"}`}
+              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ui-title flex items-center gap-2 tracking-tight pointer-events-auto transition-transform hover:scale-105 ${isSession ? "text-sm sm:text-base" : "text-base sm:text-xl font-bold"}`}
               style={isElectron ? noDragStyle : undefined}
             >
               <img
                 src="/icon.png?v=frostfox-game"
                 alt=""
                 aria-hidden="true"
-                className={`rounded-lg object-cover shadow-sm ${isSession ? "h-6 w-6" : "h-7 w-7"}`}
+                className={`rounded-lg object-cover shadow-sm ${isSession ? "h-5 w-5 sm:h-6 sm:w-6" : "h-6 w-6 sm:h-7 sm:w-7"}`}
                 draggable={false}
               />
-              <span className="font-display font-bold tracking-tight text-foreground">
+              <span className="font-display font-bold tracking-tight text-foreground hidden min-[420px]:inline">
                 FrostFox Game
               </span>
             </Link>
           )}
           <div
-            className={`w-full flex h-full items-center justify-between ${isMacDesktop ? "pl-[88px] pr-4 md:pr-6" : "px-4 md:px-6"}`}
+            className={`w-full flex h-full items-center justify-between ${isMacDesktop ? "pl-[88px] pr-3 sm:pr-6" : "px-2.5 sm:px-6"}`}
           >
             {!isHome && (
               <nav
@@ -249,16 +249,18 @@ function RootLayout() {
                         variant="ghost"
                         size="icon"
                         aria-label={t("nav.primary", "Primary")}
-                        className="md:hidden h-9 w-9 text-muted-foreground hover:text-primary hover:bg-muted/40 rounded-[var(--radius-control)]"
+                        className="md:hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/50"
                       >
                         <Menu className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-xs">
-                      <DialogHeader>
-                        <DialogTitle>{t("nav.primary", "Primary")}</DialogTitle>
+                    <DialogContent className="w-[88vw] max-w-xs rounded-3xl p-5 bg-card/95 backdrop-blur-2xl border border-border/80 shadow-2xl">
+                      <DialogHeader className="pb-3 border-b border-border/60">
+                        <DialogTitle className="text-sm font-semibold tracking-wider uppercase font-mono text-muted-foreground">
+                          {t("nav.primary", "Primary")}
+                        </DialogTitle>
                       </DialogHeader>
-                      <nav className="flex flex-col">
+                      <nav className="flex flex-col gap-1 pt-2">
                         {navItems.map((item) => (
                           <button
                             key={item.id}
@@ -271,13 +273,16 @@ function RootLayout() {
                               setMobileNavOpen(false);
                               item.onClick();
                             }}
-                            className={`h-11 px-2 text-left text-sm transition-colors rounded-[var(--radius-control)] ${
+                            className={`h-12 px-3.5 text-left text-sm font-medium transition-all rounded-2xl flex items-center justify-between cursor-pointer ${
                               activeNav === item.id
-                                ? "text-foreground font-medium"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                            } ${item.disabled ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground" : ""}`}
+                                ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                            } ${item.disabled ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground" : ""}`}
                           >
-                            {item.label}
+                            <span>{item.label}</span>
+                            {activeNav === item.id && (
+                              <span className="h-2 w-2 rounded-full bg-primary-foreground" />
+                            )}
                           </button>
                         ))}
                         <button
@@ -286,11 +291,16 @@ function RootLayout() {
                             setMobileNavOpen(false);
                             toggleLocale();
                           }}
-                          className="h-11 px-2 mt-1 border-t border-border text-left text-sm text-muted-foreground hover:text-foreground transition-colors"
+                          className="h-12 px-3.5 mt-2 border-t border-border/60 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors flex items-center justify-between cursor-pointer"
                         >
-                          {locale === "zh-CN"
-                            ? t("onboarding.localeEn", "Switch to English")
-                            : t("onboarding.localeZh", "Switch to Chinese")}
+                          <span>
+                            {locale === "zh-CN"
+                              ? t("onboarding.localeEn", "Switch to English")
+                              : t("onboarding.localeZh", "Switch to Chinese")}
+                          </span>
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-muted text-foreground">
+                            {locale === "zh-CN" ? "EN" : "ZH"}
+                          </span>
                         </button>
                       </nav>
                     </DialogContent>

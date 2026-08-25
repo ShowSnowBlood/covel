@@ -44,7 +44,7 @@ export function MediaPreviewDialog({
       open={mediaRef !== null}
       onOpenChange={(open) => !open && onClose()}
     >
-      <DialogContent className="flex w-auto max-w-[95vw] max-h-[92vh] flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="flex w-auto max-w-[95vw] max-h-[92vh] flex-col gap-0 overflow-hidden p-0 rounded-3xl border border-white/20 bg-zinc-950/90 shadow-2xl backdrop-blur-2xl">
         {mediaRef ? (
           <>
             <div className="flex min-h-0 items-center justify-center bg-black/40 p-3">

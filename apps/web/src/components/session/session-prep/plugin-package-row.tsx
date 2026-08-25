@@ -70,9 +70,6 @@ export function PluginPackageRow({
   );
   const primaryBinding = pluginBindings[0];
   const hasAgentRuntime = pluginBindings.length > 0;
-  // A plugin names the provider slot it runs on with a `type: slot` setting.
-  // Discovered by declared type, never by a key-name convention, so any
-  // plugin gets the inline picker without having to guess a magic key.
   const providerSlotSetting = pkg.userSettings?.find(
     (spec) => spec.type === "slot",
   );
@@ -80,8 +77,6 @@ export function PluginPackageRow({
     typeof providerSlotSetting?.default === "string"
       ? providerSlotSetting.default
       : undefined;
-  // Empty when the plugin declares no slot setting — `has()` then misses and
-  // the picker below stays unrendered, same as before.
   const providerSlotKey = `plugin.${pkg.name}.${providerSlotSetting?.key ?? ""}`;
   const [providerSlotOverride, setProviderSlotOverride] = useState<
     string | undefined
@@ -91,9 +86,7 @@ export function PluginPackageRow({
       ? store.get<string>(providerSlotKey)
       : undefined;
   });
-  // Reflect out-of-band edits to this setting (e.g. from Settings > Plugins)
-  // while the prep screen is open. The initializer above only reads once, so
-  // without this an external change would leave the picker stale.
+
   useEffect(() => {
     const store = getSettings();
     const read = () =>
@@ -105,6 +98,7 @@ export function PluginPackageRow({
       setProviderSlotOverride(read());
     });
   }, [providerSlotKey]);
+
   const {
     effectiveSlot: effectiveProviderSlot,
     missing: providerSlotMissing,
@@ -114,79 +108,90 @@ export function PluginPackageRow({
     override: providerSlotOverride,
     isMissing: isMissingDeclaredSlot,
   });
-  // Player picks a configured slot inline (no trip to Settings > Plugins). The
-  // override lands in the SettingsStore under `plugin.<id>.modelPresetId`, which
-  // the X-Plugin-User-Settings header reads live — so the function runtime
-  // resolves it server-side without any extra plumbing.
+
   const handleProviderSlotChange = (value: string): void => {
     const store = getSettings();
-    if (value === "") {
-      void store.clear(providerSlotKey);
-      setProviderSlotOverride(undefined);
-    } else {
-      void store.set(providerSlotKey, value);
-      setProviderSlotOverride(value);
-    }
+    void store.set(providerSlotKey, value);
   };
+
   const hasMissingRuntimeSlot = pluginBindings.some((binding) =>
     isMissingDeclaredSlot(binding.defaultSlot),
   );
 
   return (
     <div
-      className={`border px-3 py-2.5 transition-colors ${
+      data-testid={`plugin-row-${pkg.name}`}
+      className={`rounded-2xl border p-3 sm:p-4 transition-all duration-200 ${
         isSelected
-          ? "border-primary/40 bg-primary/5"
-          : "border-border bg-muted/20 opacity-60"
+          ? "border-primary/40 bg-card/85 shadow-xs"
+          : "border-border/60 bg-muted/20 opacity-75 hover:opacity-100 hover:bg-muted/35"
       }`}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+        {/* Toggle Switch */}
         <button
           type="button"
           role="switch"
           aria-checked={isSelected}
           disabled={isLocked}
-          title={isLocked ? t("plugin.locked") : undefined}
-          className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border-2 border-transparent transition-colors ${
-            isSelected ? "bg-primary" : "bg-input"
-          } ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-          onClick={() => !isLocked && onTogglePlugin(pkg.name)}
+          onClick={() => onTogglePlugin(pkg.name)}
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+            isSelected ? "bg-primary" : "bg-muted-foreground/30"
+          } ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
         >
           <span
-            className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-background shadow-sm transition ${
-              isSelected ? "translate-x-3" : "translate-x-0"
+            aria-hidden="true"
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out ${
+              isSelected ? "translate-x-4" : "translate-x-0"
             }`}
           />
         </button>
 
-        <span className="text-xs font-medium truncate flex-1 min-w-0">
+        {/* Plugin Name */}
+        <span className="text-xs sm:text-sm font-semibold text-foreground truncate min-w-0">
           {displayName}
         </span>
-        {isCore && (
+
+        {/* Core Lock Badge */}
+        {isLocked && (
           <span
-            title={t("plugin.locked")}
-            className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground/70 shrink-0"
+            className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md shrink-0 font-mono"
+            title={
+              isCore
+                ? t(
+                    "plugin.locked",
+                    "Core plugin — cannot be disabled",
+                  )
+                : t(
+                    "session.world",
+                    "World",
+                  )
+            }
           >
-            <Lock className="w-3 h-3" />
-            <span className="hidden sm:inline">{t("plugin.core", "core")}</span>
+            <Lock className="w-2.5 h-2.5" />
+            <span>{isCore ? t("plugin.core", "Core") : t("session.world", "World")}</span>
           </span>
         )}
-        {runtimes[0] && stageLabel(runtimes[0].stage, t) && (
-          <Badge variant="outline" className="text-[9px] shrink-0">
+
+        {/* Stage / Runtime Badges */}
+        {runtimes[0]?.stage && (
+          <Badge variant="outline" className="text-[9px] shrink-0 font-mono">
             {stageLabel(runtimes[0].stage, t)}
           </Badge>
         )}
         {runtimes[0]?.kind && (
-          <Badge variant="secondary" className="text-[9px] shrink-0">
+          <Badge variant="secondary" className="text-[9px] shrink-0 font-mono">
             {runtimes[0].kind === "agent" ? "LLM" : "Fn"}
           </Badge>
         )}
         {tools.length > 0 && (
-          <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground shrink-0">
+          <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground shrink-0 font-mono">
             <Wrench className="w-2.5 h-2.5" />
             {tools.length}
           </span>
         )}
+
+        {/* Single Primary Binding Select */}
         {hasAgentRuntime &&
           isSelected &&
           primaryBinding &&
@@ -201,14 +206,10 @@ export function PluginPackageRow({
                   event.target.value,
                 )
               }
-              className="min-w-[100px] flex-shrink text-[11px] bg-background border border-border rounded px-2 py-1 max-w-[240px]"
+              className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
               aria-label={t(
                 "plugin.modelBindingAria",
-                "Which model slot this plugin's runtime will use. Leave at default unless you have a reason to override.",
-              )}
-              title={t(
-                "plugin.modelBindingAria",
-                "Which model slot this plugin's runtime will use. Leave at default unless you have a reason to override.",
+                "Which model slot this plugin's runtime will use.",
               )}
             >
               <option value="">
@@ -238,14 +239,17 @@ export function PluginPackageRow({
             </select>
           )}
       </div>
+
       {description && (
-        <p className="text-[11px] text-muted-foreground mt-1.5 ml-9 line-clamp-2">
+        <p className="text-[11px] sm:text-xs text-muted-foreground mt-2 pl-1 sm:pl-9 line-clamp-2 leading-relaxed">
           {description}
         </p>
       )}
-      <div className="mt-1.5 ml-9 flex flex-wrap gap-1">
+
+      {/* Tags and Reasons */}
+      <div className="mt-2 pl-1 sm:pl-9 flex flex-wrap gap-1">
         {reason && (
-          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+          <Badge variant="flat" className="text-[9px] px-2 py-0 h-4">
             {reason}
           </Badge>
         )}
@@ -253,64 +257,42 @@ export function PluginPackageRow({
           <Badge
             key={tag}
             variant="outline"
-            className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground"
+            className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground font-mono"
           >
             {tag}
           </Badge>
         ))}
       </div>
+
+      {/* Provider Slot Config */}
       {isSelected && providerSlotSetting && (
-        <div className="mt-2.5 ml-9 flex flex-wrap items-center gap-2.5 text-[11px] text-muted-foreground min-w-0">
+        <div className="mt-2.5 pl-1 sm:pl-9 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground min-w-0">
           <KeyRound className="w-3 h-3 shrink-0" />
-          <span className="font-medium shrink-0">
-            {t("plugin.providerSlot", "provider slot")}
-          </span>
+          <span className="font-mono text-[10px] truncate">{pkg.name}</span>
           <Badge
             variant={providerSlotMissing ? "destructive" : "outline"}
-            className="text-[10px] px-1.5 py-0.5 h-5 shrink-0"
-            title={
-              providerSlotMissing
-                ? t("plugin.providerSlotMissingTitle", {
-                    slot: effectiveProviderSlot,
-                    plugin: pkg.name,
-                    defaultValue:
-                      "Add [covel.{{slot}}] to llm.toml, or pick a configured slot here.",
-                  })
-                : undefined
-            }
+            className="text-[9px] px-1.5 py-0.2 shrink-0 font-mono"
           >
             {providerSlotMissing
               ? t("plugin.slotMissingShort", {
                   slot: effectiveProviderSlot,
-                  defaultValue: "missing [covel.{{slot}}]",
+                  defaultValue: `missing [covel.${effectiveProviderSlot}]`,
                 })
-              : `[covel.${effectiveProviderSlot}]`}
+              : providerSlotOverridden
+                ? `override: ${effectiveProviderSlot}`
+                : `default: ${effectiveProviderSlot}`}
           </Badge>
-          {providerSlotOverridden && (
-            <Badge
-              variant="secondary"
-              className="text-[9px] px-1.5 py-0 h-4 shrink-0"
-            >
-              {t("plugin.providerSlotOverridden", "overridden")}
-            </Badge>
-          )}
-          {/* Inline override: pick any configured slot without leaving prep.
-              "" = fall back to the manifest default. */}
           {resolvedSlots.length > 0 && (
             <select
               value={providerSlotOverride ?? ""}
               onChange={(event) => handleProviderSlotChange(event.target.value)}
-              className="ml-auto min-w-[120px] flex-shrink text-[11px] bg-background border border-border rounded px-2 py-1 max-w-[280px]"
-              aria-label={t(
-                "plugin.providerSlotOverrideAria",
-                "Override which configured slot this plugin's provider uses. Leave at default unless you have a reason to change it.",
-              )}
+              className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
             >
               <option value="">
                 {manifestDefaultSlot
                   ? t("plugin.providerSlotDefaultOption", {
                       slot: manifestDefaultSlot,
-                      defaultValue: "default · [covel.{{slot}}]",
+                      defaultValue: `default · [covel.${manifestDefaultSlot}]`,
                     })
                   : t("plugin.providerSlotNoDefault", "default")}
               </option>
@@ -324,16 +306,15 @@ export function PluginPackageRow({
           )}
         </div>
       )}
+
+      {/* Multi-Binding Selectors */}
       {isSelected &&
         pluginBindings.length > 0 &&
         (pluginBindings.length > 1 || hasMissingRuntimeSlot) && (
-          <div className="mt-2.5 ml-9 space-y-1.5">
+          <div className="mt-2.5 pl-1 sm:pl-9 space-y-2">
             {pluginBindings.map((binding) => {
               const declaredSlot = binding.defaultSlot;
               const configuredDefault = resolveDeclaredSlot(declaredSlot);
-              const selectedSlot = binding.slotName
-                ? resolvedSlots.find((slot) => slot.slotId === binding.slotName)
-                : configuredDefault;
               const missingDefault = isMissingDeclaredSlot(declaredSlot);
               const showPicker =
                 pluginBindings.length > 1 ||
@@ -342,40 +323,22 @@ export function PluginPackageRow({
               return (
                 <div
                   key={binding.qualifiedId}
-                  className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground min-w-0"
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground min-w-0"
                 >
                   <Cpu className="w-3 h-3 shrink-0" />
                   <span
-                    className="font-mono truncate min-w-0 max-w-[240px]"
+                    className="font-mono text-[10px] truncate max-w-[200px]"
                     title={binding.qualifiedId}
                   >
                     {binding.qualifiedId}
                   </span>
                   <Badge
                     variant={missingDefault ? "destructive" : "outline"}
-                    className="text-[10px] px-1.5 py-0.5 h-5 shrink-0"
-                    title={
-                      missingDefault
-                        ? t("plugin.slotMissingTitle", {
-                            slot: declaredSlot,
-                            defaultValue: "Add [covel.{{slot}}] to llm.toml",
-                          })
-                        : undefined
-                    }
+                    className="text-[9px] px-1.5 py-0.2 shrink-0 font-mono"
                   >
-                    {missingDefault
-                      ? t("plugin.slotMissingShort", {
-                          slot: declaredSlot,
-                          defaultValue: "missing [covel.{{slot}}]",
-                        })
-                      : `default: ${declaredSlot}`}
+                    {missingDefault ? `missing [${declaredSlot}]` : `default: ${declaredSlot}`}
                   </Badge>
-                  {missingDefault && (
-                    <code className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded shrink-0">
-                      [covel.{declaredSlot}]
-                    </code>
-                  )}
-                  {showPicker ? (
+                  {showPicker && (
                     <select
                       value={binding.slotName}
                       onChange={(event) =>
@@ -384,30 +347,12 @@ export function PluginPackageRow({
                           event.target.value,
                         )
                       }
-                      className="ml-auto min-w-[120px] flex-shrink text-[11px] bg-background border border-border rounded px-2 py-1 max-w-[280px]"
-                      aria-label={t(
-                        "plugin.modelBindingAria",
-                        "Which model slot this plugin's runtime will use. Leave at default unless you have a reason to override.",
-                      )}
+                      className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
                     >
                       <option value="">
                         {configuredDefault
-                          ? configuredDefault.serverModel
-                            ? t("plugin.runtimeDefaultSummaryWithModel", {
-                                slot: declaredSlot,
-                                model: configuredDefault.serverModel,
-                                defaultValue:
-                                  "runtime default · {{slot}} · {{model}}",
-                              })
-                            : t("plugin.runtimeDefaultSummary", {
-                                slot: declaredSlot,
-                                defaultValue: "runtime default · {{slot}}",
-                              })
-                          : t("plugin.runtimeDefaultMissing", {
-                              slot: declaredSlot,
-                              defaultValue:
-                                "runtime default · {{slot}} (missing)",
-                            })}
+                          ? `default · ${declaredSlot}`
+                          : `(unassigned)`}
                       </option>
                       {resolvedSlots.map((slot) => (
                         <option key={slot.slotId} value={slot.slotId}>
@@ -416,16 +361,7 @@ export function PluginPackageRow({
                         </option>
                       ))}
                     </select>
-                  ) : selectedSlot ? (
-                    <span
-                      className="ml-auto truncate text-[11px]"
-                      title={
-                        formatSlotLabel(selectedSlot) ?? selectedSlot.slotId
-                      }
-                    >
-                      {formatSlotLabel(selectedSlot) ?? selectedSlot.slotId}
-                    </span>
-                  ) : null}
+                  )}
                 </div>
               );
             })}
