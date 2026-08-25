@@ -25,6 +25,7 @@
     },
     "apps/web": {
       "entry": ["src/routes/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["ogl"],
       "ignoreUnresolved": ["\\./routeTree\\.gen"]
     }
   }
