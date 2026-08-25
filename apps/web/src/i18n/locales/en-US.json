@@ -14,7 +14,20 @@
     "syncRules": "Synchronizing world rules & lore…",
     "loadPlugins": "Loading narrative pipeline & plugins…",
     "connectModels": "Connecting neural model endpoints…",
-    "ready": "Ready, entering world…"
+    "ready": "Ready, entering world…",
+    "saveState": "Saving session state…",
+    "unloadPipeline": "Unloading narrative pipeline…",
+    "returnHome": "Ready, returning to home…",
+    "returningHome": "Returning to home…",
+    "saveSession": "Saving current progress…",
+    "loadArchives": "Loading world archives…",
+    "readyWorldSelect": "Ready, entering world select…",
+    "returningWorldSelect": "Returning to world archives…",
+    "pauseSession": "Suspending active session…",
+    "loadWorldConfig": "Loading world configuration & plugins…",
+    "loadWorldData": "Loading world lore & parameters…",
+    "readyPrep": "Ready, entering world cockpit…",
+    "enteringWorldPrep": "Entering world configuration…"
   },
   "nav": {
     "home": "Home",

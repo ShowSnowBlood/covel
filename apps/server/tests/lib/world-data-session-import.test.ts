@@ -1333,6 +1333,7 @@ sources: {}
       "character-presence",
       "living-world-rules",
       "branch-reply",
+      "core-quest",
       "char-creator",
     ];
     const store = createMemoryStore();
@@ -1374,23 +1375,28 @@ sources: {}
     expect(
       await store.listPluginData("sess-haruka", "char-creator", "characters"),
     ).not.toHaveLength(0);
+    expect(
+      await store.listPluginData("sess-haruka", "core-quest", "quests"),
+    ).toHaveLength(3);
     expect(await store.listWorldDataImportLedger("sess-haruka")).toHaveLength(
       result.written,
     );
   });
 
-  it("imports bundled world rule sources with real plugin schemas", async () => {
+  it("imports bundled world rule, quest, and item sources with real plugin schemas", async () => {
     const worldsDir = path.resolve(import.meta.dirname, "../../../../worlds");
     const pluginRegistry = await builtinPluginRegistry();
 
-    // mistport ships a living-world-rules rule set, a character-blueprint cast,
-    // and character-presence portraits (media + presence); activate the plugins
-    // all its sources target so the import is clean.
+    // mistport ships living rules, quest/item seeds, a character-blueprint cast,
+    // and character-presence portraits; activate every targeted plugin so the
+    // import exercises all bundled sources.
     const worldId = "mistport";
     const ruleSourceId = "tideRules";
     const activePlugins = [
       "living-world-rules",
       "character-blueprint",
+      "core-quest",
+      "inventory",
       "char-creator",
       "character-presence",
     ];
@@ -1421,11 +1427,17 @@ sources: {}
     });
 
     expect(result.diagnostics.filter((d) => d.level === "error")).toEqual([]);
-    expect(result.written).toBeGreaterThanOrEqual(6);
+    expect(result.written).toBeGreaterThanOrEqual(7);
     expect(
       await store.listPluginData(sessionId, "living-world-rules", "rules"),
-    ).toHaveLength(6);
-    expect(await store.listSessionLorebookEntries(sessionId)).toHaveLength(6);
+    ).toHaveLength(7);
+    expect(await store.listSessionLorebookEntries(sessionId)).toHaveLength(7);
+    expect(
+      await store.listPluginData(sessionId, "core-quest", "quests"),
+    ).toHaveLength(2);
+    expect(
+      await store.listPluginData(sessionId, "inventory", "items"),
+    ).toHaveLength(2);
     expect(
       (await store.listWorldDataImportLedger(sessionId)).map(
         (row) => row.sourceId,

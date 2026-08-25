@@ -80,3 +80,20 @@
     - 新闻部
     - 热度
   insertionOrder: 450
+- schemaVersion: 1
+  id: haruka-festival-tradeoffs
+  title: 学园祭时间账
+  content: 学园祭倒计时是真实压力。玩家每次投入放学后时间，应推进一个清晰的筹备目标并让其他路线留下机会成本；同一回合不要同时完成多个社团关键节点。任务完成、延误或放弃都要在后续对话中留下可追踪的关系与传闻反应。
+  kind: constant
+  category: world
+  enabled: true
+  coordinate:
+    position: before_plugin
+  budgetClass: sticky
+  keys:
+    - 学园祭
+    - 时间
+    - 取舍
+    - 延误
+    - 机会成本
+  insertionOrder: 460

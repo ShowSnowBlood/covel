@@ -209,6 +209,15 @@ export function SessionPrepScreen({
 
   const [isStarting, setIsStarting] = useState(false);
   const [resumingId, setResumingId] = useState<string | null>(null);
+  const [isBacking, setIsBacking] = useState(false);
+
+  const handleBack = useCallback(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onBack();
+      return;
+    }
+    setIsBacking(true);
+  }, [onBack]);
 
   const handleStart = useCallback(async () => {
     if (isStarting) return;
@@ -280,7 +289,7 @@ export function SessionPrepScreen({
                 size="sm"
                 radius="full"
                 className="h-8 border-white/20 bg-black/40 px-3.5 text-xs text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
-                onClick={onBack}
+                onClick={handleBack}
               >
                 <ArrowLeft className="w-3.5 h-3.5 mr-1" />
                 {t("session.breadcrumbWorldSelect", "Select World")}
@@ -628,6 +637,25 @@ export function SessionPrepScreen({
           title={text(world.name)}
           subtitle={t("session.resuming", "Resuming session…")}
           durationMs={1400}
+        />
+      )}
+
+      {/* Returning to World Select Scene Loading Transition */}
+      {isBacking && (
+        <SceneLoadingTransition
+          image={visual.image}
+          title={t("session.breadcrumbWorldSelect", "选择世界")}
+          subtitle={t("transition.returningWorldSelect", "正在返回世界档案库…")}
+          steps={[
+            t("transition.saveSession", "正在保存当前配置…"),
+            t("transition.loadArchives", "正在载入世界档案库…"),
+            t("transition.readyWorldSelect", "准备就绪，即将进入世界选择…"),
+          ]}
+          durationMs={1200}
+          onComplete={() => {
+            setIsBacking(false);
+            onBack();
+          }}
         />
       )}
     </div>

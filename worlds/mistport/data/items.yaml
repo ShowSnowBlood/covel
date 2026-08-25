@@ -1,0 +1,16 @@
+# inventory seed data for Mistport.
+- id: tide-coins
+  name: 潮币
+  quantity: 50
+  description: 议会发行的标准货币，可用于补给、鉴定和合法交易。
+  tags:
+    - currency
+- id: fog-lamp
+  name: 潮石雾灯
+  quantity: 1
+  equipped: true
+  description: 冷光、低声的潮石灯。明火会吸引雾兽，进入雾区前必须确认它仍然稳定。
+  tags:
+    - tool
+    - light
+    - survival

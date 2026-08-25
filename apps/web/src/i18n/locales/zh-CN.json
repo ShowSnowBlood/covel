@@ -14,7 +14,20 @@
     "syncRules": "正在同步世界设定与法则…",
     "loadPlugins": "正在装载剧情管线与插件…",
     "connectModels": "正在连接神经网络模型…",
-    "ready": "准备就绪，即将进入世界…"
+    "ready": "准备就绪，即将进入世界…",
+    "saveState": "正在保存会话与状态…",
+    "unloadPipeline": "正在卸载叙事引擎…",
+    "returnHome": "准备就绪，正在返回主页…",
+    "returningHome": "正在返回主页…",
+    "saveSession": "正在保存当前进度…",
+    "loadArchives": "正在载入世界档案库…",
+    "readyWorldSelect": "准备就绪，即将进入世界选择…",
+    "returningWorldSelect": "正在返回世界档案库…",
+    "pauseSession": "正在保存当前会话…",
+    "loadWorldConfig": "正在加载世界配置与插件…",
+    "loadWorldData": "正在读取世界法则与设定…",
+    "readyPrep": "准备就绪，进入世界工作台…",
+    "enteringWorldPrep": "正在返回世界配置…"
   },
   "nav": {
     "home": "首页",

@@ -21,6 +21,13 @@ sources:
     to: plugin:living-world-rules/rules+lorebook
     key: id
     after: cast
+  quests:
+    kind: yaml
+    path: data/quests.yaml
+    schema: plugin://core-quest/quests
+    to: plugin:core-quest/quests
+    key: id
+    after: dimensions
   portraits:
     kind: media
     path: media/portraits

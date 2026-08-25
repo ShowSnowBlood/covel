@@ -1,0 +1,28 @@
+# core-quest seed data for Mistport.
+- id: qi-disappearance
+  name: 齐老失踪
+  description: 苏窈希望你查清公会长齐老为何在涨潮期进入下潮区，并带回能验证去向的证物。调查会触碰公会、议会与下潮区的禁忌。
+  status: active
+  giver: 苏窈
+  reward: 公会通行资格与一条关于裂潮的内部记录
+  objectives:
+    - id: ask-su-yao
+      text: 从苏窈处确认齐老留下的半封信
+      done: false
+    - id: enter-undertow
+      text: 在潮汐窗口内找到进入下潮区的路线
+      done: false
+    - id: return-evidence
+      text: 带回能够解释齐老去向的证物
+      done: false
+- id: riftide-key
+  name: 钥匙碎片的买家
+  description: 线索反复提到有人在高价收购遗物碎片。查明买家身份会迫使你在合法鉴定、黑市交易与雾中教会之间做出取舍。
+  status: active
+  objectives:
+    - id: find-fragment-lead
+      text: 找到一条关于遗物碎片买家的可靠线索
+      done: false
+    - id: choose-faction
+      text: 选择把线索交给一个势力或暂时隐瞒
+      done: false

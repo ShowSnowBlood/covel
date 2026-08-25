@@ -33,6 +33,8 @@ pluginPolicy:
     - living-world-rules
     - branch-reply
     - npc-graph
+    # Makes the festival and club routes visible without enabling traditional guide menus.
+    - core-quest
   excludedPlugins:
     - narrator
     - guide

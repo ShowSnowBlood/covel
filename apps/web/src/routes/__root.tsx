@@ -26,6 +26,8 @@ import { useLocalePreference } from "@/hooks/useLocalePreference";
 import { getCovelIpc } from "@/lib/desktop-bridge";
 import { useSession } from "@/stores/session-store";
 import { emitNavEvent } from "@/lib/nav-events";
+import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
+import { worldVisual } from "@/lib/world-visuals.js";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -89,10 +91,58 @@ function RootLayout() {
     return null;
   })();
 
-  const goHome = () => navigate({ to: "/" });
+  const [navTransition, setNavTransition] = useState<{
+    image?: string;
+    title?: string;
+    subtitle?: string;
+    steps?: string[];
+    onComplete: () => void;
+  } | null>(null);
+
+  const goHome = () => {
+    if (isHome) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      navigate({ to: "/" });
+      return;
+    }
+    setNavTransition({
+      image: "/visuals/backgrounds/frostfox-game-cover-image2.png",
+      title: t("home.gameTitle", "FrostFox Game"),
+      subtitle: t("transition.returningHome", "正在返回主页…"),
+      steps: [
+        t("transition.saveState", "正在保存会话与状态…"),
+        t("transition.unloadPipeline", "正在卸载叙事引擎…"),
+        t("transition.returnHome", "准备就绪，正在返回主页…"),
+      ],
+      onComplete: () => {
+        setNavTransition(null);
+        navigate({ to: "/" });
+      },
+    });
+  };
   const goWorld = () => {
-    if (sessionState.session) backToWorldSelect();
-    navigate({ to: "/session", search: {} });
+    if (!hasSession && !sessionState.world && isSessionRoute) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      if (sessionState.session) backToWorldSelect();
+      navigate({ to: "/session", search: {} });
+      return;
+    }
+    const visual = sessionState.world ? worldVisual(sessionState.world) : null;
+    setNavTransition({
+      image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
+      title: t("session.breadcrumbWorldSelect", "选择世界"),
+      subtitle: t("transition.returningWorldSelect", "正在返回世界档案库…"),
+      steps: [
+        t("transition.saveSession", "正在保存当前进度…"),
+        t("transition.loadArchives", "正在载入世界档案库…"),
+        t("transition.readyWorldSelect", "准备就绪，即将进入世界选择…"),
+      ],
+      onComplete: () => {
+        setNavTransition(null);
+        if (sessionState.session) backToWorldSelect();
+        navigate({ to: "/session", search: {} });
+      },
+    });
   };
   const goSession = () => navigate({ to: "/session", search: sessionSearch });
   const goPlugins = () => {
@@ -158,6 +208,10 @@ function RootLayout() {
           {!isHome && (
             <Link
               to="/"
+              onClick={(e) => {
+                e.preventDefault();
+                goHome();
+              }}
               className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ui-title flex items-center gap-2 tracking-tight pointer-events-auto transition-transform hover:scale-105 ${isSession ? "text-sm sm:text-base" : "text-base sm:text-xl font-bold"}`}
               style={isElectron ? noDragStyle : undefined}
             >
@@ -346,6 +400,15 @@ function RootLayout() {
         import.meta.env.VITE_ROUTER_DEVTOOLS !== "false" && (
           <TanStackRouterDevtools position="bottom-right" />
         )}
+      {navTransition && (
+        <SceneLoadingTransition
+          image={navTransition.image}
+          title={navTransition.title}
+          subtitle={navTransition.subtitle}
+          steps={navTransition.steps}
+          onComplete={navTransition.onComplete}
+        />
+      )}
     </>
   );
 }

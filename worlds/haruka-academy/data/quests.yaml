@@ -1,0 +1,43 @@
+# core-quest seed data for Haruka Academy.
+- id: spring-festival-prep
+  name: 春日学园祭筹备
+  description: 学园祭只剩二十一天。玩家需要选择一个愿意投入时间的方向，在公开视线和私人承诺之间完成一项真正能留下成果的工作。
+  status: active
+  giver: 遥风学园学生会
+  reward: 学园祭后的归属感，以及被选择路线角色记住的一件小事
+  objectives:
+    - id: choose-commitment
+      text: 在周五前决定加入或长期协助一个社团或班级企划
+      done: false
+    - id: finish-concrete-work
+      text: 完成一次具体筹备工作并承担它带来的关系反应
+      done: false
+    - id: deliver-festival-result
+      text: 在学园祭前交付自己的成果或说明无法完成的原因
+      done: false
+- id: literature-club-last-issue
+  name: 文艺部的最后一期
+  description: 文艺部需要一份足够有说服力的学园祭特刊，才能争取保留活动室。帮助澪意味着占用时间，也可能让其他路线等待。
+  status: active
+  giver: 神代澪
+  reward: 文艺部保留申请的关键材料
+  objectives:
+    - id: gather-feature
+      text: 和澪完成一篇特刊主题或采访素材
+      done: false
+    - id: submit-issue
+      text: 在审查前交付特刊稿件
+      done: false
+- id: nameless-song
+  name: 没有名字的歌
+  description: 夏帆需要有人真正听完新歌并帮助她面对主舞台排练。靠近这条路线会让你的公开关系更容易被注意。
+  status: active
+  giver: 椎名夏帆
+  reward: 一段只在排练室里听见的未命名旋律
+  objectives:
+    - id: hear-rehearsal
+      text: 完整听完夏帆的一次排练并回应她的顾虑
+      done: false
+    - id: finish-chorus
+      text: 帮夏帆找到新歌最后一段歌词或决定保留空白
+      done: false

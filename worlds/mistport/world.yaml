@@ -30,6 +30,10 @@ recommendedPlugins:
   - character-blueprint
   - character-presence
   - cost-gate
+  # Author-authored risk/economy rules become visible systems in new sessions.
+  - dice-check
+  - core-quest
+  - inventory
 excludedPlugins:
   - chat-mode-narrator
   - scene-cast

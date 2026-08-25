@@ -99,3 +99,20 @@
     - 周期
     - 真相
   insertionOrder: 460
+- schemaVersion: 1
+  id: mistport-consequence-ledger
+  title: 行动必须留痕
+  content: 有失败风险的行动必须留下至少一项可观察后果：骰子判定回执、物品/资源变化、任务目标推进或失败、角色关系变化。不要只写“成功了”就结束；玩家应能根据新状态决定下一步。
+  kind: constant
+  category: world
+  enabled: true
+  coordinate:
+    position: before_plugin
+  budgetClass: sticky
+  keys:
+    - 后果
+    - 判定
+    - 资源
+    - 任务
+    - 状态
+  insertionOrder: 470

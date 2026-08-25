@@ -1,6 +1,6 @@
 import { frostFoxLevelForWorld } from "@covel/shared";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { usePanelCollapse } from "./game-view/use-panel-collapse.js";
 import { useNavTabActivation } from "./game-view/use-nav-tab-activation.js";
@@ -48,6 +48,8 @@ import { PendingDraftsBar } from "./game-view/pending-drafts-bar.js";
 import { useGameViewComposer } from "./game-view/use-game-view-composer.js";
 import { worldVisual } from "@/lib/world-visuals.js";
 import { ignoreError } from "@/lib/ignore-error.js";
+import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
+import { text } from "@/components/world/editor-helpers.js";
 
 // ── Extracted Panel Components (see left-panel.tsx, right-panel.tsx) ──
 
@@ -98,7 +100,57 @@ export function GameView({ session }: GameViewProps) {
   const [levelProgression, setLevelProgression] =
     useState<FrostFoxProgressionStatus | null>(null);
   const [completingLevel, setCompletingLevel] = useState(false);
+  const [viewTransition, setViewTransition] = useState<{
+    image?: string;
+    title?: string;
+    subtitle?: string;
+    steps?: string[];
+    onComplete: () => void;
+  } | null>(null);
 
+  const handleGoWorldSelect = useCallback(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onBackToWorldSelect();
+      return;
+    }
+    const visual = world ? worldVisual(world) : null;
+    setViewTransition({
+      image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
+      title: t("session.breadcrumbWorldSelect", "选择世界"),
+      subtitle: t("transition.returningWorldSelect", "正在返回世界档案库…"),
+      steps: [
+        t("transition.saveSession", "正在保存当前进度…"),
+        t("transition.loadArchives", "正在载入世界档案库…"),
+        t("transition.readyWorldSelect", "准备就绪，即将进入世界选择…"),
+      ],
+      onComplete: () => {
+        setViewTransition(null);
+        onBackToWorldSelect();
+      },
+    });
+  }, [world, t, onBackToWorldSelect]);
+
+  const handleGoPrep = useCallback(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onResetSession();
+      return;
+    }
+    const visual = world ? worldVisual(world) : null;
+    setViewTransition({
+      image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
+      title: text(world?.name),
+      subtitle: t("transition.enteringWorldPrep", "正在返回世界配置…"),
+      steps: [
+        t("transition.pauseSession", "正在保存当前会话…"),
+        t("transition.loadWorldConfig", "正在加载世界配置与插件…"),
+        t("transition.readyPrep", "准备就绪，进入世界工作台…"),
+      ],
+      onComplete: () => {
+        setViewTransition(null);
+        onResetSession();
+      },
+    });
+  }, [world, t, onResetSession]);
   useEffect(() => {
     let cancelled = false;
     if (campaignLevel === null) {
@@ -147,7 +199,7 @@ export function GameView({ session }: GameViewProps) {
         // Progression is authoritative; request() already reports the
         // secondary session-status failure to the player.
       }
-      onBackToWorldSelect();
+      handleGoWorldSelect();
     } catch {
       // request() already surfaced the completion failure.
     } finally {
@@ -462,8 +514,8 @@ export function GameView({ session }: GameViewProps) {
                 onToggleRightPanel={toggleRightPanel}
                 onOpenSettings={() => settings.setOpen(true)}
                 onOpenSuspensions={() => setSuspensionsOpen(true)}
-                onBackToWorldSelect={onBackToWorldSelect}
-                onResetSession={onResetSession}
+                onBackToWorldSelect={handleGoWorldSelect}
+                onResetSession={handleGoPrep}
                 suspensionsCount={suspensions.length}
                 campaignLevel={campaignLevel ?? undefined}
                 canCompleteLevel={canCompleteLevel}
@@ -573,6 +625,15 @@ export function GameView({ session }: GameViewProps) {
           </>
         )}
       </ResizablePanelGroup>
+      {viewTransition && (
+        <SceneLoadingTransition
+          image={viewTransition.image}
+          title={viewTransition.title}
+          subtitle={viewTransition.subtitle}
+          steps={viewTransition.steps}
+          onComplete={viewTransition.onComplete}
+        />
+      )}
     </div>
   );
 }
