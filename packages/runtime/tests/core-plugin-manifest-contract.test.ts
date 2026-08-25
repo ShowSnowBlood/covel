@@ -173,8 +173,10 @@ describe("core plugin manifest contract", () => {
         });
       }
     }
+    // Guide intentionally uses the low-latency utility slot; the remaining
+    // narrator downstreams stay on the general plugin slot.
     expect(downstreams.map((manifest) => manifest.model)).toEqual([
-      "plugin",
+      "utility",
       "plugin",
       "plugin",
       "plugin",

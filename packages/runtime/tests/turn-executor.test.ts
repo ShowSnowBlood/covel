@@ -886,14 +886,29 @@ describe("TurnExecutor _interaction protocol", () => {
     const discoveries = await discoverPlugins(PLUGINS_DIR);
     const charDiscovery = discoveries.find((d) => d.id === "char-creator")!;
     const charManifests = await loadPluginManifest(charDiscovery);
-    // player-init is the runtime that declares `create-form`. Picking
-    // `charManifests[0]` used to grab character-tracker instead, and the
-    // test only passed back when the executor let any runtime call any
-    // builtin regardless of its declaration.
+    // player-init is now a deterministic function runtime. This test targets
+    // the agent tool-loop interaction protocol, so use the same manifest
+    // metadata with the function-only fields removed and an explicit
+    // create-form declaration.
     const charManifest = charManifests.find(
       (m) => m.manifest.name === "char-creator/player-init",
     )!.manifest;
-    const charLoaded = await loadRuntime(charDiscovery, charManifest.name);
+    const {
+      runtimeType: _runtimeType,
+      handler: _handler,
+      resultFormat: _resultFormat,
+      needs: _needs,
+      ...agentManifestBase
+    } = charManifest;
+    const isolatedManifest: RuntimeManifest = {
+      ...agentManifestBase,
+      model: "plugin",
+      tools: { builtin: ["create-form"] },
+    };
+    const agentLoaded: LoadedRuntime = {
+      manifest: isolatedManifest,
+      promptTemplate: "You are a character form agent.",
+    };
 
     // MockLLM that calls create-form (which now returns _interaction)
     const mockLLM = new MockLLM();
@@ -941,7 +956,7 @@ describe("TurnExecutor _interaction protocol", () => {
     for (const t of builtinUITools) toolMap.set(t.name, t);
 
     const deps: TurnExecutorDeps = {
-      loadRuntime: async () => charLoaded,
+      loadRuntime: async () => agentLoaded,
       llm: mockLLM as LLMAdapter,
       store,
       toolExecutor: createToolExecutor({
@@ -950,14 +965,6 @@ describe("TurnExecutor _interaction protocol", () => {
       }),
     };
 
-    // Strip the upstream gate for this unit test — the real player-init
-    // declares turn-scoped `needs: [pregame, world-init/schema-gen]` so the
-    // framework skips it when those aren't scheduled. This test focuses on the
-    // interaction protocol in isolation and doesn't wire in the setup chain.
-    const isolatedManifest = {
-      ...charManifest,
-      needs: undefined,
-    };
     const result = await executeTurn(makeTurnInput(), [isolatedManifest], deps);
 
     // Should have pendingInputs with the interaction protocol

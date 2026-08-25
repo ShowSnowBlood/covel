@@ -44,7 +44,6 @@ export function isNotFound(err: unknown): boolean {
   return err instanceof ApiError && err.status === 404;
 }
 
-/** Options for the internal `request` fetch wrapper. */
 interface RequestOptions extends RequestInit {
   /** Session id carried in a body, query, or non-standard route path. */
   sessionId?: string;
@@ -56,6 +55,12 @@ interface RequestOptions extends RequestInit {
    * polling or optional capability checks).
    */
   silentErrors?: boolean;
+  /**
+   * Validate a successful JSON response before returning it. Boot-critical
+   * GETs use this because a server restart can briefly return a valid but
+   * incomplete JSON envelope.
+   */
+  validateResponse?: (value: unknown) => boolean;
 }
 
 /**
@@ -109,7 +114,13 @@ export async function request<T>(
   url: string,
   init?: RequestOptions,
 ): Promise<T> {
-  const { silentErrors, sessionId, operatorAuth, ...fetchInit } = init ?? {};
+  const {
+    silentErrors,
+    sessionId,
+    operatorAuth,
+    validateResponse,
+    ...fetchInit
+  } = init ?? {};
   // Only GETs are retried — they're idempotent, so a boot-race ECONNREFUSED (dev
   // server not up yet) or a transient gateway error can be retried without risk
   // of double-submitting. Non-GET requests keep the single-shot behaviour.
@@ -152,6 +163,25 @@ export async function request<T>(
       throw new ApiError(res.status, url, text);
     }
 
-    return res.json();
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch (err) {
+      if (canRetry && !isLastAttempt) {
+        await delay(backoffMs(attempt));
+        continue;
+      }
+      throw err;
+    }
+
+    if (validateResponse && !validateResponse(body)) {
+      if (canRetry && !isLastAttempt) {
+        await delay(backoffMs(attempt));
+        continue;
+      }
+      throw new Error(`Invalid response shape from ${url}`);
+    }
+
+    return body as T;
   }
 }

@@ -20,8 +20,16 @@ function mapWorldRecord(w: Record<string, unknown>): WorldRecord {
 }
 
 export async function listWorlds(): Promise<WorldRecord[]> {
+  const isWorldsResponse = (
+    value: unknown,
+  ): value is { items: Record<string, unknown>[] } =>
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Array.isArray((value as Record<string, unknown>).items);
   const res = await request<{ items: Record<string, unknown>[] }>(
     "/api/worlds",
+    { validateResponse: isWorldsResponse },
   );
   return res.items.map(mapWorldRecord);
 }

@@ -8,7 +8,9 @@ export type FlowSegmentId = Stage | "event-manual";
 // -- Config API -------------------------------------------------
 
 export async function listPresets(): Promise<PresetSummary[]> {
-  return request<PresetSummary[]>("/api/presets");
+  return request<PresetSummary[]>("/api/presets", {
+    validateResponse: Array.isArray,
+  });
 }
 
 export interface PluginLoadError {
@@ -41,14 +43,28 @@ function normalizePackageSummary(pkg: RawPackageSummary): PackageSummary {
   };
 }
 
+function isPackagesResponse(value: unknown): value is {
+  packages: RawPackageSummary[];
+  loadErrors?: PluginLoadError[];
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    Array.isArray(record.packages) &&
+    (record.loadErrors === undefined || Array.isArray(record.loadErrors))
+  );
+}
+
 export async function listPackages(): Promise<PackagesResponse> {
   const res = await request<{
     packages: RawPackageSummary[];
-    loadErrors: PluginLoadError[];
-  }>("/api/packages");
+    loadErrors?: PluginLoadError[];
+  }>("/api/packages", {
+    validateResponse: isPackagesResponse,
+  });
   return {
     packages: res.packages.map(normalizePackageSummary),
-    loadErrors: res.loadErrors,
+    loadErrors: res.loadErrors ?? [],
   };
 }
 

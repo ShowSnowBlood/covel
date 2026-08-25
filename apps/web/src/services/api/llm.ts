@@ -63,7 +63,21 @@ export interface LlmConfigResponse {
 }
 
 export async function fetchLlmConfig(): Promise<LlmConfigResponse> {
-  return request<LlmConfigResponse>("/api/llm-config");
+  const isLlmConfigResponse = (value: unknown): value is LlmConfigResponse => {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return false;
+    const record = value as Record<string, unknown>;
+    return (
+      typeof record.configured === "boolean" &&
+      Boolean(record.slots) &&
+      typeof record.slots === "object" &&
+      !Array.isArray(record.slots) &&
+      Array.isArray(record.providers)
+    );
+  };
+  return request<LlmConfigResponse>("/api/llm-config", {
+    validateResponse: isLlmConfigResponse,
+  });
 }
 
 export interface LlmReloadResult {

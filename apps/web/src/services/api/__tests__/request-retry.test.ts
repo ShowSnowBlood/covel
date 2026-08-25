@@ -42,6 +42,25 @@ describe("request() boot-race retry", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("retries a GET when a successful response has the wrong shape", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okRes({}))
+      .mockResolvedValueOnce(okRes({ items: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = request<{ items: unknown[] }>("/api/worlds", {
+      silentErrors: true,
+      validateResponse: (value): value is { items: unknown[] } =>
+        Boolean(value) &&
+        typeof value === "object" &&
+        Array.isArray((value as { items?: unknown }).items),
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    await expect(promise).resolves.toEqual({ items: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("retries a GET on a transport error (ECONNREFUSED), then resolves", async () => {
     const fetchMock = vi
       .fn()
