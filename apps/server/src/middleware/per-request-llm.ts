@@ -184,7 +184,7 @@ export function createPerRequestLlmMiddleware(
   };
 }
 
-function mergeManagedSlotDefaults(
+export function mergeManagedSlotDefaults(
   defaults: SlotOverridesInput | undefined,
   overrides: SlotOverridesInput | null,
 ): SlotOverridesInput | null {

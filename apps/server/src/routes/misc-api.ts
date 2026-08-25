@@ -6,6 +6,11 @@
 
 import { Hono } from "hono";
 import { readEnvString, readRuntimeEnv } from "@covel/shared";
+import {
+  FrostFoxServiceError,
+  type FrostFoxService,
+} from "../frostfox/service.js";
+import { errorBody } from "../api-error.js";
 import { reloadAiStack, type AiStack } from "../ai-setup.js";
 import {
   applySlotOverlay,
@@ -22,13 +27,16 @@ import { buildUiSpecsResponse } from "./misc-api/ui-specs.js";
 import {
   checkHostedOperator,
   checkSessionOwnerById,
+  hasOperatorToken,
 } from "./api/session/session-guard.js";
+import { mergeManagedSlotDefaults } from "../middleware/per-request-llm.js";
 import { decodeBase64Json } from "../lib/base64-json.js";
 
 export function createMiscApiRoutes(
   ai: AiStack,
   registry: PluginRegistry,
   store: DataStore,
+  frostFox?: FrostFoxService | null,
 ): Hono {
   const app = new Hono();
 
@@ -229,8 +237,35 @@ export function createMiscApiRoutes(
   // the probe cheap — we only care about connectivity + latency, not the
   // full reply.
   app.post("/api/ai/ping", async (c) => {
-    const denied = checkHostedOperator(c);
-    if (denied) return denied;
+    const operator = hasOperatorToken(c);
+    const principal = c.get("frostFoxPrincipal");
+    let frostFoxContext: Awaited<
+      ReturnType<FrostFoxService["prepareAiContext"]>
+    > = null;
+    if (!operator && frostFox) {
+      if (!principal) {
+        return c.json(
+          errorBody("FrostFox account connection required", {
+            code: "frostfox_account_required",
+          }),
+          401,
+        );
+      }
+      try {
+        frostFoxContext = await frostFox.prepareAiContext(principal);
+      } catch (error) {
+        if (error instanceof FrostFoxServiceError) {
+          return c.json(
+            errorBody(error.code, { code: error.code }),
+            error.status === 400 ? 400 : 401,
+          );
+        }
+        throw error;
+      }
+    } else if (!operator) {
+      const denied = checkHostedOperator(c);
+      if (denied) return denied;
+    }
     const body = await c.req
       .json<{ presetId?: string; slot?: string }>()
       .catch((): { presetId?: string; slot?: string } => ({}));
@@ -245,6 +280,11 @@ export function createMiscApiRoutes(
     if (keysParsed && typeof keysParsed === "object") {
       apiKeys = keysParsed as Record<string, string>;
     }
+    if (frostFoxContext) {
+      // The derived managed key wins over any browser-supplied value for the
+      // reserved FrostFox provider ids.
+      apiKeys = { ...(apiKeys ?? {}), ...frostFoxContext.apiKeys };
+    }
 
     // Decode the client slot config header (base64 JSON). Shared with the
     // turn pipeline's per-request middleware — the ping endpoint needs its
@@ -252,11 +292,16 @@ export function createMiscApiRoutes(
     // middleware runs (same request, but the resolution we do here happens
     // against the already-mutated registries).
     // Malformed header → behave as if no overrides were supplied.
-    let slotConfig: SlotOverridesInput = {};
+    let browserSlotConfig: SlotOverridesInput | null = {};
     const slotParsed = decodeBase64Json(c.req.header("X-Slot-Config"));
     if (slotParsed && typeof slotParsed === "object") {
-      slotConfig = slotParsed as SlotOverridesInput;
+      browserSlotConfig = slotParsed as SlotOverridesInput;
     }
+    const slotConfig =
+      mergeManagedSlotDefaults(
+        frostFoxContext?.managedSlotDefaults,
+        browserSlotConfig,
+      ) ?? {};
 
     // Register client-declared custom presets via the shared overlay helper
     // (request-isolated scoped ids, ref-counted, base-registry-safe).
@@ -320,6 +365,16 @@ export function createMiscApiRoutes(
         error:
           "No LLM provider configured. Add a slot to llm.toml or via Settings.",
       });
+    }
+    const managedOnly = !!frostFoxContext && !operator;
+    if (managedOnly && !preset.provider.startsWith("frostfox-")) {
+      cleanupTransient();
+      return c.json(
+        errorBody("Only FrostFox managed models may be tested", {
+          code: "frostfox_managed_model_required",
+        }),
+        403,
+      );
     }
 
     // Resolve the effective baseUrl/protocol once so error + success paths

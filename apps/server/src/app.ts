@@ -439,7 +439,7 @@ export const drainServerResources = async (): Promise<void> => {
 app.route("/", createFrostFoxRoutes(frostFox));
 app.route("/", api.app);
 app.route("/", createModelDbRoutes(ai));
-app.route("/", createMiscApiRoutes(ai, api.registry, store));
+app.route("/", createMiscApiRoutes(ai, api.registry, store, frostFox));
 app.route("/", createConfigApiRoutes({ apiKeys }));
 
 // ── Static file serving (production) ─────────────────────────────
