@@ -76,31 +76,30 @@ describe("core plugin manifest contract", () => {
     expect(playerInit).toMatchObject({
       pluginType: "core-plugin",
       stage: "setup",
-      model: "plugin",
-      guard: "./guard.js",
+      runtimeType: "function",
+      handler: "./handler.js",
+      resultFormat: "envelope-v1",
       trigger: { type: "auto" },
       // Turn-scoped needs carry both the intra-stage order and the same-turn
       // gate; the explicit stage picks the band.
       needs: ["pregame", "world-init/schema-gen"],
     });
-    expect(playerInit.input?.inject).toEqual([
-      {
-        kind: "runtime",
-        from: "pregame",
-        field: "narrativeOutput",
-        as: "<pregame-opening>",
-      },
-      {
-        kind: "runtime",
-        from: "world-init/schema-gen",
-        field: "worldSchema",
-        as: "<same-turn-world-schema>",
-      },
-    ]);
+    expect(playerInit.guard).toBeUndefined();
+    expect(playerInit.inputs).toEqual({
+      opening: expect.objectContaining({
+        from: { runtime: "pregame" },
+        select: "/narrativeOutput",
+        required: false,
+      }),
+      worldSchema: expect.objectContaining({
+        from: { runtime: "world-init/schema-gen" },
+        select: "/worldSchema",
+        required: false,
+      }),
+    });
 
     // All three resolve to the setup stage. pregame / schema-gen still ride the
-    // priority-band derivation (the loader forbids `stage: setup` on their
-    // scheduled trigger); player-init declares `stage` explicitly.
+    // priority-band derivation; player-init declares `stage` explicitly.
     for (const manifest of [pregame, schemaGen, playerInit]) {
       expect(getRuntimeSpec(manifest).stage).toBe("setup");
     }

@@ -3,7 +3,7 @@
  *
  * This plugin hosts two runtimes:
  *   - player-init       — deterministic function runtime that emits the
- *                         opening form and writes the submitted player in its guard;
+ *                         opening form and writes the submitted player itself;
  *   - character-tracker — LLM agent that detects NPC/state changes each turn.
  *
  * Full execution behavior is covered by E2E tests in apps/server and
@@ -67,7 +67,11 @@ describe("char-creator plugin", () => {
       expect(manifest.tags).toContain("cost:function");
       expect(manifest.tags).not.toContain("cost:llm");
       expect(manifest.tools?.builtin ?? []).toEqual([]);
-      expect(manifest.effects?.writes).toEqual(["interaction:*"]);
+      expect(manifest.effects?.writes).toEqual([
+        "interaction:*",
+        "characters:*",
+        "plugin-data:self:characters",
+      ]);
     });
 
     it("binds the same-turn pregame opening and generated world schema", () => {
@@ -90,21 +94,24 @@ describe("char-creator plugin", () => {
       expect(manifest.needs).toEqual(["pregame", "world-init/schema-gen"]);
     });
 
-    it("uses an auto trigger with a guard to gate re-runs", () => {
-      // Pre-Game runtimes use `trigger: { type: 'auto' }` and rely on
-      // the guard + preGameDone output to opt-out after completion.
+    it("uses an auto trigger and completes from submitted state in its handler", () => {
       expect(manifest.trigger?.type).toBe("auto");
-      expect(manifest.guard).toBeTruthy();
-    });
-
-    it("ships both the guard and deterministic handler", () => {
-      for (const file of ["guard.js", "handler.js"]) {
-        expect(
-          fs.existsSync(
-            path.join(discovery.rootPath, "runtimes", "player-init", file),
+      expect(manifest.guard).toBeUndefined();
+      expect(
+        fs.existsSync(
+          path.join(
+            discovery.rootPath,
+            "runtimes",
+            "player-init",
+            "handler.js",
           ),
-        ).toBe(true);
-      }
+        ),
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(discovery.rootPath, "runtimes", "player-init", "guard.js"),
+        ),
+      ).toBe(false);
     });
 
     it("declares the shared character-panel ui spec", () => {

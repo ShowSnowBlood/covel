@@ -23,6 +23,7 @@ This release rebuilds provider and model configuration around explicit connectio
 - **Reasoning controls reject unsupported combinations before they reach providers.** Claude 4.0 no longer receives newer Anthropic effort fields, `gpt-5-pro` exposes only `high`, and Qwen thinking-only models cannot be forced into disabled thinking.
 - **Provider migration preserves independent credentials and model references.** Canonical provider ids no longer collapse distinct connections, request routing uses the connection namespace, legacy family-level keys remain available as a fallback, and orphaned preset secrets are cleaned up.
 - **World setup controls keep their shape and model probes stay bounded.** The loaded-plugin tab now uses the same layout contract as the model and session tabs, while connectivity checks request a short non-reasoning response instead of inheriting production-sized reasoning and output settings.
+- **Submitted character names now complete setup exactly once.** `char-creator/player-init` keeps both form projection and submitted-player persistence inside its deterministic function handler; the previous manifest guard was unreachable for function runtimes, so every submission generated another form and left setup pending.
 
 ## [0.0.25] - 2026-08-11
 

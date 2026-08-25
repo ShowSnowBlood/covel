@@ -142,7 +142,7 @@ CI 的 `check-plugin-i18n` 校验 `ui/*.json` spec、`PLUGIN.md` frontmatter，*
 | -------------------------------- | ----------- | ------------------------------------- | ------------- | ------------------------------------------------------------ | ------------------------------- |
 | `pregame`                        | `setup`     | `auto`（`maxTriggerCount: 1`）        | function      | 无                                                           | 最简 function runtime,纯初始化  |
 | `world-init/schema-gen`          | `setup`     | `auto`（`maxTriggerCount: 1`）        | agent + guard | `tools.plugin`（set-world-schema / set-world-entries-batch） | guard 在 LLM 前跳过门控,零开销  |
-| `char-creator/player-init`       | `setup`     | `auto`（guard 门控）                  | agent         | builtin `create-form`                                        | 首轮表单 + setup 闸门           |
+| `char-creator/player-init`       | `setup`     | `auto`（提交前保持 pending）          | function      | handler 读取 `player_inputs` 并缓冲角色写入                  | 确定性两阶段表单 + setup 闸门   |
 | `npc-graph/rag-retriever`        | `pre-turn`  | `scheduled`（interval 1）             | function      | —                                                            | 给 narrator 预拉结构化检索      |
 | `narrator`                       | `narrative` | `auto`                                | agent         | builtin `world-dimension-get` / `emit-event`                 | 零代码主叙事 + 事件发射         |
 | `codex`                          | `post-turn` | `auto`                                | agent         | `tools.plugin` + plugin-data inject                          | JS 工具 + 已有条目预注入        |

@@ -10,7 +10,7 @@ import type {
   LLMRequest,
   LLMResponse,
 } from "../src/llm/llm-adapter.js";
-import playerInitGuard from "../../../plugins/char-creator/runtimes/player-init/guard.js";
+import playerInitHandler from "../../../plugins/char-creator/runtimes/player-init/handler.js";
 
 class CapturingLLM implements LLMAdapter {
   readonly systemPrompts: string[] = [];
@@ -80,24 +80,20 @@ async function createPregameStore(sessionId: string): Promise<DataStore> {
   return store;
 }
 
-describe("char-creator core plugin guard bridge", () => {
-  // Deliberate change (scheduling redesign, Step 2 — turn-wide transaction):
-  // the guard's player-creation writes now BUFFER instead of hitting the store
-  // directly, and the same-batch main-loop follow-up that used to run the
-  // narrator in the SAME turn was removed. So this is now a two-stage flow:
-  //   Turn 1 (setup): player-init's guard buffers the character + mirror and
-  //     returns skip:true; only finalize commits them. The narrator does NOT
-  //     run this turn.
-  //   Turn 2 (main loop): the narrator runs on the next request and reads the
-  //     COMMITTED player from context.
+describe("char-creator function setup bridge", () => {
+  // The player-init runtime is a deterministic function. Its handler owns both
+  // phases: first it emits the form; after submit-form persists player_inputs,
+  // the next setup turn buffers the character + mirror and completes setup.
+  // The narrator runs on the following request and reads the committed player.
   it("buffers the submitted player on the setup turn (committed by finalize) and the narrator reads it on the next turn", async () => {
     const sessionId = "sess-char-bridge";
     const store = await createPregameStore(sessionId);
     const playerInit = manifest("char-creator/player-init", {
       pluginId: "char-creator",
       stage: "setup",
-      runtimeType: "agent",
-      guard: "./guard.js",
+      runtimeType: "function",
+      handler: "./handler.js",
+      resultFormat: "envelope-v1",
       needs: ["pregame", "world-init/schema-gen"],
     });
     const narrator = manifest("narrator", {
@@ -113,7 +109,7 @@ describe("char-creator core plugin guard bridge", () => {
           return {
             manifest: runtime,
             promptTemplate: "",
-            guard: playerInitGuard,
+            handler: playerInitHandler,
           };
         }
         return {
@@ -130,7 +126,7 @@ describe("char-creator core plugin guard bridge", () => {
       store,
     };
 
-    // ── Turn 1 (setup): guard creates the player; only player-init runs. ──
+    // ── Turn 1 (setup): handler creates the player; only player-init runs. ──
     const setupInput: TurnInput = {
       sessionId,
       turnId: "turn-form",
@@ -149,16 +145,14 @@ describe("char-creator core plugin guard bridge", () => {
     expect(
       setupResult.runtimeResults.map((runtime) => runtime.runtimeId),
     ).toEqual(["char-creator/player-init"]);
-    expect(setupResult.runtimeResults[0]!.status).toBe("skipped");
+    expect(setupResult.runtimeResults[0]!.status).toBe("success");
     expect(setupResult.runtimeResults[0]!.output).toMatchObject({
-      skip: true,
       playerExists: true,
       playerName: "柳无痕",
       preGameDone: true,
     });
-    // player-init completes setup this turn (guard skip). The persisted
-    // turnCount / preGameCompleted are written by the finalize session-clock
-    // step; here we pin the completion delta the executor produces.
+    // player-init completes setup this turn. The persisted turnCount / setup
+    // mirror are written by the finalize session-clock step.
     expect(Object.keys(setupResult.setupCompletion?.newlyDone ?? {})).toEqual([
       "char-creator/player-init",
     ]);
@@ -166,7 +160,7 @@ describe("char-creator core plugin guard bridge", () => {
     // The narrator never ran, so no system prompt was captured yet.
     expect(llm.systemPrompts).toHaveLength(0);
 
-    // Guard writes buffer now: nothing is in the store until finalize commits.
+    // Handler writes buffer now: nothing is in the store until finalize commits.
     expect(await store.listCharacters(sessionId)).toHaveLength(0);
 
     // Commit the setup execution, as the actions route does. The buffered

@@ -9,7 +9,7 @@
 ### setup 阶段
 
 - [`pregame`](#pregame) — 游戏初始化 function runtime（`stage: setup`）
-- [`char-creator/player-init`](#char-creatorplayer-init) — 玩家建角 agent runtime（`stage: setup`）
+- [`char-creator/player-init`](#char-creatorplayer-init) — 玩家建角 function runtime（`stage: setup`）
 - [`world-init/schema-gen`](#world-initschema-gen) — 世界维度 agent runtime（guard 门控，`stage: setup` + `after: [pregame]`）
 - [`scene-stage/seed`](#scene-stageseed) — 舞台开场种子 function runtime（`stage: setup`，为叙事不发 `scene.set` 兜底）
 
@@ -112,7 +112,7 @@
 | ------------------------------------ | ----------- | -------------------------- | -------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------- |
 | pregame                              | core-plugin | `setup`                    | auto（setup 段一次性，重试预算 1）                                         | —         | 游戏初始化（function runtime）                                                                 |
 | world-init/schema-gen                | core-plugin | `setup` · after: [pregame] | auto（setup 段一次性，重试预算 1）                                         | `plugin`  | 世界维度初始化（guard + agent，setup 第二步）                                                  |
-| char-creator/player-init             | core-plugin | `setup`                    | auto（guard 门控）                                                         | `plugin`  | 玩家角色创建（agent runtime；turn-scoped `needs` 依赖 pregame + schema-gen）                   |
+| char-creator/player-init             | core-plugin | `setup`                    | auto（提交表单后完成）                                                     | —         | 玩家角色创建（function runtime；turn-scoped `needs` 依赖 pregame + schema-gen）                |
 | npc-graph/rag-retriever              | plugin      | `pre-turn`                 | scheduled（interval=1，function runtime）                                  | —         | NPC 图谱结构化检索器，向 narrator 注入相关关系事实                                             |
 | dice-check/roller                    | plugin      | `pre-turn`                 | scheduled（interval=1，function）                                          | —         | 每回合预掷 d20 骰池，向叙事引擎注入 `<check-results>` 判定规则与骰值                           |
 | dice-check/recorder                  | plugin      | 无（event，不设 stage）    | event（topic: `check.resolved`）                                           | —         | 记录叙事发回的批量判定回执，驱动消息区 🎲 结果块与「判定记录」面板                             |
@@ -497,7 +497,7 @@ namespace="meta"   key=ontology   value=NpcGraphOntology
 
 ## char-creator（角色子系统）
 
-🔵 core · 🧠 uses LLM（player-init，guard 门控）· 🧠 uses LLM（character-tracker）
+🔵 core · ⚙️ zero-LLM（player-init）· 🧠 uses LLM（character-tracker）
 
 **Quick use**：你要玩家在首轮填一张"角色创建表单"生成主角；并且每轮自动跟踪叙事里出现的 NPC、角色状态变化（受伤、死亡、装备、关系）并写进 `characters` 表。两个子 runtime 共用同一个 `character-panel.json` 侧边栏。
 
@@ -507,32 +507,29 @@ namespace="meta"   key=ontology   value=NpcGraphOntology
 
 ### char-creator/player-init
 
-| 字段         | 值                                                                                                                     |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| pluginType   | `core-plugin`（不可禁用）                                                                                              |
-| stage        | `setup`                                                                                                                |
-| runtimeType  | `agent`（默认，LLM 生成开场表单；guard 命中时跳过）                                                                    |
-| trigger      | `auto`（`guard` 门控）                                                                                                 |
-| needs        | `[pregame, world-init/schema-gen]`（turn-scoped：既是同 pass 的 DAG 边，也是同回合上游门控）                           |
-| input.inject | `world-init/schema-gen.worldSchema` → `<same-turn-world-schema>`；同轮结构化 schema 优先，已提交的 `world.schema` 兜底 |
-| guard        | `./guard.js` — 若 player 已存在或已收到表单提交则 skip LLM                                                             |
-| model        | `plugin`                                                                                                               |
-| ui.right     | `../../ui/character-panel.json`                                                                                        |
+| 字段        | 值                                                                                           |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| pluginType  | `core-plugin`（不可禁用）                                                                    |
+| stage       | `setup`                                                                                      |
+| runtimeType | `function`（确定性表单投影与角色写入，零 LLM）                                               |
+| trigger     | `auto`；提交前返回 `preGameDone: false`，提交后返回 `preGameDone: true`                      |
+| needs       | `[pregame, world-init/schema-gen]`（turn-scoped：既是同 pass 的 DAG 边，也是同回合上游门控） |
+| inputs      | `opening` 与 `worldSchema` 两个可选 binding；首次执行直接消费同轮上游输出                    |
+| effects     | `interaction:*`、`characters:*`、`plugin-data:self:characters`                               |
+| ui.right    | `../../ui/character-panel.json`                                                              |
 
-**两步流程**（第 1 步由 LLM agent 完成，第 2 步由 `guard.js` 确定性完成）：
+**两步流程**（均由 `handler.js` 确定性完成）：
 
-1. **第 1 步 - 生成表单**（`<player-submission>` 为空时）：
-   - 读取世界 schema
-   - 直接返回 `interaction.request` 形式的角色创建表单
-   - 表单字段从 `worldSchema.character-attributes.attributes` 中选取，最多 4 个字段含 `characterName`
+1. **生成表单**：读取 `worldSchema.character-attributes.attributes`，生成一张
+   `char-creation` 表单，最多四个字段（含必填 `characterName`），并保持 setup pending。
+2. **提交创建**：`submit-form` 先持久化 `player_inputs`；下一次 setup 执行只读取
+   `formId=char-creation` 的最新提交，合并 schema `defaultValue`，通过 function
+   execution write buffer 原子生成 `character.upsert` 与角色面板镜像，返回
+   `preGameDone: true`。若角色已存在则直接完成并刷新镜像，不再生成表单。
 
-2. **第 2 步 - 提交创建**（`<player-submission>` 包含表单值时）：
-   - 读取最近一次 player input submission
-   - 合并 schema `defaultValue`
-   - 通过 guard 的 execution write buffer 生成 `character.upsert` 与 `plugin.data` proposals
-   - 输出 `preGameDone: true`，标记本 runtime 已完成 setup 初始化（框架将其累加到 `session.setupRuntimes`）
-
-**当前代码状态**: 这一条路径保持在插件包内部，实现位于 `runtimes/player-init/guard.js`（deterministic 提交分支）。schema `defaultValue` 在写入边界合并进存库 `fields`（与 builtin `create-character` 一致），使右栏显示、模型 `get-character` 与 prompt 注入读到同一份字段，schema 通过 well-known namespace/key 发现而非硬编码 world-data 插件 id。如果后续希望统一 deterministic runtime 的 trace 与工具链，可以把这条流程收敛到 builtin character tools。
+提交后的角色写入失败会让 runtime 明确失败并保留可重试状态，不会退回表单制造第二张
+“塑造你的角色”。schema 通过 well-known namespace/key 发现，不硬编码 world-data
+插件 id。
 
 ### char-creator/character-tracker
 
@@ -1058,7 +1055,7 @@ plugins/<plugin-id>/
 └── tools/                 # 可选：所有子运行时共享的工具
 ```
 
-> 真实多 runtime 范例见 `plugins/npc-graph/`（`extractor` agent + `rag-retriever` function）和 `plugins/char-creator/`（`player-init` 首轮 agent + `character-tracker` 持续 agent）。`world-init` 当前是单 runtime（`schema-gen`）+ 一个 `guard` 文件，不算多 runtime。
+> 真实多 runtime 范例见 `plugins/npc-graph/`（`extractor` agent + `rag-retriever` function）和 `plugins/char-creator/`（`player-init` 确定性 function + `character-tracker` 持续 agent）。`world-init` 当前是单 runtime（`schema-gen`）+ 一个 `guard` 文件，不算多 runtime。
 
 子运行时之间可通过 `input.inject` 传递数据（上游输出 → 下游 prompt 注入）。
 

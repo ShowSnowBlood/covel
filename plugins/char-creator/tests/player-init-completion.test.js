@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import guard from "../runtimes/player-init/guard.js";
+import handler from "../runtimes/player-init/handler.js";
 
 function createStore() {
   const characters = [];
@@ -37,12 +37,14 @@ function createStore() {
   };
 }
 
-describe("char-creator/player-init guard character mirror", () => {
+describe("char-creator/player-init completion", () => {
   it("creates a submitted player and mirrors it for the character panel", async () => {
     const store = createStore();
     store.playerInputs.push({
       id: "input-1",
       sessionId: "sess-1",
+      formId: "char-creation",
+      createdAt: "2026-08-25T00:00:00.000Z",
       values: {
         characterName: "柳无痕",
         background: "外门弟子，灵识敏锐",
@@ -51,13 +53,15 @@ describe("char-creator/player-init guard character mirror", () => {
       },
     });
 
-    const result = await guard({ sessionId: "sess-1", store });
+    const result = await handler({ sessionId: "sess-1", store });
 
     expect(result).toMatchObject({
-      skip: true,
-      playerExists: true,
-      playerName: "柳无痕",
-      preGameDone: true,
+      outcome: "success",
+      value: {
+        playerExists: true,
+        playerName: "柳无痕",
+        preGameDone: true,
+      },
     });
     expect(store.characters).toHaveLength(1);
     const character = store.characters[0];
@@ -120,10 +124,12 @@ describe("char-creator/player-init guard character mirror", () => {
     store.playerInputs.push({
       id: "input-1",
       sessionId: "sess-1",
+      formId: "char-creation",
+      createdAt: "2026-08-25T00:00:00.000Z",
       values: { characterName: "神代澪", club: "文艺部", trust: 30 },
     });
 
-    await guard({ sessionId: "sess-1", store });
+    await handler({ sessionId: "sess-1", store });
 
     const character = store.characters[0];
     // Player-set values kept; missing-default (hp) filled; no-default (club) kept; club kept.
@@ -144,13 +150,15 @@ describe("char-creator/player-init guard character mirror", () => {
       updatedAt: "2026-04-25T00:00:00.000Z",
     });
 
-    const result = await guard({ sessionId: "sess-1", store });
+    const result = await handler({ sessionId: "sess-1", store });
 
     expect(result).toMatchObject({
-      skip: true,
-      playerExists: true,
-      playerId: "char-existing",
-      preGameDone: true,
+      outcome: "success",
+      value: {
+        playerExists: true,
+        playerId: "char-existing",
+        preGameDone: true,
+      },
     });
     expect(store.characters).toHaveLength(1);
     expect(store.upsertCharacter).toHaveBeenCalledTimes(0);
@@ -170,11 +178,13 @@ describe("char-creator/player-init guard character mirror", () => {
     });
   });
 
-  it("repeated guard runs keep one player mirror row", async () => {
+  it("repeated handler runs keep one player mirror row", async () => {
     const store = createStore();
     store.playerInputs.push({
       id: "input-1",
       sessionId: "sess-1",
+      formId: "char-creation",
+      createdAt: "2026-08-25T00:00:00.000Z",
       values: {
         name: "苏婉",
         bio: "剑修弟子",
@@ -182,8 +192,8 @@ describe("char-creator/player-init guard character mirror", () => {
       },
     });
 
-    await guard({ sessionId: "sess-1", store });
-    await guard({ sessionId: "sess-1", store });
+    await handler({ sessionId: "sess-1", store });
+    await handler({ sessionId: "sess-1", store });
 
     expect(store.characters).toHaveLength(1);
     expect(store.pluginData).toHaveLength(1);

@@ -7,15 +7,16 @@ description:
 
 # Deterministic player-creation form
 
-This runtime does not call an LLM. `handler.js` projects the character
-attribute schema produced by `world-init/schema-gen` directly into a form, so a
-transient provider failure cannot block session setup:
+This runtime does not call an LLM. `handler.js` owns the complete deterministic
+flow, so a transient provider failure cannot block session setup:
 
-1. The first setup execution returns the `char-creation` form with
+1. The first setup execution projects the character attribute schema from
+   `world-init/schema-gen` into the `char-creation` form and returns
    `preGameDone: false`.
-2. After submission, `guard.js` deterministically writes the player character
-   on the next execution and returns `preGameDone: true`.
-3. If a player already exists, the guard skips the handler and refreshes the
+2. After submission, the next execution reads `player_inputs`, atomically
+   writes the player and character-panel mirror, and returns
+   `preGameDone: true` without generating another form.
+3. If a player already exists, the handler completes setup and refreshes the
    character-panel mirror.
 
 The form always requires a character name and selects at most three editable

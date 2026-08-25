@@ -1,4 +1,5 @@
 import { pickLocaleText as pick } from "@covel/plugin-handlers-utils";
+import { mergeSchemaDefaults, mirrorCharacterToPluginData } from "@covel/tools";
 
 const CATEGORY_PRIORITY = {
   bio: 0,
@@ -9,19 +10,25 @@ const CATEGORY_PRIORITY = {
 };
 
 /**
- * Deterministic setup form for the player character.
+ * Deterministic two-phase player setup.
  *
- * The previous agent runtime spent an LLM call to translate an already
- * structured character schema into form fields. A transient provider failure
- * therefore blocked session setup before the player could do anything. This
- * handler performs that mechanical projection locally; guard.js still owns the
- * submitted-form -> CharacterRecord transition on the following execution.
+ * Before submission, projects the structured world schema into one form.
+ * After submit-form persists player_inputs, creates the player and mirror in
+ * the same execution buffer, then returns preGameDone=true. Keeping both phases
+ * here is required: function runtimes do not execute manifest guards.
  *
  * @param {import('@covel/plugin-loader').FunctionHandlerContext} ctx
  * @returns {Promise<Record<string, unknown>>}
  */
 export default async function playerInitHandler(ctx) {
   const locale = ctx.locale;
+  const completed = await completePlayerSetup(ctx);
+  if (completed) {
+    return {
+      outcome: "success",
+      value: completed,
+    };
+  }
   const schema = characterSchemaFromInput(ctx.inputs?.worldSchema?.value);
   const attributes = Array.isArray(schema?.attributes) ? schema.attributes : [];
   const selectedAttributes = attributes
@@ -204,4 +211,150 @@ function textFromInput(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
   const narrative = value.narrativeOutput;
   return typeof narrative === "string" ? narrative.trim() : "";
+}
+
+const CHARACTER_PLUGIN_ID = "char-creator";
+const CHARACTER_FORM_ID = "char-creation";
+
+async function completePlayerSetup(ctx) {
+  const store = ctx.store;
+  if (!store) return null;
+
+  const characters = await store.listCharacters(ctx.sessionId);
+  const player = Array.isArray(characters)
+    ? characters.find((character) => character.type === "player")
+    : null;
+  if (player) {
+    await mirrorPlayer(store, ctx.sessionId, player);
+    return {
+      narrativeOutput: "",
+      preGameDone: true,
+      playerExists: true,
+      playerId: player.id,
+      playerName: player.name,
+    };
+  }
+
+  const submission = await latestCharacterSubmission(store, ctx.sessionId);
+  if (!submission) return null;
+
+  const values =
+    submission.values &&
+    typeof submission.values === "object" &&
+    !Array.isArray(submission.values)
+      ? submission.values
+      : {};
+  const name = pickName(values);
+  if (!name) {
+    throw new Error("submitted character form is missing characterName");
+  }
+
+  const now = new Date().toISOString();
+  const schema = await loadCharacterAttributesSchema(store, ctx.sessionId);
+  const character = {
+    id: `char-${crypto.randomUUID()}`,
+    sessionId: ctx.sessionId,
+    name,
+    type: "player",
+    description: pickDescription(values),
+    fields: mergeSchemaDefaults(stripNameKeys(values), schema),
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await store.upsertCharacter(character);
+  await mirrorPlayer(store, ctx.sessionId, character);
+  await ctx.logger?.info?.("player-init created submitted player", {
+    playerId: character.id,
+  });
+
+  return {
+    narrativeOutput: pick(
+      ctx.locale,
+      `[系统] 已创建角色 ${name}，冒险即将开始……`,
+      `[System] Character ${name} created — your adventure is about to begin…`,
+    ),
+    preGameDone: true,
+    playerExists: true,
+    playerId: character.id,
+    playerName: name,
+  };
+}
+
+async function latestCharacterSubmission(store, sessionId) {
+  const inputs = await store.listPlayerInputs(sessionId);
+  if (!Array.isArray(inputs)) return null;
+
+  let latest = null;
+  let latestOrder = "";
+  for (const input of inputs) {
+    if (input.formId !== CHARACTER_FORM_ID) continue;
+    const order = `${String(input.createdAt)}\0${String(input.id)}`;
+    if (!latest || order > latestOrder) {
+      latest = input;
+      latestOrder = order;
+    }
+  }
+  return latest;
+}
+
+async function loadCharacterAttributesSchema(store, sessionId) {
+  if (typeof store.listPluginDataSessionScope !== "function") return null;
+  const rows = await store.listPluginDataSessionScope(sessionId);
+  const row = Array.isArray(rows)
+    ? rows.find(
+        (entry) =>
+          entry.namespace === "schema" && entry.key === "character-attributes",
+      )
+    : null;
+  const value = row?.value;
+  return value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Array.isArray(value.attributes)
+    ? value
+    : null;
+}
+
+function pickName(values) {
+  for (const key of ["characterName", "name", "姓名", "playerName"]) {
+    const value = values[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function pickDescription(values) {
+  const direct = values.background ?? values.bio ?? values.description;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  const parts = [];
+  for (const [key, value] of Object.entries(values)) {
+    if (["characterName", "name", "姓名", "playerName"].includes(key)) {
+      continue;
+    }
+    if (typeof value === "string" && value.trim()) {
+      parts.push(`${key}: ${value.trim()}`);
+    }
+    if (parts.length >= 3) break;
+  }
+  return parts.length > 0 ? parts.join("；") : undefined;
+}
+
+function stripNameKeys(values) {
+  const { characterName, name, 姓名, playerName, ...rest } = values;
+  return rest;
+}
+
+async function mirrorPlayer(store, sessionId, character) {
+  await mirrorCharacterToPluginData(store, sessionId, CHARACTER_PLUGIN_ID, {
+    id: character.id,
+    name: character.name,
+    type: character.type,
+    description: character.description,
+    fields: character.fields,
+    version: character.version,
+    createdAt: character.createdAt,
+    updatedAt: character.updatedAt,
+  });
 }

@@ -17,17 +17,15 @@ tags:
   - data:characters
   - cost:function
   - ui:right-panel
-guard: ./guard.js
 trigger:
   type: auto
-# Keep the session-aware setup gate: on the submission execution these
-# producers may already be in setupRuntimes rather than running again.
+# This setup runtime remains pending until its deterministic handler observes a
+# submitted char-creation form and returns preGameDone=true.
 needs:
   - pregame
   - world-init/schema-gen
-# First setup execution receives same-turn values. Optional bindings let the
-# guard consume a later form submission even when completed producers do not
-# rerun in that execution.
+# First setup execution receives same-turn producer values. Optional bindings
+# remain available while the runtime waits for the player's form submission.
 inputs:
   opening:
     from:
@@ -42,6 +40,8 @@ inputs:
 effects:
   writes:
     - interaction:*
+    - characters:*
+    - plugin-data:self:characters
 dataSchemas:
   characters:
     schemaVersion: 1
@@ -55,13 +55,14 @@ ui:
 
 # 确定性角色创建表单
 
-此 runtime 不调用 LLM。`handler.js` 把 `world-init/schema-gen` 输出的角色属性
-Schema 直接转换成表单，因此服务商瞬时故障不会阻塞开局：
+此 runtime 不调用 LLM。`handler.js` 负责完整的确定性流程，因此服务商瞬时故障
+不会阻塞开局：
 
-1. 首次 setup 执行返回 `char-creation` 表单，`preGameDone: false`。
-2. 玩家提交后，`guard.js` 在下一次执行中确定性写入玩家角色并返回
-   `preGameDone: true`。
-3. 已存在玩家时，guard 直接跳过并保持角色镜像。
+1. 首次 setup 执行把 `world-init/schema-gen` 输出的角色属性 Schema 转换成
+   `char-creation` 表单，并返回 `preGameDone: false`。
+2. 玩家提交后，下一次执行读取 `player_inputs`，原子写入玩家角色及角色面板镜像，
+   返回 `preGameDone: true`，不再生成第二张表单。
+3. 已存在玩家时，handler 直接完成 setup 并保持角色镜像。
 
 字段规则：姓名必填；按 `bio → abilities → social → equipment → stats` 选择最多
 三个可编辑属性；数值型 `stats` 使用 Schema 默认值，不进入表单。
