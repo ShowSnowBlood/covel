@@ -375,7 +375,7 @@ export function SessionPrepScreen({
                   type="button"
                   onClick={() => setActiveTab("plugins")}
                   className={cn(
-                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    "flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
                     activeTab === "plugins"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
@@ -395,7 +395,7 @@ export function SessionPrepScreen({
                   type="button"
                   onClick={() => setActiveTab("models")}
                   className={cn(
-                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    "flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
                     activeTab === "models"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
@@ -415,7 +415,7 @@ export function SessionPrepScreen({
                   type="button"
                   onClick={() => setActiveTab("history")}
                   className={cn(
-                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    "flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
                     activeTab === "history"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
@@ -437,7 +437,7 @@ export function SessionPrepScreen({
               </div>
 
               {/* Status Indicator */}
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium">
+              <div className="flex shrink-0 items-center gap-2 whitespace-nowrap text-[11px] text-muted-foreground font-medium">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>
                   {selectedPluginIds.length}{" "}

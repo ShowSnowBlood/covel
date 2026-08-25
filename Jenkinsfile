@@ -18,7 +18,7 @@ pipeline {
     booleanParam(
       name: 'DEPLOY_PRODUCTION',
       defaultValue: true,
-      description: 'Build and deploy the checked-out main commit to game.dstopology.com.'
+      description: 'Build and deploy the checked-out main commit to game.frostfox.ai.'
     )
   }
 
@@ -69,10 +69,10 @@ pipeline {
         sh '''
           set -eu
           curl --fail --silent --show-error --retry 10 --retry-delay 3 \
-            https://game.dstopology.com/api/health \
+            https://game.frostfox.ai/api/health \
             | grep -q '"status":"ok"'
           curl --fail --silent --show-error --retry 10 --retry-delay 3 \
-            https://game.dstopology.com/api/frostfox/account \
+            https://game.frostfox.ai/api/frostfox/account \
             | grep -q '"clientId":"covel-game"'
         '''
       }
