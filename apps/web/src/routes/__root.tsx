@@ -59,7 +59,7 @@ function RootLayout() {
   // /debug doesn't restore the session into SessionProvider, so we must also
   // honour `?sid=` already in the URL. The session-store value takes priority
   // (matches the Studio's authoritative state); the URL is a read-only fallback.
-  const { state: sessionState } = useSession();
+  const { state: sessionState, backToWorldSelect } = useSession();
   const urlSid = (() => {
     const search = location.search as unknown;
     if (typeof search === "string") {
@@ -74,17 +74,26 @@ function RootLayout() {
   })();
   const activeSid = sessionState.session?.id ?? urlSid;
   const hasSession = sessionState.session !== null;
+  const navSearch = activeSid ? { sid: activeSid } : {};
   const sessionSearch = activeSid ? { sid: activeSid } : {};
 
-  // Primary navigation covers the home, active session, plugin, and image surfaces.
-  type NavId = "home" | "session" | "plugins" | "images";
+  // Active state for the primary nav. The tabs map to the world, session,
+  // plugin, and image surfaces.
+  type NavId = "home" | "world" | "session" | "plugins" | "images";
   const activeNav: NavId | null = (() => {
     if (isHome) return "home";
-    if (isSessionRoute) return hasSession ? "session" : null;
+    if (isSessionRoute) {
+      if (!hasSession) return "world";
+      return "session";
+    }
     return null;
   })();
 
   const goHome = () => navigate({ to: "/" });
+  const goWorld = () => {
+    if (sessionState.session) backToWorldSelect();
+    navigate({ to: "/session", search: {} });
+  };
   const goSession = () => navigate({ to: "/session", search: sessionSearch });
   const goPlugins = () => {
     navigate({ to: "/session", search: sessionSearch });
@@ -102,6 +111,7 @@ function RootLayout() {
     disabled?: boolean;
   }> = [
     { id: "home", label: t("nav.home", "Home"), onClick: goHome },
+    { id: "world", label: t("nav.world", "World"), onClick: goWorld },
     {
       id: "session",
       label: t("nav.session", "Session"),
