@@ -32,10 +32,7 @@ import {
 } from "@/components/ui/dialog.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { useSlotConfig } from "@/hooks/use-slot-config.js";
-import {
-  isDeclaredSlotMissing,
-  resolveDeclaredSlot,
-} from "./session-prep/model-slot-helpers.js";
+import { resolveDeclaredSlot } from "./session-prep/model-slot-helpers.js";
 import {
   activeSessionRecords,
   removeSessionById,
@@ -207,10 +204,6 @@ export function SessionPrepScreen({
 
   const resolveSelectedDeclaredSlot = useCallback(
     (slotId: string) => resolveDeclaredSlot(resolvedSlots, slotId),
-    [resolvedSlots],
-  );
-  const isSelectedDeclaredSlotMissing = useCallback(
-    (slotId: string) => isDeclaredSlotMissing(resolvedSlots, slotId),
     [resolvedSlots],
   );
 
@@ -481,7 +474,6 @@ export function SessionPrepScreen({
                     bindingState={bindingState}
                     resolvedSlots={resolvedSlots}
                     resolveDeclaredSlot={resolveSelectedDeclaredSlot}
-                    isMissingDeclaredSlot={isSelectedDeclaredSlotMissing}
                     onTogglePlugin={togglePlugin}
                     worldDataPreflight={worldDataPreflight}
                     worldDataPreflightStatus={worldDataPreflightStatus}

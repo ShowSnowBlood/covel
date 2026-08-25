@@ -107,21 +107,108 @@ export function createGatewaySlotResolution(
   deps: GatewaySlotResolutionDependencies,
   warnedFallbacks: Set<string>,
 ): GatewaySlotResolution {
+  function presetTag(presetId: string): string | undefined {
+    try {
+      const preset = deps.presetRegistry.resolveTextTarget({ presetId }).preset;
+      if (!preset) return undefined;
+      if (preset.tag) return preset.tag;
+      if (preset.capability?.output.includes("image")) return "image";
+      if (preset.capability?.output.includes("audio")) return "speech";
+      if (preset.capability?.output.includes("embedding")) return "embedding";
+      if (preset.supportedModes.includes("image")) return "image";
+      if (preset.supportedModes.includes("speech")) return "speech";
+      if (preset.supportedModes.includes("embed")) return "embedding";
+      if (preset.supportedModes.includes("transcription")) {
+        return "transcription";
+      }
+      if (
+        preset.supportedModes.some((mode) =>
+          ["text", "object", "stream"].includes(mode),
+        )
+      ) {
+        return "text";
+      }
+    } catch {
+      // Unknown slot/preset — preserve the existing explicit error path.
+    }
+    return undefined;
+  }
+
+  function requestPresetId(
+    presetId: string,
+    options: GatewayOptions | undefined,
+  ): string {
+    return (
+      resolveOverlayPresetId(
+        presetId,
+        options?.slotOverrides,
+        (id) => deps.presetRegistry.hasPreset?.(id) ?? false,
+      ) ?? presetId
+    );
+  }
+
+  function firstCompatiblePreset(
+    requestedId: string,
+    fallbackTag: string,
+    options: GatewayOptions | undefined,
+  ): string | undefined {
+    const slots = deps.slotRegistry;
+
+    // Prefer another request-scoped slot mapping. Hosted account defaults and
+    // browser-only presets live here, not in the process-wide slot registry.
+    for (const [slotId, mappedPresetId] of Object.entries(
+      options?.slotOverrides?.slotPresetOverrides ?? {},
+    )) {
+      if (slotId === requestedId) continue;
+      const effectivePresetId = requestPresetId(mappedPresetId, options);
+      const tag = presetTag(effectivePresetId) ?? slots?.getSlotTag(slotId);
+      if (tag === fallbackTag) return effectivePresetId;
+    }
+
+    const direct = slots?.resolveSlot(requestedId);
+    const directTag =
+      slots?.getSlotTag(requestedId) ??
+      (direct ? presetTag(direct) : undefined);
+    if (direct && directTag === fallbackTag) {
+      return direct;
+    }
+
+    if (presetTag(requestedId) === fallbackTag) return requestedId;
+    return slots?.listSlotsByTag(fallbackTag)[0]?.presetId;
+  }
+
+  function fallbackForCrossTag(
+    requestedId: string,
+    actualTag: string,
+    fallbackTag: string,
+    options: GatewayOptions | undefined,
+  ): string {
+    const fallback = firstCompatiblePreset(requestedId, fallbackTag, options);
+    if (!fallback) {
+      throw new Error(
+        `slot "${requestedId}" resolved to tag "${actualTag}", but no "${fallbackTag}" slot is configured`,
+      );
+    }
+
+    const key = `${requestedId}(${actualTag})→${fallback}(${fallbackTag})`;
+    if (!warnedFallbacks.has(key)) {
+      warnedFallbacks.add(key);
+      console.warn(
+        `[ai-gateway] slot "${requestedId}" resolved to tag "${actualTag}" but "${fallbackTag}" was requested; falling back to "${fallback}"`,
+      );
+    }
+    return fallback;
+  }
+
   /**
    * Resolve a slot name to its preset ID.
    *
    * If the slot isn't configured, fall back to the first registered slot
-   * whose tag matches `fallbackTag`. This lets minimal configs (e.g. only
-   * a `story` slot defined) serve every plugin that asks for `plugin`,
-   * `fast`, `balance`, etc. — the user gets a warning once per unknown
-   * slot so they can add the missing entry when they care.
-   *
-   * Cross-tag fallback is intentionally disabled: a slot asking for `image`
-   * never silently falls through to a text slot.
-   *
-   * Returns the original slotId when no fallback is possible; callers keep
-   * their existing error paths (preset-registry will throw "preset not
-   * found" so the failure is explicit).
+   * whose tag matches `fallbackTag`. Request-scoped slot overrides use the
+   * same compatibility check as process-wide slots; otherwise a stale
+   * runtime override such as `text-runtime → image` can send a chat request
+   * to an image model before the slot registry gets a chance to protect it.
+   * Cross-tag fallback is never allowed.
    */
   function resolveSlotOrPassthrough(
     presetId: string | undefined,
@@ -130,62 +217,41 @@ export function createGatewaySlotResolution(
   ): string | undefined {
     if (!presetId) return presetId;
 
-    // Per-request client override takes highest precedence. When the slot
-    // name matches a key in `slotPresetOverrides` we treat the result as
-    // an already-resolved preset id and short-circuit — skipping the
-    // slot-registry lookup prevents the tag-based fallback from silently
-    // routing a browser-only slot name (e.g. "fast") to the first
-    // llm.toml slot (e.g. "story").
-    //
-    // A preset id declared in the request's own customPresets is then
-    // mapped to its request-scoped overlay registration — the
-    // request only ever resolves the config it declared itself, never a
-    // same-named registration from a concurrent request.
     const clientOverride = resolveSlotOverride(
       presetId,
       options?.slotOverrides,
     );
-    const overlayId = resolveOverlayPresetId(
-      clientOverride,
-      options?.slotOverrides,
-      (id) => deps.presetRegistry.hasPreset?.(id) ?? false,
+    const effectiveClientId = requestPresetId(
+      clientOverride ?? presetId,
+      options,
     );
-    if (overlayId !== presetId) return overlayId;
+    const clientTag =
+      presetTag(effectiveClientId) ??
+      (clientOverride
+        ? deps.slotRegistry?.getSlotTag(clientOverride)
+        : undefined);
 
-    // Direct preset-id match trumps the slot lookup. Without this the
-    // tag-based fallback below would divert calls made with a raw preset
-    // id (e.g. a browser-registered `custom_abc`) into the first
-    // same-tag slot, silently swapping the target model.
-    if (deps.presetRegistry.hasPreset?.(presetId)) return presetId;
-
-    if (!deps.slotRegistry) return presetId;
-
-    const direct = deps.slotRegistry.resolveSlot(presetId);
-    if (direct) {
-      const directTag = deps.slotRegistry.getSlotTag?.(presetId);
-      if (!directTag || directTag === fallbackTag) return direct;
-
-      // A runtime override may point at a real slot with the wrong modality
-      // (for example a text agent accidentally bound to the image slot). Do
-      // not send a chat request to an image endpoint/model. Fall back only to
-      // the first slot with the requested tag; cross-modality fallback stays
-      // disabled.
-      const compatible = deps.slotRegistry.listSlotsByTag(fallbackTag);
-      if (compatible.length > 0) {
-        const fallback = compatible[0]!;
-        const key = `${presetId}(${directTag})→${fallback.slotId}(${fallbackTag})`;
-        if (!warnedFallbacks.has(key)) {
-          warnedFallbacks.add(key);
-          console.warn(
-            `[ai-gateway] slot "${presetId}" has tag "${directTag}" but "${fallbackTag}" was requested; falling back to "${fallback.slotId}"`,
-          );
-        }
-        return fallback.presetId;
+    const tagSensitive = fallbackTag === "text" || fallbackTag === "image";
+    if (effectiveClientId !== presetId) {
+      if (tagSensitive && clientTag && clientTag !== fallbackTag) {
+        return fallbackForCrossTag(presetId, clientTag, fallbackTag, options);
       }
-      return presetId;
+      return effectiveClientId;
     }
 
-    const candidates = deps.slotRegistry.listSlotsByTag(fallbackTag);
+    const direct = deps.slotRegistry?.resolveSlot(presetId);
+    const directTag = deps.slotRegistry?.getSlotTag(presetId);
+    const knownTag = presetTag(presetId) ?? directTag;
+    if (tagSensitive && knownTag && knownTag !== fallbackTag) {
+      return fallbackForCrossTag(presetId, knownTag, fallbackTag, options);
+    }
+
+    // Direct preset-id match trumps slot lookup. Without this, a raw preset
+    // id could be diverted into the first same-tag slot.
+    if (deps.presetRegistry.hasPreset?.(presetId)) return presetId;
+    if (direct) return direct;
+
+    const candidates = deps.slotRegistry?.listSlotsByTag(fallbackTag) ?? [];
     if (candidates.length === 0) return presetId;
     const fallback = candidates[0]!;
     const key = `${presetId}→${fallback.slotId}`;
@@ -302,7 +368,7 @@ export function createGatewaySlotResolution(
       const model = targetModel(target);
       const protocol = target.preset?.protocol ?? resolved.protocol;
       const baseUrl = resolved.config.baseUrl ?? target.preset?.baseUrl;
-      const presetTag = target.preset?.tag ?? "text";
+      const presetTagValue = presetTag(effectivePresetId) ?? "text";
       const presetMeta = target.preset?.providerRequestMetadata ?? {};
       const parameterOverrides = resolveParameterOverrides(presetId, options);
 
@@ -329,7 +395,7 @@ export function createGatewaySlotResolution(
           ? { headers: { ...resolved.config.headers } }
           : {}),
         model,
-        tag: presetTag,
+        tag: presetTagValue,
         metadata,
         ...(parameterOverrides ? { parameterOverrides } : {}),
       };

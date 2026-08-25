@@ -137,7 +137,13 @@ export function useRuntimeBindings(
       runtimeTargets,
       resolvedSlots,
     );
-    if (Object.keys(defaults).length === Object.keys(bindings).length) return;
+    if (
+      Object.keys(defaults).length === Object.keys(bindings).length &&
+      Object.entries(defaults).every(
+        ([qualifiedId, slotName]) => bindings[qualifiedId] === slotName,
+      )
+    )
+      return;
 
     setBindingsState(defaults);
     persist(sessionId, defaults);
@@ -151,19 +157,21 @@ export function useRuntimeBindings(
   }, [runtimeTargets, bindings]);
 
   const compatibleSlots = useCallback(
-    (tag: string): ResolvedSlot[] => {
-      const byTag = resolvedSlots.filter((s) => s.tag === tag);
-      if (byTag.length > 0) return byTag;
-      const byName = resolvedSlots.filter((s) => s.slotId === tag);
-      return byName;
-    },
+    (_defaultSlot: string): ResolvedSlot[] =>
+      resolvedSlots.filter(
+        (slot) => slot.tag === "text" || slot.tag === undefined,
+      ),
     [resolvedSlots],
   );
 
   const allBound = useMemo(() => {
     return entries.every((entry) => {
       if (entry.slotName) {
-        return resolvedSlots.some((slot) => slot.slotId === entry.slotName);
+        return resolvedSlots.some(
+          (slot) =>
+            slot.slotId === entry.slotName &&
+            (slot.tag === "text" || slot.tag === undefined),
+        );
       }
       return autoAssignRuntimeBindings({}, [entry], resolvedSlots)[
         entry.qualifiedId

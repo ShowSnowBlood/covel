@@ -84,6 +84,7 @@ export function createMiscApiRoutes(
         scope: "global",
         baseUrl: p.baseUrl ?? providerBaseUrl,
         protocol: p.protocol ?? providerProtocol,
+        ...(p.capability ? { capability: p.capability } : {}),
         slotBindings: slotBindingsByPreset.get(p.id) ?? [],
       };
     });

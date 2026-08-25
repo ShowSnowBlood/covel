@@ -14,6 +14,7 @@ export type {
   SetupRuntimeState,
 } from "@covel/shared";
 
+import type { ModelCapabilityInfo } from "./llm.js";
 // -- Shared API types
 
 export interface WorldRecord {
@@ -106,6 +107,8 @@ export interface PresetSummary {
   baseUrl?: string;
   /** Effective protocol (openai-chat/anthropic/...). Undefined if unresolvable. */
   protocol?: string;
+  /** Effective model input/output modalities, when the server resolved them. */
+  capability?: ModelCapabilityInfo;
   /** Slot IDs whose presetId resolves here (e.g. ["default","fast"]). */
   slotBindings?: string[];
 }

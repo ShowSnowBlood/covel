@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createGateway } from "../src/gateway.js";
 import { createPresetRegistry } from "../src/preset-registry.js";
 import { createProviderRegistry } from "../src/provider-registry.js";
+import { createSlotRegistry } from "../src/slot-registry.js";
 import { registerImageWire } from "../src/image/wire-registry.js";
 import type { ImageWire } from "../src/image/types.js";
 import type { ModelProfile, PresetConfig } from "../src/types.js";
@@ -110,6 +111,68 @@ describe("gateway.generateImage", () => {
     expect(result.images).toHaveLength(1);
     expect(result.model).toBe("test-image-model");
     expect(result.provider).toBe("test");
+  });
+
+  it("routes an image slot override through the image wire", async () => {
+    const fn = mockFetchOnce(200, { data: [{ b64_json: PNG_B64 }] });
+    const providerRegistry = createProviderRegistry({
+      providers: {
+        test: {
+          adapter: createStubAdapter(),
+          defaults: { baseUrl: "https://x.test", apiKey: "k" },
+        },
+        vendorX: {
+          adapter: createStubAdapter(),
+          defaults: { baseUrl: "https://vendor.example", apiKey: "k-vendor" },
+        },
+      },
+    });
+    const presetRegistry = createPresetRegistry({ profiles, presets: [] });
+    const slotRegistry = createSlotRegistry({ presetRegistry });
+    slotRegistry.configure({
+      slots: {
+        image: {
+          slotId: "image",
+          presetId: "base-image",
+          tag: "image",
+        },
+      },
+    });
+    const gateway = createGateway({
+      providerRegistry,
+      presetRegistry,
+      slotRegistry,
+    });
+
+    const result = await gateway.generateImage(
+      { presetId: "image", prompt: "a lighthouse in fog" },
+      {
+        slotOverrides: {
+          slotPresetOverrides: { image: "browser-image" },
+          customPresets: [
+            {
+              id: "browser-image",
+              name: "Browser image model",
+              provider: "vendorX",
+              baseUrl: "https://vendor.example/v1",
+              model: "image-model",
+              protocol: "openai-chat-v1",
+              tag: "image",
+            },
+          ],
+        },
+      },
+    );
+
+    const body = JSON.parse(
+      (fn.mock.calls[0]![1] as RequestInit).body as string,
+    );
+    expect(body.model).toBe("image-model");
+    expect(result).toMatchObject({
+      model: "image-model",
+      provider: "vendorX",
+    });
+    expect(result.images).toHaveLength(1);
   });
 
   it("merges slot providerRequestMetadata into the wire call, stripping the imageWire routing key", async () => {

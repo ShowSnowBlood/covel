@@ -40,7 +40,6 @@ interface PluginSelectionCardProps {
   bindingState: UseRuntimeBindingsResult;
   resolvedSlots: ResolvedSlot[];
   resolveDeclaredSlot: (slotId: string) => ResolvedSlot | null;
-  isMissingDeclaredSlot: (slotId: string) => boolean;
   onTogglePlugin: (name: string) => void;
   worldDataPreflight: api.WorldDataPreflightResponse | null;
   worldDataPreflightStatus: PrepSectionStatus;
@@ -134,7 +133,6 @@ export function PluginSelectionCard({
   bindingState,
   resolvedSlots,
   resolveDeclaredSlot,
-  isMissingDeclaredSlot,
   onTogglePlugin,
   worldDataPreflight,
   worldDataPreflightStatus,
@@ -187,7 +185,6 @@ export function PluginSelectionCard({
                 bindingState={bindingState}
                 resolvedSlots={resolvedSlots}
                 resolveDeclaredSlot={resolveDeclaredSlot}
-                isMissingDeclaredSlot={isMissingDeclaredSlot}
                 onTogglePlugin={onTogglePlugin}
               />
             ))}

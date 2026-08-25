@@ -8,15 +8,19 @@ export function resolveDeclaredSlot(
   resolvedSlots: readonly ResolvedSlot[],
   slotId: string,
 ): ResolvedSlot | null {
+  const isTextSlot = (slot: ResolvedSlot): boolean =>
+    slot.tag === "text" || slot.tag === undefined;
   const direct = resolvedSlots.find((slot) => slot.slotId === slotId);
-  if (direct) return direct;
-  return resolvedSlots.find((slot) => slot.tag === "text") ?? null;
+  if (direct) return isTextSlot(direct) ? direct : null;
+  return resolvedSlots.find(isTextSlot) ?? null;
 }
 
 export function isDeclaredSlotMissing(
   resolvedSlots: readonly ResolvedSlot[],
   slotId: string,
 ): boolean {
+  const direct = resolvedSlots.find((slot) => slot.slotId === slotId);
+  if (direct) return direct.tag !== "text" && direct.tag !== undefined;
   return resolveDeclaredSlot(resolvedSlots, slotId) === null;
 }
 

@@ -18,7 +18,10 @@ import type { LLMAdapter } from "@covel/runtime";
 import type { PluginRuntimeGateway } from "@covel/plugin-loader";
 import type { SlotOverridesInput } from "@covel/ai-provider";
 import type { AiStack } from "../../src/ai-setup.js";
-import { createPerRequestLlmMiddleware } from "../../src/middleware/per-request-llm.js";
+import {
+  createPerRequestLlmMiddleware,
+  mergeManagedSlotDefaults,
+} from "../../src/middleware/per-request-llm.js";
 import type {
   FrostFoxPrincipal,
   FrostFoxService,
@@ -30,6 +33,14 @@ interface RecordedCall {
   presetId: string | undefined;
   apiKeys: Record<string, string> | undefined;
   envApiKeys: Record<string, string> | undefined;
+  slotOverrides: GenerateOptions extends { slotOverrides?: infer S }
+    ? S
+    : never;
+}
+
+interface RecordedImageCall {
+  presetId: string | undefined;
+  apiKeys: Record<string, string> | undefined;
   slotOverrides: GenerateOptions extends { slotOverrides?: infer S }
     ? S
     : never;
@@ -71,9 +82,11 @@ function stubDefaultPluginGateway(): PluginRuntimeGateway {
 function createMockAi(): {
   ai: AiStack;
   calls: RecordedCall[];
+  imageCalls: RecordedImageCall[];
   resolveSlotCalls: RecordedResolveSlotCall[];
 } {
   const calls: RecordedCall[] = [];
+  const imageCalls: RecordedImageCall[] = [];
   const resolveSlotCalls: RecordedResolveSlotCall[] = [];
 
   const gateway: AiStack["gateway"] = {
@@ -89,6 +102,20 @@ function createMockAi(): {
         finishReason: "stop",
         usage: { inputTokens: 1, outputTokens: 1 },
         toolCalls: [],
+      };
+    },
+    async generateImage(input, options) {
+      imageCalls.push({
+        presetId: input.presetId,
+        apiKeys: options?.apiKeys,
+        slotOverrides: options?.slotOverrides,
+      });
+      return {
+        images: [],
+        warnings: [],
+        usage: null,
+        model: "mock-image",
+        provider: "mock",
       };
     },
     async *streamText() {
@@ -130,7 +157,7 @@ function createMockAi(): {
     gateway,
   } as unknown as AiStack;
 
-  return { ai, calls, resolveSlotCalls };
+  return { ai, calls, imageCalls, resolveSlotCalls };
 }
 
 function buildTestApp(opts: {
@@ -203,6 +230,19 @@ function buildTestApp(opts: {
     return c.json({ resolved: true, baseUrl: slot.baseUrl, model: slot.model });
   });
 
+  app.post("/generate-image", async (c) => {
+    const gateway = c.get("pluginGateway");
+    if (!gateway?.generateImage) {
+      return c.json({ error: "image gateway missing" }, 500);
+    }
+    const body = await c.req.json<{ presetId?: string }>();
+    const result = await gateway.generateImage({
+      presetId: body.presetId,
+      prompt: "a test image",
+    });
+    return c.json({ imageCount: result.images.length });
+  });
+
   return app;
 }
 
@@ -252,6 +292,7 @@ describe("per-request LLM middleware", () => {
           baseUrl: "https://api.vendorx.example/v1",
           model: "fast-7b",
           protocol: "openai-chat-v1",
+          tag: "text",
         },
       ],
     };
@@ -285,6 +326,7 @@ describe("per-request LLM middleware", () => {
           provider: "vendorX",
           model: "fast-7b",
           baseUrl: "https://api.vendorx.example/v1",
+          tag: "text",
         }),
       ],
     });
@@ -385,6 +427,45 @@ describe("per-request LLM middleware", () => {
       },
       customPresets: [browserPreset],
     });
+  });
+
+  it("keeps the managed image tag when the browser repeats its binding", () => {
+    const managedImage = {
+      id: "managed-image",
+      name: "Image · model",
+      provider: "frostfox-image",
+      baseUrl: "https://market.example/v1",
+      model: "unknown-image-model",
+      protocol: "openai-chat-v1" as const,
+      tag: "image",
+    };
+    const merged = mergeManagedSlotDefaults(
+      {
+        slotPresetOverrides: { story: "managed-text", image: managedImage.id },
+        customPresets: [
+          {
+            id: "managed-text",
+            name: "Text · model",
+            provider: "frostfox-text",
+            model: "text-model",
+            tag: "text",
+          },
+          managedImage,
+        ],
+      },
+      {
+        slotPresetOverrides: { image: managedImage.id },
+        customPresets: [{ ...managedImage, tag: undefined }],
+      },
+    );
+
+    expect(merged?.slotPresetOverrides).toEqual({
+      story: "managed-text",
+      image: managedImage.id,
+    });
+    expect(merged?.customPresets).toEqual(
+      expect.arrayContaining([expect.objectContaining(managedImage)]),
+    );
   });
 
   it("leaves the default adapter in place when no request-scoped headers are present", async () => {
@@ -500,6 +581,59 @@ describe("per-request LLM middleware", () => {
           model: "wan2.7-image-pro",
         }),
       ],
+    });
+  });
+
+  it("rebuilds pluginGateway image generation with browser slot config", async () => {
+    const { ai, imageCalls } = createMockAi();
+    const app = buildTestApp({
+      ai,
+      envApiKeys: {},
+      defaultAdapter: {
+        async generate() {
+          throw new Error("llmAdapter unused by the image route");
+        },
+      },
+    });
+
+    const slotConfig = {
+      slotPresetOverrides: { image: "custom_image" },
+      customPresets: [
+        {
+          id: "custom_image",
+          name: "Browser image",
+          provider: "qwen",
+          baseUrl: "https://dashscope.example/v1",
+          model: "image-model",
+          tag: "image",
+        },
+      ],
+    };
+    const res = await app.request("/generate-image", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Provider-Keys": b64({ qwen: "sk-image" }),
+        "X-Slot-Config": b64(slotConfig),
+      },
+      body: JSON.stringify({ presetId: "image" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(imageCalls).toHaveLength(1);
+    expect(imageCalls[0]).toMatchObject({
+      presetId: "image",
+      apiKeys: { qwen: "sk-image" },
+      slotOverrides: {
+        slotPresetOverrides: { image: "custom_image" },
+        customPresets: [
+          expect.objectContaining({
+            id: "custom_image",
+            model: "image-model",
+            tag: "image",
+          }),
+        ],
+      },
     });
   });
 

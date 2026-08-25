@@ -167,6 +167,8 @@ export interface CustomPresetInput {
   baseUrl?: string;
   model: string;
   protocol?: ProviderProtocol;
+  /** Slot compatibility tag supplied by a trusted managed catalog or client overlay. */
+  tag?: string;
 }
 
 /**

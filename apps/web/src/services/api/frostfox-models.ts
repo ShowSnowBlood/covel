@@ -34,6 +34,13 @@ export function getManagedFrostFoxPresets(): CustomPreset[] {
           baseUrl: channel.baseUrl,
           model: model.id,
           protocol: channel.protocol,
+          tag: model.capability.output.includes("image")
+            ? "image"
+            : model.capability.output.includes("audio")
+              ? "speech"
+              : model.capability.output.includes("embedding")
+                ? "embedding"
+                : "text",
           capability: model.capability,
         }))
       : [],

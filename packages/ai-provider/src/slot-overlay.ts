@@ -86,6 +86,7 @@ function overlayPresetKey(cp: CustomPresetInput): string {
       cp.baseUrl ?? null,
       cp.protocol ?? null,
       cp.name ?? null,
+      cp.tag ?? null,
     ])
   );
 }
@@ -157,7 +158,7 @@ export function applySlotOverlay(
         tier: "medium",
         supportedModes: supportedModesFor(capability),
         enabled: true,
-        tag: tagFor(capability),
+        tag: cp.tag ?? tagFor(capability),
         capability,
         // Untrusted request origin — env keys must not bind to it, and the
         // provider registry resolves unknown providers ephemerally for it.

@@ -24,10 +24,12 @@ export interface ResolvedSlot {
 }
 
 function inferClientSlotTag(slotId: string): string {
-  if (slotId === "image") return "image";
+  // Local-only roles have no server manifest to supply a tag. Preserve the
+  // canonical image namespace (including image-* aliases) so image-runtime
+  // selectors never offer a text slot by accident.
+  if (slotId === "image" || slotId.startsWith("image-")) return "image";
   return "text";
 }
-
 /**
  * Format a slot for compact display as `<provider> · <model>`. Prefers
  * the resolved preset (user's current selection), then the server-side
@@ -75,6 +77,7 @@ export function useSlotConfig(
       enabled: true,
       isDefault: false,
       scope: "custom",
+      capability: p.capability,
     }));
     return [...serverPresets, ...customs];
   }, [serverPresets, customPresets]);
@@ -142,12 +145,13 @@ export function useSlotConfig(
       const preset = presetId
         ? (allPresets.find((p) => p.id === presetId) ?? null)
         : null;
+      const tag = inferClientSlotTag(slotId);
       out.push({
         slotId,
         presetId,
         preset,
         label: slotId,
-        tag: inferClientSlotTag(slotId),
+        tag,
         serverModel: preset?.model,
         serverProvider: preset?.provider,
       });

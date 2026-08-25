@@ -129,6 +129,20 @@ export function buildAiHeaders(): Record<string, string> {
   };
 }
 
+function presetTag(
+  preset: Pick<CustomPreset, "tag" | "capability">,
+): string | undefined {
+  const explicit = preset.tag?.trim();
+  if (explicit) return explicit;
+  const output = preset.capability?.output;
+  if (!output) return undefined;
+  if (output.includes("image")) return "image";
+  if (output.includes("audio")) return "speech";
+  if (output.includes("embedding")) return "embedding";
+  if (output.includes("text")) return "text";
+  return undefined;
+}
+
 interface SlotConfigHeaderOptions {
   includeCustomPresetIds?: readonly string[];
 }
@@ -160,13 +174,14 @@ export function buildSlotConfigHeaderInternal(
   }
   const customPresetDefs = customPresets
     .filter((p) => referencedCustomIds.has(p.id))
-    .map(({ id, name, provider, baseUrl, model, protocol }) => ({
-      id,
-      name,
-      provider,
-      baseUrl,
-      model,
-      protocol,
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      provider: p.provider,
+      baseUrl: p.baseUrl,
+      model: p.model,
+      protocol: p.protocol,
+      ...(presetTag(p) ? { tag: presetTag(p) } : {}),
     }));
 
   const hasSlotPresetOverrides = Object.keys(slotPresetOverrides).length > 0;
@@ -264,6 +279,8 @@ export interface CustomPreset {
   baseUrl: string;
   model: string;
   protocol?: string;
+  /** Explicit or capability-derived slot compatibility tag. */
+  tag?: string;
   capability?: ModelCapabilityInfo;
   apiKey?: string;
 }

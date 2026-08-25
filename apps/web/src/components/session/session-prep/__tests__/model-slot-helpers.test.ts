@@ -41,6 +41,11 @@ describe("agent runtime slot fallback", () => {
     expect(resolveDeclaredSlot(slots.slice(0, 1), "plugin")).toBeNull();
     expect(isDeclaredSlotMissing(slots.slice(0, 1), "plugin")).toBe(true);
   });
+
+  it("rejects a declared image slot for an agent runtime", () => {
+    expect(resolveDeclaredSlot(slots, "image")).toBeNull();
+    expect(isDeclaredSlotMissing(slots, "image")).toBe(true);
+  });
 });
 
 describe("resolveProviderSlot", () => {

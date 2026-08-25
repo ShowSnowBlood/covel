@@ -26,7 +26,8 @@ export function filterRuntimeBindingsForKnownRuntimes(
 
 /**
  * Fill every currently unbound agent runtime with the best text-model slot.
- * Existing non-empty bindings are preserved.
+ * Existing valid text bindings are preserved; stale bindings to an image slot
+ * are repaired instead of being sent to a chat endpoint.
  *
  * Matching priority (per runtime):
  * 0. Direct name match: slot whose slotId === runtime.defaultSlot.
@@ -41,19 +42,28 @@ export function autoAssignRuntimeBindings(
 ): Record<string, string> {
   if (slots.length === 0) return { ...bindings };
 
+  const isTextSlot = (slot: RuntimeBindingSlotLike): boolean =>
+    slot.tag === "text" || slot.tag === undefined;
   const next = { ...bindings };
-  const firstTextSlot =
-    slots.find((slot) => slot.tag === "text") ??
-    slots.find((slot) => slot.tag === undefined);
+  const textSlots = slots.filter(isTextSlot);
+  const firstTextSlot = textSlots[0];
   const defaultSlot =
-    slots.find((slot) => slot.slotId === "default") ?? firstTextSlot;
+    textSlots.find((slot) => slot.slotId === "default") ?? firstTextSlot;
+
   for (const target of targets) {
-    if (next[target.qualifiedId]) continue;
+    const existing = next[target.qualifiedId]
+      ? slots.find((slot) => slot.slotId === next[target.qualifiedId])
+      : undefined;
+    if (existing && isTextSlot(existing)) continue;
+    if (next[target.qualifiedId]) delete next[target.qualifiedId];
 
     let chosen: RuntimeBindingSlotLike | undefined;
 
-    // 0. Direct name match: `model: plugin` selects `[covel.plugin]`.
-    chosen = slots.find((s) => s.slotId === target.defaultSlot);
+    // 0. Direct name match: `model: plugin` selects `[covel.plugin]`, but
+    // never when that slot is an image/audio/embedding slot.
+    chosen = slots.find(
+      (slot) => slot.slotId === target.defaultSlot && isTextSlot(slot),
+    );
 
     // 1. `default` is a virtual slot name used by some plugins to mean
     //    "the deployment's default text model". It does not require a literal

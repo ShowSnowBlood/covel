@@ -1,4 +1,5 @@
 import type { ProviderConfig } from "../../types.js";
+import { fetch as undiciFetch } from "undici";
 import { createConnectPinnedDispatcher } from "./dns-safety.js";
 import {
   computeBackoffMs,
@@ -28,17 +29,21 @@ function getPinnedDispatcher(): ReturnType<
 }
 
 /**
- * fetch routed through the pinned dispatcher. Undici wraps connect-time
- * failures in a generic `TypeError: fetch failed`; surface the SSRF policy
- * error from the cause chain so callers see the actual rejection reason.
+ * Fetch through the pinned dispatcher. Node's built-in fetch is backed by a
+ * version of Undici that may differ from the package used to create the
+ * dispatcher (notably on Node 24). In that combination the built-in client
+ * rejects a valid external Agent before connecting with `UND_ERR_INVALID_ARG`.
+ * Use the package fetch only for that compatibility failure; keeping the
+ * normal global fetch path preserves test doubles and the runtime's native
+ * implementation on matching Node versions.
  */
 async function pinnedFetch(url: string, init: RequestInit): Promise<Response> {
-  try {
-    return await fetch(url, {
-      ...init,
-      dispatcher: getPinnedDispatcher(),
-    } as RequestInit);
-  } catch (error) {
+  const requestInit = {
+    ...init,
+    dispatcher: getPinnedDispatcher(),
+  } as RequestInit;
+
+  const surfacePolicyError = (error: unknown): never => {
     for (
       let cause: unknown = error, depth = 0;
       cause instanceof Error && depth < 5;
@@ -47,6 +52,29 @@ async function pinnedFetch(url: string, init: RequestInit): Promise<Response> {
       if (cause.message.startsWith("SSRF policy rejected")) throw cause;
     }
     throw error;
+  };
+
+  try {
+    return await fetch(url, requestInit);
+  } catch (error) {
+    let dispatcherCompatibilityError = false;
+    for (
+      let cause: unknown = error, depth = 0;
+      cause instanceof Error && depth < 5;
+      cause = cause.cause, depth++
+    ) {
+      if ((cause as Error & { code?: string }).code === "UND_ERR_INVALID_ARG") {
+        dispatcherCompatibilityError = true;
+        break;
+      }
+    }
+    if (!dispatcherCompatibilityError) return surfacePolicyError(error);
+
+    try {
+      return (await undiciFetch(url, requestInit as never)) as unknown as Response;
+    } catch (fallbackError) {
+      return surfacePolicyError(fallbackError);
+    }
   }
 }
 

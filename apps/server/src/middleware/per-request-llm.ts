@@ -208,11 +208,15 @@ export function mergeManagedSlotDefaults(
         replacementByDefault.get(presetId) ?? presetId,
       ]),
   );
+  const slotPresetOverrides = { ...defaultSlots, ...explicitSlots };
   const managedPresetIds = new Set(
     (defaults.customPresets ?? []).map((preset) => preset.id),
   );
+  // Keep the trusted managed definition whenever any final slot points to it,
+  // including an explicit browser binding to the same managed id. Dropping it
+  // here would let a header reintroduce the preset without its image tag.
   const activeManagedPresetIds = new Set(
-    Object.values(defaultSlots).filter((presetId) =>
+    Object.values(slotPresetOverrides).filter((presetId) =>
       managedPresetIds.has(presetId),
     ),
   );
@@ -227,7 +231,7 @@ export function mergeManagedSlotDefaults(
 
   return {
     ...overrides,
-    slotPresetOverrides: { ...defaultSlots, ...explicitSlots },
+    slotPresetOverrides,
     ...(customPresets.length > 0
       ? { customPresets }
       : { customPresets: undefined }),
@@ -340,6 +344,11 @@ function parseSlotOverrides(
                         : never
                       : never,
                 }
+              : {}),
+            ...(typeof r.tag === "string" &&
+            r.tag.trim().length > 0 &&
+            r.tag.trim().length <= 64
+              ? { tag: r.tag.trim() }
               : {}),
           });
         }

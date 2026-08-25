@@ -41,4 +41,14 @@ describe("autoAssignRuntimeBindings", () => {
       ),
     ).toEqual({});
   });
+
+  it("repairs a stale direct binding that points at an image slot", () => {
+    expect(
+      autoAssignRuntimeBindings(
+        { inventory: "image" },
+        [{ qualifiedId: "inventory", defaultSlot: "image" }],
+        slots,
+      ),
+    ).toEqual({ inventory: "story" });
+  });
 });

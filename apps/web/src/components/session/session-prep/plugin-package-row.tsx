@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Cpu, KeyRound, Lock, Wrench } from "lucide-react";
+import { FrameworkCapability, FrameworkRuntimeCapability } from "@covel/shared";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.js";
 import { text } from "@/components/world/editor-helpers.js";
@@ -25,7 +26,6 @@ export interface PluginPackageRowProps {
   bindingState: UseRuntimeBindingsResult;
   resolvedSlots: ResolvedSlot[];
   resolveDeclaredSlot: (slotId: string) => ResolvedSlot | null;
-  isMissingDeclaredSlot: (slotId: string) => boolean;
   onTogglePlugin: (name: string) => void;
 }
 
@@ -39,7 +39,6 @@ export function PluginPackageRow({
   bindingState,
   resolvedSlots,
   resolveDeclaredSlot,
-  isMissingDeclaredSlot,
   onTogglePlugin,
 }: PluginPackageRowProps) {
   const { t, i18n } = useTranslation();
@@ -70,6 +69,16 @@ export function PluginPackageRow({
   );
   const primaryBinding = pluginBindings[0];
   const hasAgentRuntime = pluginBindings.length > 0;
+  const isTextSlot = (slot: ResolvedSlot): boolean =>
+    slot.tag === "text" || slot.tag === undefined;
+  const isMissingTextRuntimeSlot = (slotId: string): boolean => {
+    const direct = resolvedSlots.find((slot) => slot.slotId === slotId);
+    if (direct) return !isTextSlot(direct);
+    return resolveDeclaredSlot(slotId) === null;
+  };
+  const primaryBindingSlots = primaryBinding
+    ? bindingState.compatibleSlots(primaryBinding.defaultSlot)
+    : [];
   const providerSlotSetting = pkg.userSettings?.find(
     (spec) => spec.type === "slot",
   );
@@ -77,6 +86,20 @@ export function PluginPackageRow({
     typeof providerSlotSetting?.default === "string"
       ? providerSlotSetting.default
       : undefined;
+  const providerSlotTag = pkg.runtimes?.some(
+    (runtime) =>
+      runtime.capabilities?.includes(
+        FrameworkRuntimeCapability.ImageGenerator,
+      ) || runtime.capabilities?.includes(FrameworkCapability.ImageGeneration),
+  )
+    ? "image"
+    : (resolvedSlots.find((slot) => slot.slotId === manifestDefaultSlot)?.tag ??
+      "text");
+  const providerSlots = resolvedSlots.filter((slot) =>
+    providerSlotTag === "text"
+      ? slot.tag === "text" || slot.tag === undefined
+      : slot.tag === providerSlotTag,
+  );
   const providerSlotKey = `plugin.${pkg.name}.${providerSlotSetting?.key ?? ""}`;
   const [providerSlotOverride, setProviderSlotOverride] = useState<
     string | undefined
@@ -106,16 +129,29 @@ export function PluginPackageRow({
   } = resolveProviderSlot({
     manifestDefault: manifestDefaultSlot,
     override: providerSlotOverride,
-    isMissing: isMissingDeclaredSlot,
+    isMissing: (slotId) =>
+      !resolvedSlots.some(
+        (slot) =>
+          slot.slotId === slotId &&
+          (providerSlotTag === "text"
+            ? slot.tag === "text" || slot.tag === undefined
+            : slot.tag === providerSlotTag),
+      ),
   });
 
   const handleProviderSlotChange = (value: string): void => {
     const store = getSettings();
+    if (value === "") {
+      void store.clear(providerSlotKey);
+      setProviderSlotOverride(undefined);
+      return;
+    }
     void store.set(providerSlotKey, value);
+    setProviderSlotOverride(value);
   };
 
   const hasMissingRuntimeSlot = pluginBindings.some((binding) =>
-    isMissingDeclaredSlot(binding.defaultSlot),
+    isMissingTextRuntimeSlot(binding.defaultSlot),
   );
 
   return (
@@ -158,18 +194,14 @@ export function PluginPackageRow({
             className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md shrink-0 font-mono"
             title={
               isCore
-                ? t(
-                    "plugin.locked",
-                    "Core plugin — cannot be disabled",
-                  )
-                : t(
-                    "session.world",
-                    "World",
-                  )
+                ? t("plugin.locked", "Core plugin — cannot be disabled")
+                : t("session.world", "World")
             }
           >
             <Lock className="w-2.5 h-2.5" />
-            <span>{isCore ? t("plugin.core", "Core") : t("session.world", "World")}</span>
+            <span>
+              {isCore ? t("plugin.core", "Core") : t("session.world", "World")}
+            </span>
           </span>
         )}
 
@@ -197,7 +229,7 @@ export function PluginPackageRow({
           primaryBinding &&
           pluginBindings.length === 1 &&
           !hasMissingRuntimeSlot &&
-          resolvedSlots.length > 1 && (
+          primaryBindingSlots.length > 1 && (
             <select
               value={primaryBinding.slotName}
               onChange={(event) =>
@@ -230,7 +262,7 @@ export function PluginPackageRow({
                   });
                 })()}
               </option>
-              {resolvedSlots.map((slot) => (
+              {primaryBindingSlots.map((slot) => (
                 <option key={slot.slotId} value={slot.slotId}>
                   {slot.slotId}
                   {slot.serverModel ? ` · ${slot.serverModel}` : ""}
@@ -282,9 +314,15 @@ export function PluginPackageRow({
                 ? `override: ${effectiveProviderSlot}`
                 : `default: ${effectiveProviderSlot}`}
           </Badge>
-          {resolvedSlots.length > 0 && (
+          {providerSlots.length > 0 && (
             <select
-              value={providerSlotOverride ?? ""}
+              value={
+                providerSlots.some(
+                  (slot) => slot.slotId === providerSlotOverride,
+                )
+                  ? providerSlotOverride
+                  : ""
+              }
               onChange={(event) => handleProviderSlotChange(event.target.value)}
               className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
             >
@@ -296,7 +334,7 @@ export function PluginPackageRow({
                     })
                   : t("plugin.providerSlotNoDefault", "default")}
               </option>
-              {resolvedSlots.map((slot) => (
+              {providerSlots.map((slot) => (
                 <option key={slot.slotId} value={slot.slotId}>
                   {slot.slotId}
                   {slot.serverModel ? ` · ${slot.serverModel}` : ""}
@@ -314,12 +352,15 @@ export function PluginPackageRow({
           <div className="mt-2.5 pl-1 sm:pl-9 space-y-2">
             {pluginBindings.map((binding) => {
               const declaredSlot = binding.defaultSlot;
-              const configuredDefault = resolveDeclaredSlot(declaredSlot);
-              const missingDefault = isMissingDeclaredSlot(declaredSlot);
+              const configuredDefault = isMissingTextRuntimeSlot(declaredSlot)
+                ? null
+                : resolveDeclaredSlot(declaredSlot);
+              const missingDefault = isMissingTextRuntimeSlot(declaredSlot);
+              const bindingSlots = bindingState.compatibleSlots(declaredSlot);
               const showPicker =
                 pluginBindings.length > 1 ||
                 missingDefault ||
-                resolvedSlots.length > 1;
+                bindingSlots.length > 1;
               return (
                 <div
                   key={binding.qualifiedId}
@@ -336,7 +377,9 @@ export function PluginPackageRow({
                     variant={missingDefault ? "destructive" : "outline"}
                     className="text-[9px] px-1.5 py-0.2 shrink-0 font-mono"
                   >
-                    {missingDefault ? `missing [${declaredSlot}]` : `default: ${declaredSlot}`}
+                    {missingDefault
+                      ? `missing [${declaredSlot}]`
+                      : `default: ${declaredSlot}`}
                   </Badge>
                   {showPicker && (
                     <select
@@ -354,7 +397,7 @@ export function PluginPackageRow({
                           ? `default · ${declaredSlot}`
                           : `(unassigned)`}
                       </option>
-                      {resolvedSlots.map((slot) => (
+                      {bindingSlots.map((slot) => (
                         <option key={slot.slotId} value={slot.slotId}>
                           {slot.slotId}
                           {slot.serverModel ? ` · ${slot.serverModel}` : ""}

@@ -91,6 +91,17 @@ const basePresets: PresetConfig[] = [
     enabled: true,
     tag: "text",
   },
+  {
+    id: "image-preset",
+    name: "Image (base)",
+    provider: "vendorX",
+    model: "gpt-image-2-2k",
+    protocol: "openai-chat-v1",
+    tier: "medium",
+    supportedModes: ["image"],
+    enabled: true,
+    tag: "image",
+  },
 ];
 
 function setup() {
@@ -127,6 +138,7 @@ function setup() {
   slotRegistry.configure({
     slots: {
       story: { slotId: "story", presetId: "ds-chat", tag: "text" },
+      image: { slotId: "image", presetId: "image-preset", tag: "image" },
     },
   });
 
@@ -181,6 +193,63 @@ describe("gateway + slotOverrides", () => {
     // Registry state restored after the call completes.
     expect(presetRegistry.hasPreset("custom_abc")).toBe(false);
     expect(__internals.presetRefs.size).toBe(0);
+  });
+
+  it("does not send a text call through an image slot override", async () => {
+    const { gateway, calls } = setup();
+
+    await gateway.generateText(
+      { presetId: "story", messages: [{ role: "user", content: "hi" }] },
+      { slotOverrides: { slotPresetOverrides: { story: "image-preset" } } },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      provider: "deepseek",
+      model: "deepseek-chat",
+    });
+  });
+
+  it("keeps a valid image slot override on the image target", () => {
+    const { gateway } = setup();
+
+    const resolved = gateway.resolveSlot("image", {
+      fallbackTag: "image",
+      slotOverrides: {
+        slotPresetOverrides: { image: "image-preset" },
+      },
+    });
+
+    expect(resolved).toMatchObject({
+      presetId: "image-preset",
+      model: "gpt-image-2-2k",
+      tag: "image",
+    });
+  });
+
+  it("keeps an explicitly tagged image overlay even when the model is unknown", () => {
+    const { gateway } = setup();
+    const resolved = gateway.resolveSlot("image", {
+      fallbackTag: "image",
+      slotOverrides: {
+        slotPresetOverrides: { image: "custom-image" },
+        customPresets: [
+          {
+            id: "custom-image",
+            name: "Managed image",
+            provider: "vendorX",
+            model: "router-specific-image-model",
+            tag: "image",
+          },
+        ],
+      },
+    });
+
+    expect(resolved).toMatchObject({
+      presetId: "custom-image",
+      model: "router-specific-image-model",
+      tag: "image",
+    });
   });
 
   it("forwards slot-level parameter overrides into providerRequestMetadata", async () => {

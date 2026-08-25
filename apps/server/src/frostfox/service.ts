@@ -780,6 +780,15 @@ function buildManagedSlotDefaults(
       baseUrl: provider.baseUrl,
       model: preset.model,
       protocol: provider.protocol,
+      tag:
+        preset.tag ??
+        (preset.capability?.output.includes("image")
+          ? "image"
+          : preset.capability?.output.includes("audio")
+            ? "speech"
+            : preset.capability?.output.includes("embedding")
+              ? "embedding"
+              : "text"),
     });
   }
 
@@ -841,6 +850,7 @@ function withManagedImageDefaults(
         baseUrl: selected.channel.baseUrl,
         model: selected.model.id,
         protocol: selected.channel.protocol,
+        tag: "image",
       });
     }
   }
