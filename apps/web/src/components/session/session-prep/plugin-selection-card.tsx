@@ -63,22 +63,22 @@ function PluginPackSelector({
   if (pluginPacks.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-3.5">
       {pluginPacks.map((pack) => {
         const isActive = activePluginPack?.id === pack.id;
         return (
           <button
             key={pack.id}
             type="button"
-            className={`border px-3 py-2 text-left transition-colors ${
+            className={`group rounded-xl border p-3 text-left transition-all duration-200 cursor-pointer select-none ${
               isActive
-                ? "border-primary/50 bg-primary/10"
-                : "border-border bg-muted/20 hover:bg-muted/40"
+                ? "border-primary bg-primary/15 text-foreground shadow-sm shadow-primary/20 ring-1 ring-primary/40"
+                : "border-border/80 bg-card/60 hover:border-foreground/30 hover:bg-accent/40 text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => onApplyPack(pack.id)}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold truncate">
+              <span className="text-xs font-semibold truncate text-foreground">
                 {pack.labelKey
                   ? t(
                       pack.labelKey,
@@ -87,14 +87,14 @@ function PluginPackSelector({
                   : textValue(pack.label, i18n.language) || pack.id}
               </span>
               <Badge
-                variant={isActive ? "secondary" : "outline"}
-                className="text-[9px] shrink-0"
+                variant={isActive ? "default" : "outline"}
+                className="text-[9px] shrink-0 font-mono"
               >
                 {pack.plugins.length}
               </Badge>
             </div>
             {pack.description && (
-              <p className="mt-1 text-[10px] text-muted-foreground line-clamp-2">
+              <p className="mt-1 text-[11px] text-muted-foreground leading-snug line-clamp-2">
                 {pack.descriptionKey
                   ? t(
                       pack.descriptionKey,

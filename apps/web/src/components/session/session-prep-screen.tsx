@@ -6,10 +6,21 @@ import {
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Play, ArrowLeft, Loader2 } from "lucide-react";
+import {
+  Play,
+  ArrowLeft,
+  Loader2,
+  Puzzle,
+  Cpu,
+  History,
+  FileText,
+  KeyRound,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 import * as api from "@/services/api.js";
 import { Button } from "@/components/ui/button.js";
-import { ScrollArea } from "@/components/ui/scroll-area.js";
+import { Badge } from "@/components/ui/badge.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
 import {
   Dialog,
@@ -19,7 +30,6 @@ import {
   DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog.js";
-import { SessionBreadcrumb } from "./session-breadcrumb.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { useSlotConfig } from "@/hooks/use-slot-config.js";
 import {
@@ -31,11 +41,9 @@ import {
   removeSessionById,
   startPluginsPayload,
 } from "./session-prep/session-actions.js";
-import { WorldInfoCard } from "./session-prep/world-info-card.js";
 import { SessionHistoryCard } from "./session-prep/session-history-card.js";
-import { WorldLoreCard } from "./session-prep/world-lore-card.js";
 import { DimensionActions } from "./session-prep/dimension-actions.js";
-import { ModelsCard } from "./session-prep/models-card.js";
+import { ActiveModelSlots } from "./active-model-slots.js";
 import { PluginSelectionCard } from "./session-prep/plugin-selection-card.js";
 import type { SessionPrepScreenProps } from "./session-prep/types.js";
 import { worldVisual } from "@/lib/world-visuals.js";
@@ -48,8 +56,18 @@ import {
   isLockedCorePackage,
 } from "./session-prep/plugin-selection-helpers.js";
 import { ShinyText, Magnet, StarBorder } from "@/components/reactbits/index.js";
+import { cn } from "@/lib/utils.js";
+
 export { defaultSelectedPluginIdsForWorld, isLockedCorePackage };
 
+type CockpitTab = "plugins" | "models" | "history";
+
+/**
+ * SessionPrepScreen — Single-Screen Cockpit Dashboard
+ * Completely eliminates vertical page scroll.
+ * Left: 4K World Hero Poster + World Lore/Dimensions Card (40%)
+ * Right: Cockpit Control Panel with Plugins, Models, History tabs & HeroUI CTA (60%)
+ */
 export function SessionPrepScreen({
   world,
   packages,
@@ -108,11 +126,7 @@ export function SessionPrepScreen({
       .catch(ignoreError("fetch plugin flows"));
   }, []);
 
-  const [worldInfoExpanded, setWorldInfoExpanded] = useState(false);
-  const [sessionsExpanded, setSessionsExpanded] = useState(true);
-  const [loreExpanded, setLoreExpanded] = useState(false);
-  const [modelsExpanded, setModelsExpanded] = useState(false);
-  const [pluginSectionExpanded, setPluginSectionExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<CockpitTab>("plugins");
   const [existingSessions, setExistingSessions] = useState<api.SessionRecord[]>(
     [],
   );
@@ -199,9 +213,6 @@ export function SessionPrepScreen({
     [resolvedSlots],
   );
 
-  // In-flight guards: startGame / resume run several serial network round
-  // trips, so lock the relevant button to prevent duplicate session creation
-  // or double resume on a slow connection.
   const [isStarting, setIsStarting] = useState(false);
   const [resumingId, setResumingId] = useState<string | null>(null);
 
@@ -229,18 +240,23 @@ export function SessionPrepScreen({
   );
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="h-full w-full overflow-hidden bg-background text-foreground flex flex-col">
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={handleSettingsOpenChange}
         initialKey={settingsInitialKey}
       />
-      <ScrollArea className="w-full h-full">
-        <div className="mx-auto max-w-6xl px-4 md:px-8 py-5 md:py-8">
-          <header
-            className="relative mb-8 overflow-hidden rounded-3xl border border-border/80 bg-card shadow-xl"
+
+      {/* Main One-Screen Cockpit Area */}
+      <div className="flex-1 w-full max-w-[1700px] mx-auto p-4 sm:p-5 md:p-6 lg:p-7 overflow-hidden flex flex-col lg:flex-row gap-5">
+        {/* Left Column (40%): 4K World Hero + World Lore / Dimensions */}
+        <section className="w-full lg:w-[42%] xl:w-[40%] flex flex-col gap-4 h-full overflow-hidden shrink-0">
+          {/* Card 1: 4K World Cover Poster */}
+          <article
+            className="relative rounded-3xl border border-border/80 bg-card shadow-xl overflow-hidden flex flex-col justify-between p-6 shrink-0 min-h-[220px] max-h-[48%]"
             style={{ "--world-accent": visual.accent } as CSSProperties}
           >
+            {/* 4K/2K Artwork Background */}
             <img
               src={visual.image}
               alt=""
@@ -250,188 +266,337 @@ export function SessionPrepScreen({
               loading="eager"
               fetchPriority="high"
               decoding="async"
-              className="absolute inset-0 h-full w-full object-cover scale-[1.01] transition-transform duration-700"
+              className="absolute inset-0 h-full w-full object-cover scale-[1.02] transition-transform duration-700"
               draggable={false}
             />
+            {/* Dark Vignette Overlays */}
             <div
               aria-hidden="true"
               className="absolute inset-0"
               style={{
                 background:
-                  "linear-gradient(90deg, rgba(9,9,11,0.88) 0%, rgba(9,9,11,0.65) 48%, rgba(9,9,11,0.3) 100%), linear-gradient(180deg, rgba(9,9,11,0.3) 0%, rgba(9,9,11,0.85) 100%)",
+                  "linear-gradient(90deg, rgba(9,9,11,0.92) 0%, rgba(9,9,11,0.65) 50%, rgba(9,9,11,0.35) 100%), linear-gradient(180deg, rgba(9,9,11,0.4) 0%, rgba(9,9,11,0.85) 100%)",
               }}
             />
-            <div className="relative z-10 flex min-h-[250px] md:min-h-[270px] flex-col justify-between p-6 md:p-8 text-white">
-              <div className="flex items-center justify-between gap-4">
-                <Button
-                  variant="bordered"
-                  size="sm"
-                  radius="full"
-                  className="h-9 border-white/20 bg-black/40 px-4 text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
-                  onClick={onBack}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1.5" />
-                  {t("session.breadcrumbWorldSelect", "Select World")}
-                </Button>
-                <Magnet padding={50} magnetStrength={3}>
-                  <Button
-                    size="default"
-                    radius="full"
-                    className="h-10 px-6 font-bold uppercase tracking-wider text-zinc-950 bg-white hover:bg-zinc-100 shadow-lg shadow-black/40 hover:scale-105 active:scale-95 transition-all"
-                    disabled={isStarting}
-                    onClick={() => void handleStart()}
-                  >
-                    {isStarting ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Play className="w-4 h-4 mr-2 fill-current" />
-                    )}
-                    {isStarting
-                      ? t("session.startingGame", "Creating…")
-                      : t("session.startGame", "Start Game")}
-                  </Button>
-                </Magnet>
-              </div>
 
-              <div className="max-w-2xl space-y-3">
-                <SessionBreadcrumb
-                  step="prep"
-                  worldName={text(world.name)}
-                  onGoWorldSelect={onBack}
-                />
-                <div>
-                  <p className="ui-eyebrow mb-2 text-white/60 font-mono tracking-wider">
-                    {t("session.preparation", "Session Setup")}
-                  </p>
-                  <h1 className="ui-title text-3xl md:text-5xl font-bold leading-[1.02] text-white">
-                    <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.85)">
-                      {text(world.name)}
-                    </ShinyText>
-                  </h1>
-                  <p className="mt-3 max-w-xl text-sm md:text-base leading-relaxed text-zinc-300 font-light">
-                    {text(world.description)}
-                  </p>
-                </div>
+            {/* Header Back Button & Tags */}
+            <div className="relative z-10 flex items-center justify-between gap-3 text-white">
+              <Button
+                variant="bordered"
+                size="sm"
+                radius="full"
+                className="h-8 border-white/20 bg-black/40 px-3.5 text-xs text-white/90 backdrop-blur-md hover:bg-white/20 hover:text-white"
+                onClick={onBack}
+              >
+                <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                {t("session.breadcrumbWorldSelect", "Select World")}
+              </Button>
+              <div className="flex flex-wrap gap-1">
+                {(world.tags ?? []).slice(0, 3).map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-white/20 bg-black/35 px-2.5 py-0.5 text-[10px] font-medium text-white/80 backdrop-blur-md"
+                  >
+                    {tag}
+                  </span>
+                ))}
               </div>
             </div>
-          </header>
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-start">
-            <section className="min-w-0 space-y-4">
-              <WorldInfoCard
-                world={world}
-                expanded={worldInfoExpanded}
-                onToggle={() => setWorldInfoExpanded(!worldInfoExpanded)}
-              />
 
-              <SessionHistoryCard
-                activeSessions={activeSessions}
-                expanded={sessionsExpanded}
-                onToggle={() => setSessionsExpanded(!sessionsExpanded)}
-                onResume={handleResume}
-                resumingId={resumingId}
-                onRequestDelete={setDeleteTarget}
-              />
+            {/* World Title & Summary */}
+            <div className="relative z-10 space-y-2 mt-auto text-white">
+              <span className="ui-eyebrow text-[10px] text-white/60 font-mono tracking-widest block">
+                {t("session.preparation", "SESSION SETUP")}
+              </span>
+              <h1 className="ui-title text-2xl sm:text-3xl font-bold leading-tight text-white tracking-tight">
+                <ShinyText speed={5} shineColor="rgba(255, 255, 255, 0.9)">
+                  {text(world.name)}
+                </ShinyText>
+              </h1>
+              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed line-clamp-3 font-light">
+                {text(world.description)}
+              </p>
+            </div>
+          </article>
 
-              <WorldLoreCard
-                expanded={loreExpanded}
-                onToggle={() => setLoreExpanded(!loreExpanded)}
-                loreValue={loreValue}
-                originalLore={originalLore}
-                isModified={isLoreModified}
-                onLoreChange={handleLoreChange}
-                onResetLore={resetLore}
-              />
+          {/* Card 2: World Lore & Dimensions */}
+          <article className="rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-lg p-5 flex-1 flex flex-col justify-between overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">
+                  {t("session.worldDocument", "World Document & Lore")}
+                </h3>
+              </div>
+              {isLoreModified && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="h-6 gap-1 text-[10px] text-amber-500 hover:text-amber-400"
+                  onClick={resetLore}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  {t("common.reset", "Reset")}
+                </Button>
+              )}
+            </div>
 
+            {/* Lore Editor / Preview Area */}
+            <div className="flex-1 my-3 overflow-hidden rounded-xl border border-border/70 bg-background/50 p-3 backdrop-blur-xs flex flex-col">
+              <p className="ui-eyebrow text-[10px] text-muted-foreground mb-1.5 font-mono">
+                {loreValue.length.toLocaleString()} {t("common.chars", "characters")} · {t("session.loreDoc", "Knowledge Base")}
+              </p>
+              <textarea
+                value={loreValue}
+                onChange={(e) => handleLoreChange(e.target.value)}
+                placeholder={t("session.lorePlaceholder", "World lore and background setting...")}
+                className="w-full flex-1 bg-transparent text-xs leading-relaxed outline-none resize-none ui-scroll text-foreground/90 placeholder:text-muted-foreground"
+              />
+            </div>
+
+            {/* Dimension Import / Export Actions */}
+            <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-3">
               <DimensionActions
                 worldId={world.id}
                 enabled={Boolean(world.dimensions)}
               />
-            </section>
+            </div>
+          </article>
+        </section>
 
-            <section className="min-w-0 space-y-4 lg:sticky lg:top-4">
-              <ModelsCard
-                resolvedSlots={resolvedSlots}
-                expanded={modelsExpanded}
-                onToggle={() => setModelsExpanded(!modelsExpanded)}
-                onOpenSettings={() => onSettingsOpenChange(true)}
-              />
+        {/* Right Column (60%): Cockpit Control Console with Tabs & CTA */}
+        <section className="w-full lg:w-[58%] xl:w-[60%] flex flex-col gap-3 h-full overflow-hidden flex-1">
+          {/* Cockpit Card Shell */}
+          <div className="rounded-3xl border border-border/80 bg-card/90 backdrop-blur-2xl shadow-2xl flex-1 flex flex-col overflow-hidden p-5 md:p-6">
+            {/* Cockpit Header with Tab Switches */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-4 shrink-0">
+              {/* Tabs */}
+              <div className="flex items-center gap-1 p-1 rounded-2xl bg-background/60 border border-border/80 backdrop-blur-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("plugins")}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    activeTab === "plugins"
+                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+                  )}
+                >
+                  <Puzzle className="w-3.5 h-3.5" />
+                  <span>{t("session.plugins", "Gameplay Plugins")}</span>
+                  <Badge
+                    variant={activeTab === "plugins" ? "secondary" : "outline"}
+                    className="text-[9px] px-1.5 py-0 font-mono"
+                  >
+                    {selectedPluginIds.length}/{packages.length}
+                  </Badge>
+                </button>
 
-              <PluginSelectionCard
-                world={world}
-                packages={packages}
-                selectedPluginIds={selectedPluginIds}
-                selectedPluginIdSet={selectedPluginIdSet}
-                selectedPackages={selectedPackages}
-                expanded={pluginSectionExpanded}
-                onToggleExpanded={() =>
-                  setPluginSectionExpanded(!pluginSectionExpanded)
-                }
-                pluginPacks={pluginPacks}
-                activePluginPack={activePluginPack}
-                activePluginTags={activePluginTags}
-                availablePluginTags={availablePluginTags}
-                pluginSearch={pluginSearch}
-                onPluginSearchChange={setPluginSearch}
-                onTogglePluginTag={togglePluginTag}
-                onApplyPack={applyPack}
-                pluginGroups={pluginGroups}
-                corePluginIds={corePluginIds}
-                lockedPluginIds={lockedPluginIds}
-                bindingState={bindingState}
-                resolvedSlots={resolvedSlots}
-                resolveDeclaredSlot={resolveSelectedDeclaredSlot}
-                isMissingDeclaredSlot={isSelectedDeclaredSlotMissing}
-                onTogglePlugin={togglePlugin}
-                worldDataPreflight={worldDataPreflight}
-                worldDataPreflightStatus={worldDataPreflightStatus}
-                worldDataPreflightError={worldDataPreflightError}
-                onRetryWorldDataPreflight={runWorldDataPreflight}
-                flowData={flowData}
-                selectedFlowSteps={selectedFlowSteps}
-              />
-            </section>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("models")}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    activeTab === "models"
+                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+                  )}
+                >
+                  <Cpu className="w-3.5 h-3.5" />
+                  <span>{t("session.activeModels", "AI Models")}</span>
+                  <Badge
+                    variant={activeTab === "models" ? "secondary" : "outline"}
+                    className="text-[9px] px-1.5 py-0 font-mono"
+                  >
+                    {resolvedSlots.length}
+                  </Badge>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("history")}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    activeTab === "history"
+                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+                  )}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>{t("session.sessions", "Saved Sessions")}</span>
+                  {activeSessions.length > 0 && (
+                    <Badge
+                      variant={activeTab === "history" ? "secondary" : "outline"}
+                      className="text-[9px] px-1.5 py-0 font-mono"
+                    >
+                      {activeSessions.length}
+                    </Badge>
+                  )}
+                </button>
+              </div>
+
+              {/* Status Indicator */}
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>
+                  {selectedPluginIds.length} {t("session.pluginsActive", "plugins active")}
+                </span>
+              </div>
+            </div>
+
+            {/* Tab Body — Smooth internal scrolling within fixed cockpit height */}
+            <div className="flex-1 overflow-y-auto ui-scroll py-4 pr-1">
+              {/* Tab 1: Plugins */}
+              {activeTab === "plugins" && (
+                <div className="space-y-4 animate-in fade-in-0 duration-200">
+                  <PluginSelectionCard
+                    world={world}
+                    packages={packages}
+                    selectedPluginIds={selectedPluginIds}
+                    selectedPluginIdSet={selectedPluginIdSet}
+                    selectedPackages={selectedPackages}
+                    expanded={true}
+                    onToggleExpanded={() => {}}
+                    pluginPacks={pluginPacks}
+                    activePluginPack={activePluginPack}
+                    activePluginTags={activePluginTags}
+                    availablePluginTags={availablePluginTags}
+                    pluginSearch={pluginSearch}
+                    onPluginSearchChange={setPluginSearch}
+                    onTogglePluginTag={togglePluginTag}
+                    onApplyPack={applyPack}
+                    pluginGroups={pluginGroups}
+                    corePluginIds={corePluginIds}
+                    lockedPluginIds={lockedPluginIds}
+                    bindingState={bindingState}
+                    resolvedSlots={resolvedSlots}
+                    resolveDeclaredSlot={resolveSelectedDeclaredSlot}
+                    isMissingDeclaredSlot={isSelectedDeclaredSlotMissing}
+                    onTogglePlugin={togglePlugin}
+                    worldDataPreflight={worldDataPreflight}
+                    worldDataPreflightStatus={worldDataPreflightStatus}
+                    worldDataPreflightError={worldDataPreflightError}
+                    onRetryWorldDataPreflight={runWorldDataPreflight}
+                    flowData={flowData}
+                    selectedFlowSteps={selectedFlowSteps}
+                  />
+                </div>
+              )}
+
+              {/* Tab 2: AI Models */}
+              {activeTab === "models" && (
+                <div className="space-y-4 animate-in fade-in-0 duration-200">
+                  <div className="flex items-center justify-between p-4 rounded-2xl border border-border/80 bg-background/50 backdrop-blur-xs">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">
+                        {t("session.activeModels", "Configured Model Slots")}
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {resolvedSlots.length > 0
+                          ? t("session.slotsConfigured", { count: resolvedSlots.length })
+                          : t("session.slotsUnconfigured")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      radius="full"
+                      className="gap-1.5 text-xs"
+                      onClick={() => onSettingsOpenChange(true)}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      {t("session.configureKeys", "Manage Providers & Keys")}
+                    </Button>
+                  </div>
+                  <ActiveModelSlots slots={resolvedSlots} />
+                </div>
+              )}
+
+              {/* Tab 3: Saved Sessions */}
+              {activeTab === "history" && (
+                <div className="space-y-4 animate-in fade-in-0 duration-200">
+                  <SessionHistoryCard
+                    activeSessions={activeSessions}
+                    expanded={true}
+                    onToggle={() => {}}
+                    onResume={handleResume}
+                    resumingId={resumingId}
+                    onRequestDelete={setDeleteTarget}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Cockpit Action Bar (Fixed, never pushed off-screen) */}
+            <div className="pt-3.5 border-t border-border/80 flex items-center justify-between gap-4 shrink-0 bg-card/60 backdrop-blur-md rounded-2xl p-3 mt-auto">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-foreground">
+                  {text(world.name)}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {selectedPluginIds.length} {t("session.plugins", "plugins")} · {resolvedSlots.length} {t("session.activeModels", "models ready")}
+                </span>
+              </div>
+
+              <Magnet padding={60} magnetStrength={3}>
+                <Button
+                  size="lg"
+                  radius="full"
+                  className="h-12 px-8 font-bold uppercase tracking-wider text-zinc-950 bg-white hover:bg-zinc-100 shadow-xl shadow-black/30 hover:scale-105 active:scale-95 transition-all text-sm"
+                  disabled={isStarting}
+                  onClick={() => void handleStart()}
+                >
+                  {isStarting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4 mr-2 fill-current" />
+                  )}
+                  {isStarting
+                    ? t("session.startingGame", "Creating…")
+                    : t("session.startGame", "Start Game")}
+                </Button>
+              </Magnet>
+            </div>
           </div>
-        </div>
-      </ScrollArea>
+        </section>
+      </div>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
       >
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>
-              {t("session.deleteConfirmTitle", "Delete Session")}
+              {t("session.deleteSession", "Delete Session")}
             </DialogTitle>
             <DialogDescription>
               {t(
-                "session.deleteConfirmDesc",
-                "This will permanently delete the session and all its data (messages, game state, etc.). This action cannot be undone.",
+                "session.deleteConfirm",
+                "Are you sure you want to delete this session? This action cannot be undone.",
               )}
             </DialogDescription>
           </DialogHeader>
-          {deleteTarget && (
-            <p className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1.5 break-all">
-              {deleteTarget.id}
-            </p>
-          )}
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="flex justify-end gap-2 mt-4">
             <DialogClose asChild>
-              <Button variant="outline" size="sm" disabled={deleting}>
+              <Button variant="ghost" size="sm" radius="full">
                 {t("common.cancel", "Cancel")}
               </Button>
             </DialogClose>
             <Button
               variant="destructive"
               size="sm"
+              radius="full"
               disabled={deleting}
-              onClick={handleConfirmDelete}
+              onClick={() => void handleConfirmDelete()}
             >
-              {deleting
-                ? t("common.deleting", "Deleting...")
-                : t("common.delete", "Delete")}
+              {deleting ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : null}
+              {t("common.delete", "Delete")}
             </Button>
           </div>
         </DialogContent>
