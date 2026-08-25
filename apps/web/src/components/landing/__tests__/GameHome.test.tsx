@@ -1,0 +1,80 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+const navigate = vi.hoisted(() => vi.fn());
+const setOpen = vi.hoisted(() => vi.fn());
+const accountState = vi.hoisted(() => ({
+  status: {
+    enabled: true,
+    authenticated: false,
+  },
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigate,
+}));
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+vi.mock("@/components/frostfox-account-summary.js", () => ({
+  useFrostFoxAccount: () => ({
+    status: accountState.status,
+    loading: false,
+    error: false,
+    refresh: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/use-settings-dialog.js", () => ({
+  useSettingsDialog: () => ({
+    open: false,
+    setOpen,
+    onOpenChange: vi.fn(),
+    initialKey: undefined,
+  }),
+}));
+vi.mock("@/settings/SettingsDialog.js", () => ({
+  SettingsDialog: () => null,
+}));
+vi.mock("@/components/visual-effects/balatro-transition.js", () => ({
+  BalatroTransition: () => null,
+}));
+vi.mock("@/components/reactbits/index.js", () => ({
+  Particles: () => null,
+  ShinyText: ({ children }: { children: React.ReactNode }) => children,
+  DecryptedText: ({ text }: { text: string }) => text,
+  Magnet: ({ children }: { children: React.ReactNode }) => children,
+  StarBorder: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("@/services/api.js", () => ({
+  fetchFrostFoxProgression: vi.fn(),
+}));
+
+const { GameHome } = await import("../GameHome.js");
+
+describe("GameHome", () => {
+  it("keeps the cinematic home and its actions visible before account login", () => {
+    render(<GameHome />);
+
+    expect(
+      screen.getByRole("heading", { name: "home.gameTitle" }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "home.startPlaying" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+    expect(
+      screen
+        .getByRole("button", { name: "home.openSettings" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+    expect(screen.queryByText("home.mainLoginRequired")).toBeNull();
+  });
+
+  it("opens settings from the restored secondary action", () => {
+    render(<GameHome />);
+
+    fireEvent.click(screen.getByRole("button", { name: "home.openSettings" }));
+    expect(setOpen).toHaveBeenCalledWith(true);
+  });
+});

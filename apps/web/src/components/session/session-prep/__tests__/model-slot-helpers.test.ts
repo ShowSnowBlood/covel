@@ -1,10 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { resolveProviderSlot } from "../model-slot-helpers.js";
+import {
+  isDeclaredSlotMissing,
+  resolveDeclaredSlot,
+  resolveProviderSlot,
+} from "../model-slot-helpers.js";
 
 // The configured slots in this scenario: the user has `gpt-image` but NOT the
 // plugin's manifest default `openai-image`.
 const configured = new Set(["story", "plugin", "gpt-image"]);
 const isMissing = (slot: string) => !configured.has(slot);
+
+const slots = [
+  {
+    slotId: "image",
+    presetId: "image-model",
+    preset: null,
+    label: "image",
+    tag: "image",
+  },
+  {
+    slotId: "story",
+    presetId: "story-model",
+    preset: null,
+    label: "story",
+    tag: "text",
+  },
+];
+
+describe("agent runtime slot fallback", () => {
+  it("uses a directly configured role slot", () => {
+    expect(resolveDeclaredSlot(slots, "story")?.slotId).toBe("story");
+  });
+
+  it("falls back from a missing plugin role to the first text slot", () => {
+    expect(resolveDeclaredSlot(slots, "plugin")?.slotId).toBe("story");
+    expect(isDeclaredSlotMissing(slots, "plugin")).toBe(false);
+  });
+
+  it("does not route an agent runtime through an image-only slot", () => {
+    expect(resolveDeclaredSlot(slots.slice(0, 1), "plugin")).toBeNull();
+    expect(isDeclaredSlotMissing(slots.slice(0, 1), "plugin")).toBe(true);
+  });
+});
 
 describe("resolveProviderSlot", () => {
   it("uses the manifest default when there is no override", () => {

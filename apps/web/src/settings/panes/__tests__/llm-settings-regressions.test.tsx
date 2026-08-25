@@ -1,36 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import i18n from "@/i18n";
 import type {
   ModelParameterOverrides,
-  ProviderModelProfile,
   ReasoningEffortProfile,
 } from "@/services/api.js";
 import { parseNumericParameterOverride } from "../LlmAdvancedPane.js";
-import { ProviderDetails } from "../llm-provider-details.js";
 import {
   clearChangedSlotReasoningEfforts,
   pruneInvalidReasoningEffortOverride,
 } from "../llm-reasoning-effort.js";
-
-vi.mock("@/components/shared/ping-button.js", () => ({
-  PingButton: () => null,
-}));
-
-vi.mock("../LlmKeysPane.js", () => ({
-  LlmKeysPane: ({ providerId }: { providerId: string }) => (
-    <span data-testid="key-namespace">{providerId}</span>
-  ),
-}));
-
-vi.mock("@/services/api.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/services/api.js")>();
-  return {
-    ...original,
-    getApiKey: vi.fn(() => ""),
-    lookupModelCapabilityDetails: vi.fn(() => new Promise(() => undefined)),
-  };
-});
 
 const profile = (options: ReasoningEffortProfile["options"]) =>
   ({
@@ -98,48 +76,5 @@ describe("LLM settings regressions", () => {
     expect(parseNumericParameterOverride("5", -2, 2)).toBe(2);
     expect(parseNumericParameterOverride("-5", -2, 2)).toBe(-2);
     expect(parseNumericParameterOverride("invalid", -2, 2)).toBeUndefined();
-  });
-
-  it("keeps the base URL as a draft and commits it once on blur", () => {
-    const onPatchLocalProfile = vi.fn();
-    const localProfile: ProviderModelProfile = {
-      id: "openai-second-connection",
-      provider: "openai",
-      name: "OpenAI proxy",
-      baseUrl: "https://old.example/v1",
-      protocol: "openai-chat-v1",
-      models: [],
-    };
-    render(
-      <ProviderDetails
-        provider={{
-          id: "openai-second-connection",
-          provider: "openai",
-          baseUrl: localProfile.baseUrl,
-          protocol: "openai-chat-v1",
-          serverModels: [],
-          localProfile,
-        }}
-        onAddModel={vi.fn()}
-        onPatchLocalProfile={onPatchLocalProfile}
-        onDeleteLocalModel={vi.fn()}
-        onDeleteLocalProvider={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("key-namespace").textContent).toBe(
-      "openai-second-connection",
-    );
-
-    const input = screen.getByLabelText("API endpoint");
-    fireEvent.change(input, { target: { value: "https://new" } });
-    fireEvent.change(input, { target: { value: "https://new.example/v1" } });
-    expect(onPatchLocalProfile).not.toHaveBeenCalled();
-
-    fireEvent.blur(input);
-    expect(onPatchLocalProfile).toHaveBeenCalledTimes(1);
-    expect(onPatchLocalProfile).toHaveBeenCalledWith({
-      baseUrl: "https://new.example/v1",
-    });
   });
 });

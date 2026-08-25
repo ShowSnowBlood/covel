@@ -195,7 +195,7 @@ export function LlmSlotsPane() {
         <p className="text-[11px] text-muted-foreground leading-relaxed">
           {t(
             "settings.slotChainSummary",
-            "Plugin tasks → model roles → providers and models → API keys.",
+            "Plugin tasks use model roles; models come from llm.toml and synchronized FrostFox channels.",
           )}
         </p>
         <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/80 flex-wrap">
@@ -208,11 +208,7 @@ export function LlmSlotsPane() {
           </span>
           <span className="text-muted-foreground/50">▸</span>
           <span className="px-1.5 py-0.5 rounded bg-background border border-border">
-            {t("settings.chainPreset", "Provider and model")}
-          </span>
-          <span className="text-muted-foreground/50">▸</span>
-          <span className="px-1.5 py-0.5 rounded bg-background border border-border">
-            {t("settings.chainKey", "API key")}
+            {t("settings.chainPreset", "Configured models")}
           </span>
         </div>
       </div>

@@ -344,12 +344,17 @@ export function SessionPrepScreen({
             {/* Lore Editor / Preview Area */}
             <div className="flex-1 my-3 overflow-hidden rounded-xl border border-border/70 bg-background/50 p-3 backdrop-blur-xs flex flex-col">
               <p className="ui-eyebrow text-[10px] text-muted-foreground mb-1.5 font-mono">
-                {loreValue.length.toLocaleString()} {t("common.chars", "characters")} · {t("session.loreDoc", "Knowledge Base")}
+                {loreValue.length.toLocaleString()}{" "}
+                {t("common.chars", "characters")} ·{" "}
+                {t("session.loreDoc", "Knowledge Base")}
               </p>
               <textarea
                 value={loreValue}
                 onChange={(e) => handleLoreChange(e.target.value)}
-                placeholder={t("session.lorePlaceholder", "World lore and background setting...")}
+                placeholder={t(
+                  "session.lorePlaceholder",
+                  "World lore and background setting...",
+                )}
                 className="w-full flex-1 bg-transparent text-xs leading-relaxed outline-none resize-none ui-scroll text-foreground/90 placeholder:text-muted-foreground"
               />
             </div>
@@ -426,7 +431,9 @@ export function SessionPrepScreen({
                   <span>{t("session.sessions", "Saved Sessions")}</span>
                   {activeSessions.length > 0 && (
                     <Badge
-                      variant={activeTab === "history" ? "secondary" : "outline"}
+                      variant={
+                        activeTab === "history" ? "secondary" : "outline"
+                      }
                       className="text-[9px] px-1.5 py-0 font-mono"
                     >
                       {activeSessions.length}
@@ -439,7 +446,8 @@ export function SessionPrepScreen({
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>
-                  {selectedPluginIds.length} {t("session.pluginsActive", "plugins active")}
+                  {selectedPluginIds.length}{" "}
+                  {t("session.pluginsActive", "plugins active")}
                 </span>
               </div>
             </div>
@@ -493,7 +501,9 @@ export function SessionPrepScreen({
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {resolvedSlots.length > 0
-                          ? t("session.slotsConfigured", { count: resolvedSlots.length })
+                          ? t("session.slotsConfigured", {
+                              count: resolvedSlots.length,
+                            })
                           : t("session.slotsUnconfigured")}
                       </p>
                     </div>
@@ -505,7 +515,10 @@ export function SessionPrepScreen({
                       onClick={() => onSettingsOpenChange(true)}
                     >
                       <KeyRound className="w-3.5 h-3.5" />
-                      {t("session.configureKeys", "Manage Providers & Keys")}
+                      {t(
+                        "session.configureModelRoles",
+                        "Configure model roles",
+                      )}
                     </Button>
                   </div>
                   <ActiveModelSlots slots={resolvedSlots} />
@@ -534,7 +547,9 @@ export function SessionPrepScreen({
                   {text(world.name)}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {selectedPluginIds.length} {t("session.plugins", "plugins")} · {resolvedSlots.length} {t("session.activeModels", "models ready")}
+                  {selectedPluginIds.length} {t("session.plugins", "plugins")} ·{" "}
+                  {resolvedSlots.length}{" "}
+                  {t("session.activeModels", "models ready")}
                 </span>
               </div>
 

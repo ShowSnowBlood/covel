@@ -67,10 +67,6 @@ const LLM_SUBNODES: Array<{
     label: { "zh-CN": "用途分配", "en-US": "Model Roles" },
   },
   {
-    id: "llm.providers",
-    label: { "zh-CN": "服务商与模型", "en-US": "Providers & Models" },
-  },
-  {
     id: "llm.advanced",
     label: { "zh-CN": "生成参数", "en-US": "Generation" },
   },
@@ -90,9 +86,8 @@ interface BuildNavOptions {
  * Build the left-nav tree.
  *
  * Nodes are a flat list rather than a tree to keep the renderer simple;
- * sub-nodes carry `parentId` and render indented. LLM always expands into
- * 3 fixed sub-nodes (model roles / providers and models / generation) backed by
- * purpose-built panes, not widget dispatch.
+ * sub-nodes carry `parentId` and render indented. LLM expands into two fixed
+ * sub-nodes (model roles / generation), both backed by purpose-built panes.
  */
 export function buildNavTree(
   store: SettingsStoreApi,

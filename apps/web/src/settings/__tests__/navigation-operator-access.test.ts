@@ -23,6 +23,12 @@ describe("operator access settings navigation", () => {
     ).toBe("运维访问");
   });
 
+  it("does not expose duplicate provider configuration", () => {
+    const nodes = buildNavTree(emptyStore, { locale: "zh-CN" });
+
+    expect(nodes.some((node) => node.id === "llm.providers")).toBe(false);
+  });
+
   it("is discoverable through settings search", () => {
     const nodes = buildNavTree(emptyStore, { locale: "en-US" });
 

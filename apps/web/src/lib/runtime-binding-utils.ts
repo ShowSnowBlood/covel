@@ -5,6 +5,7 @@ export interface RuntimeBindingTargetLike {
 
 export interface RuntimeBindingSlotLike {
   slotId: string;
+  tag?: string;
 }
 
 /**
@@ -24,14 +25,14 @@ export function filterRuntimeBindingsForKnownRuntimes(
 }
 
 /**
- * Fill every currently unbound runtime with the best matching slot.
+ * Fill every currently unbound agent runtime with the best text-model slot.
  * Existing non-empty bindings are preserved.
  *
  * Matching priority (per runtime):
  * 0. Direct name match: slot whose slotId === runtime.defaultSlot.
- * 1. `default` binds to the configured default/first slot.
- * 2. Missing explicit slots are left unbound so the UI can surface
- *    "missing [covel.<slot>]".
+ * 1. `default` binds to the configured default/first text slot.
+ * 2. A missing declared slot (commonly `plugin`) transparently falls back to
+ *    the first configured text slot, matching the AI gateway's resolution.
  */
 export function autoAssignRuntimeBindings(
   bindings: Record<string, string>,
@@ -41,8 +42,11 @@ export function autoAssignRuntimeBindings(
   if (slots.length === 0) return { ...bindings };
 
   const next = { ...bindings };
-  const defaultSlot = slots.find((s) => s.slotId === "default") ?? slots[0];
-
+  const firstTextSlot =
+    slots.find((slot) => slot.tag === "text") ??
+    slots.find((slot) => slot.tag === undefined);
+  const defaultSlot =
+    slots.find((slot) => slot.slotId === "default") ?? firstTextSlot;
   for (const target of targets) {
     if (next[target.qualifiedId]) continue;
 
@@ -53,14 +57,16 @@ export function autoAssignRuntimeBindings(
 
     // 1. `default` is a virtual slot name used by some plugins to mean
     //    "the deployment's default text model". It does not require a literal
-    //    [covel.default] block; bind it to the configured default/first slot.
+    //    [covel.default] block.
     if (!chosen && target.defaultSlot === "default") {
       chosen = defaultSlot;
     }
 
-    // 2. Runtime `model` values are concrete slot names from PLUGIN.md.
+    // 2. Agent runtimes generate text. If their preferred role slot is not
+    //    configured, use the deployment's first text slot rather than making
+    //    every plugin require a duplicate [covel.plugin] declaration.
     if (!chosen) {
-      continue;
+      chosen = firstTextSlot;
     }
 
     if (chosen) {

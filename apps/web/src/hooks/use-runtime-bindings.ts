@@ -125,22 +125,23 @@ export function useRuntimeBindings(
     }
   }, [sessionId, runtimeTargetIdsKey, runtimeTargets, runtimeModelOverrides]);
 
-  // Auto-generate defaults on first load when a session has no saved bindings.
+  // Fill every unbound runtime whenever the runtime or slot set changes.
+  // This also completes partially saved maps (for example, `story` was bound
+  // before additional plugins became active) without touching user choices.
   useEffect(() => {
     if (!sessionId) return;
     if (runtimeTargets.length === 0 || resolvedSlots.length === 0) return;
-    if (Object.keys(bindings).length > 0) return;
 
     const defaults = autoAssignRuntimeBindings(
       bindings,
       runtimeTargets,
       resolvedSlots,
     );
-    if (Object.keys(defaults).length === 0) return;
+    if (Object.keys(defaults).length === Object.keys(bindings).length) return;
 
     setBindingsState(defaults);
     persist(sessionId, defaults);
-  }, [bindings, resolvedSlots, runtimeTargets, sessionId]);
+  }, [bindings, persist, resolvedSlots, runtimeTargets, sessionId]);
 
   const entries = useMemo((): RuntimeBindingEntry[] => {
     return runtimeTargets.map((target) => ({
@@ -160,10 +161,15 @@ export function useRuntimeBindings(
   );
 
   const allBound = useMemo(() => {
-    return entries.every((e) => {
-      const effectiveSlotName = e.slotName || e.defaultSlot;
-      if (effectiveSlotName === "default") return resolvedSlots.length > 0;
-      return resolvedSlots.some((s) => s.slotId === effectiveSlotName);
+    return entries.every((entry) => {
+      if (entry.slotName) {
+        return resolvedSlots.some((slot) => slot.slotId === entry.slotName);
+      }
+      return autoAssignRuntimeBindings({}, [entry], resolvedSlots)[
+        entry.qualifiedId
+      ]
+        ? true
+        : false;
     });
   }, [entries, resolvedSlots]);
 
