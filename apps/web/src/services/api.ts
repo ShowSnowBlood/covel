@@ -42,6 +42,7 @@ export {
   getSlotConfig,
   loadProviderKeysFromStorage,
   removeCustomPreset,
+  reconcileManagedFrostFoxImageSlot,
   setCustomPresets,
   setParamOverrides,
   setPrepRuntimeBindings,

@@ -10,9 +10,11 @@ import {
   storageModeForServerStorage,
 } from "@/services/data-service";
 import {
+  fetchLlmConfig,
   fetchServerHealth,
   hydrateManagedFrostFoxModels,
   loadProviderKeysFromStorage,
+  reconcileManagedFrostFoxImageSlot,
 } from "@/services/api";
 import { probeDesktopMode } from "@/lib/desktop-bridge";
 import { emitToast } from "@/lib/toast-channel.js";
@@ -170,11 +172,13 @@ probeDesktopMode()
       configureMessagesWindowCap(next);
     });
     consumeFrostFoxCallbackResult();
-    return Promise.all([
+    const [, , , llmConfig] = await Promise.all([
       syncStorageMode(),
       loadProviderKeysFromStorage(),
       hydrateManagedFrostFoxModels(),
+      fetchLlmConfig(),
     ]);
+    reconcileManagedFrostFoxImageSlot(llmConfig.slots.image?.model);
   })
   // Nothing in the bootstrap is allowed to stop the app from mounting. Every
   // step above is a preference/hydration concern; a rejection here used to

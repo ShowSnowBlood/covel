@@ -40,8 +40,11 @@ const { getSettings, initSettings } = await import("@/settings/store");
 const {
   getCustomPresets,
   getProviderPriceMultiplier,
+  getSlotConfig,
+  reconcileManagedFrostFoxImageSlot,
   removeCustomPreset,
   setCustomPresets,
+  setManagedFrostFoxCatalog,
   setParamOverrides,
   setProviderProfiles,
   setProviderPriceMultipliers,
@@ -68,10 +71,49 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  setManagedFrostFoxCatalog(null);
   vi.restoreAllMocks();
 });
 
 describe("custom preset secret channel", () => {
+  it("replaces a deployment image preset with the matching managed model", async () => {
+    setManagedFrostFoxCatalog({
+      configurationVersion: "1",
+      channels: [
+        {
+          channelKey: "image",
+          providerId: "frostfox-696d616765",
+          displayName: "Images",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [
+            {
+              id: "banana-1k",
+              name: "Banana",
+              capability: { input: ["text", "image"], output: ["image"] },
+            },
+            {
+              id: "gpt-image-2-2k",
+              name: "GPT Image",
+              capability: { input: ["text", "image"], output: ["image"] },
+            },
+          ],
+        },
+      ],
+    });
+    setSlotConfig({ image: { presetId: "slot-image" } });
+
+    reconcileManagedFrostFoxImageSlot("gpt-image-2-2k");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      image: {
+        modelRef: "frostfox:image:gpt-image-2-2k",
+      },
+    });
+  });
+
   it("uses a 1x default and persists positive decimal provider multipliers", async () => {
     expect(getProviderPriceMultiplier("openai")).toBe(1);
 

@@ -330,6 +330,10 @@ export function LlmSlotsPane() {
         const isVirtualSlot = isDiscovered && !serverSlot;
         const baseCapability =
           selectedPreset?.capability ?? serverSlot?.capability;
+        const selectedIsManaged = managedCatalog?.channels.some(
+          (channel) => channel.providerId === selectedPreset?.provider,
+        );
+        const showServerBase = !!serverSlot && !selectedIsManaged;
         const hasCapOverride = isConfigured && !!capOverrides[slotId];
         const isEditing = editingSlot === slotId;
 
@@ -442,7 +446,7 @@ export function LlmSlotsPane() {
                   }}
                   className="w-full bg-background border border-border px-3 py-1.5 text-sm font-mono outline-none focus:ring-1 focus:ring-primary"
                 >
-                  {serverSlot && (
+                  {showServerBase && (
                     <option value="__base">{serverSlot.model}</option>
                   )}
                   {!serverSlot && modelChoices.length === 0 && (

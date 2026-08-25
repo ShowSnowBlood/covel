@@ -300,6 +300,39 @@ export function setSlotConfig(config: Record<string, SlotConfigEntry>): void {
 }
 
 /**
+ * Keep hosted accounts on a managed image model instead of exposing a
+ * deployment-only image provider as the effective browser override. Existing
+ * managed or player-authored model references win; a server preset binding is
+ * replaced because hosted requests cannot supply that provider's credential.
+ */
+export function reconcileManagedFrostFoxImageSlot(
+  preferredModel?: string,
+): void {
+  const managedPresets = getManagedFrostFoxPresets();
+  const imagePresets = managedPresets.filter((preset) =>
+    preset.capability?.output.includes("image"),
+  );
+  if (imagePresets.length === 0) return;
+
+  const config = getSlotConfig();
+  const current = config.image;
+  const currentId = slotBindingId(current);
+  const currentManaged = currentId
+    ? managedPresets.find((preset) => preset.id === currentId)
+    : undefined;
+  if (currentManaged?.capability?.output.includes("image")) return;
+  if (current?.modelRef && !currentManaged) return;
+
+  const selected =
+    imagePresets.find((preset) => preset.model === preferredModel) ??
+    imagePresets[0]!;
+  setSlotConfig({
+    ...config,
+    image: { modelRef: selected.id },
+  });
+}
+
+/**
  * Secret channel key used to persist a custom preset's API key. Kept out
  * of `llm.customPresets` so the JSON settings file never records a raw
  * `sk-...` string - the secret lives in keys.env (desktop) or the
