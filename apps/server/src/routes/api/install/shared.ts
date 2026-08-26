@@ -10,7 +10,7 @@
  *   - Target directory must not already exist (409) — upgrades require manual removal.
  */
 
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import yauzl, { type Entry, type ZipFile } from "yauzl";
 import { errorBody } from "../../../api-error.js";
@@ -58,6 +58,16 @@ export function errorResponse(err: unknown): {
   return { status: 500, body: errorBody("unknown error") };
 }
 
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await lstat(target);
+    return true;
+  } catch (err) {
+    if (isFsErrorCode(err, "ENOENT")) return false;
+    throw err;
+  }
+}
 // ── Helpers ─────────────────────────────────────────────────────
 
 export interface ExtractedEntry {
@@ -281,14 +291,20 @@ export async function materializeAtomically(
   const staging = await mkdtemp(path.join(parent, ".covel-install-"));
   try {
     await writer(staging);
-    // `rename` onto an existing non-empty dir fails with ENOTEMPTY on POSIX and
-    // EEXIST on some kernels; onto an existing file it's ENOTDIR. We rely on the
-    // kernel as the single arbiter — no TOCTOU gap between a prior `exists` check
-    // and the rename.
+    // `rename` onto an existing non-empty dir fails with ENOTEMPTY on POSIX,
+    // EEXIST on some kernels, and EPERM on Windows. We rely on the kernel as
+    // the single arbiter — no TOCTOU gap from a prior exists check. Windows
+    // reports EPERM for unrelated permission failures too, so only translate
+    // it when the destination is demonstrably present.
     try {
       await rename(staging, finalDir);
     } catch (err) {
-      if (isFsErrorCode(err, "EEXIST", "ENOTEMPTY", "EISDIR", "ENOTDIR")) {
+      const destinationExists =
+        isFsErrorCode(err, "EPERM", "EACCES") && (await pathExists(finalDir));
+      if (
+        isFsErrorCode(err, "EEXIST", "ENOTEMPTY", "EISDIR", "ENOTDIR") ||
+        destinationExists
+      ) {
         throw httpError(
           409,
           `target already exists: ${path.basename(finalDir)}`,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Database, BookOpen, HelpCircle, type LucideIcon } from "lucide-react";
 import * as Icons from "lucide-react";
@@ -16,8 +16,9 @@ import { DatabasePanel } from "./database-panel.js";
 import {
   fetchUiSpecs,
   listPluginData,
+  type WorldRecord,
 } from "@/services/api.js";
-import type { WorldRecord } from "@/services/api.js";
+import { loadPluginData } from "@/stores/plugin-data-store.js";
 import {
   aggregateSpecsIntoGroups,
   compactTabLabel,
@@ -26,10 +27,11 @@ import {
   planPluginPanelProviders,
   type PluginPanelTabGroup,
 } from "@/lib/plugin-panel-tabs.js";
-import { loadPluginData } from "@/stores/plugin-data-store.js";
 import { useSession } from "@/stores/session-store.js";
 import { onNavEvent } from "@/lib/nav-events.js";
 import { ignoreError } from "@/lib/ignore-error.js";
+import { useMediaQuery } from "@/hooks/use-media-query.js";
+import { cn } from "@/lib/utils.js";
 
 interface RightPanelTabItem {
   id: string;
@@ -48,8 +50,6 @@ function resolvePluginIcon(name: string): Icons.LucideIcon {
   const resolved = (Icons as Record<string, unknown>)[pascal] as
     Icons.LucideIcon | undefined;
   if (resolved) return resolved;
-  // Surface the mismatch loudly in dev so plugin authors notice mis-typed
-  // icons without crashing the panel.
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
     console.warn(
@@ -71,22 +71,13 @@ export interface RightPanelProps {
   statePatches: Array<{ id: string }>;
 }
 
-/**
- * Right panel — split into two sections in the activity bar:
- *   1. Framework-owned tabs (世界 / 数据库) — always present while a session is loaded.
- *   2. Plugin-driven tabs (from /api/ui-specs) — rendered below a thin divider.
- *
- * The hardcoded 角色 and 世界观 tabs were removed because they duplicated
- * plugin contributions (char-creator "角色" and world-init
- * "世界维度"); the pretty world-dimensions rendering moved into the
- * plugin tab via the `WorldDimensions` covelRegistry component.
- */
 export function RightPanel({
   sessionId,
   world,
   statePatches,
-}: RightPanelProps) {
+}: RightPanelProps): ReactElement {
   const { t, i18n } = useTranslation();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const pluginPanelStateCacheRef = useRef<PluginPanelStateCache>(new Map());
   const [pluginTabGroups, setPluginTabGroups] = useState<PluginPanelTabGroup[]>(
     [],
@@ -106,6 +97,15 @@ export function RightPanel({
     [sessionState.sessionPlugins],
   );
 
+  // Plugin panel state stores are local UI state (collapse/toggle selections),
+  // not session data. Reset them with the session so a tab from the previous
+  // session cannot remain selected and render stale controls in the new one.
+  useEffect(() => {
+    setActiveTab("world");
+    setActivePluginSubTab({});
+    pluginPanelStateCacheRef.current.clear();
+  }, [sessionId]);
+
   const tabItems = useMemo<RightPanelTabItem[]>(
     () => [
       {
@@ -121,7 +121,7 @@ export function RightPanel({
         icon: Database,
       },
       ...pluginTabGroups.map((group) => ({
-        id: `plugin-${group.id}`,
+        id: group.id,
         value: `plugin-${group.id}`,
         label: group.label,
         shortLabel: groupShortLabel(group),
@@ -131,49 +131,30 @@ export function RightPanel({
     [pluginTabGroups, t],
   );
 
-
-  // Topbar nav → controlled tab switch. Previously this dispatched synthetic
-  // mouse events at the trigger DOM node matched by aria-label, which silently
-  // broke whenever the label translation drifted.
+  // Global header navigation shortcut listener
   useEffect(() => {
     return onNavEvent((event) => {
-      if (event === "open-database") {
-        setActiveTab("database");
+      if (event === "open-plugins") {
+        const first = pluginTabGroups[0];
+        if (first) setActiveTab(`plugin-${first.id}`);
       } else if (event === "open-images") {
-        // ponytail: match by declared icon — a first-class "media surface"
-        // capability flag on panel specs would be sturdier if this grows.
-        const target = pluginTabGroups.find((group) =>
-          group.subPanels.some((sub) => sub.icon === "image"),
+        const imageTab = pluginTabGroups.find(
+          (g) =>
+            g.id.includes("image") ||
+            g.id.includes("gallery") ||
+            g.id.includes("portrait"),
         );
-        if (target) setActiveTab(`plugin-${target.id}`);
+        if (imageTab) setActiveTab(`plugin-${imageTab.id}`);
       }
     });
   }, [pluginTabGroups]);
 
-  // Load plugin panel specs from /api/ui-specs and seed plugin-data-store.
+  // Load right-rail UI specs
   useEffect(() => {
-    if (!sessionId) return;
     let cancelled = false;
     fetchUiSpecs(sessionId)
       .then((specs) => {
         if (cancelled) return;
-
-        // Surface server-side validation diagnostics for rejected specs so a
-        // plugin author sees the exact plugin/field/problem in dev instead of
-        // a panel silently missing its tab.
-        if (import.meta.env.DEV && specs.diagnostics?.length) {
-          for (const diag of specs.diagnostics) {
-            const where = `${diag.pluginId} (${diag.runtimeId}) ${diag.slot}[${diag.specIndex}]${
-              diag.specId ? ` "${diag.specId}"` : ""
-            }`;
-            const why = diag.issues
-              .map((issue) => `${issue.path}: ${issue.message}`)
-              .join("; ");
-            // eslint-disable-next-line no-console
-            console.warn(`[ui-specs] dropped invalid spec — ${where}: ${why}`);
-          }
-        }
-
         setPluginTabGroups(
           aggregateSpecsIntoGroups(specs.right, i18n.language, {
             warn: (message) => {
@@ -190,93 +171,146 @@ export function RightPanel({
           listPluginData(sessionId, pid)
             .then((items) => {
               if (cancelled) return;
-              const byNs = new Map<string, { key: string; value: unknown }[]>();
+              const byNamespace = new Map<string, Array<{ key: string; value: unknown }>>();
               for (const item of items) {
-                const arr = byNs.get(item.namespace) ?? [];
-                arr.push({ key: item.key, value: item.value });
-                byNs.set(item.namespace, arr);
+                const list = byNamespace.get(item.namespace) ?? [];
+                list.push({ key: item.key, value: item.value });
+                byNamespace.set(item.namespace, list);
               }
-              for (const [ns, entries] of byNs) {
-                loadPluginData(pid, ns, entries);
+              for (const [ns, rows] of byNamespace.entries()) {
+                loadPluginData(pid, ns, rows);
               }
             })
-            .catch(ignoreError("seed plugin data store"));
+            .catch(ignoreError(`load initial data for ${pid}`));
         }
       })
-      .catch(ignoreError("fetch ui specs for right panel"));
+      .catch(ignoreError("fetch right panel ui-specs"));
+
     return () => {
       cancelled = true;
     };
   }, [sessionId, activePluginKey, i18n.language]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-background text-foreground">
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className="flex-1 flex min-h-0 min-w-0"
-        orientation="vertical"
+        className={cn(
+          "flex-1 flex min-h-0 min-w-0",
+          isMobile ? "flex-col" : "flex-row",
+        )}
+        orientation={isMobile ? "horizontal" : "vertical"}
       >
-        <div
-          className="border-r border-[var(--rule-color)] shrink-0 w-12 overflow-hidden"
-          style={{
-            background:
-              "color-mix(in oklab, var(--surface-rail) 70%, var(--surface-page))",
-          }}
-        >
-          <TabsList className="flex h-full w-full flex-col items-center justify-start rounded-none bg-transparent p-0 text-muted-foreground">
-            {tabItems.map((item, idx) => {
-              const ItemIcon = item.icon;
-              const afterFrameworkTabs = idx === 2;
-              return (
-                <div
-                  key={item.id}
-                  className="w-full flex flex-col items-center"
-                >
-                  {afterFrameworkTabs && (
-                    <div
-                      aria-hidden
-                      className="w-6 h-px bg-border my-1.5 shrink-0"
-                    />
-                  )}
+        {/* Navigation Rail / Header Bar */}
+        {isMobile ? (
+          /* Mobile Horizontal Tab Scroller */
+          <div className="border-b border-border/80 bg-card/75 backdrop-blur-md px-2 py-1.5 overflow-x-auto flex items-center gap-1 shrink-0 ui-scroll max-w-full z-10 shadow-xs">
+            <TabsList className="flex h-auto w-auto items-center justify-start rounded-none bg-transparent p-0 gap-1 text-muted-foreground">
+              {tabItems.map((item) => {
+                const ItemIcon = item.icon;
+                const isActive = activeTab === item.value;
+                return (
                   <TabsTrigger
+                    key={item.id}
                     value={item.value}
-                    className="group relative min-h-12 w-full rounded-none border-0 px-0 py-1 text-muted-foreground shadow-none touch-manipulation data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
                     title={item.title ?? item.label}
                     aria-label={item.label}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs whitespace-nowrap font-medium transition-all shrink-0 cursor-pointer select-none border border-transparent",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-xs font-semibold border-primary/20"
+                        : "bg-background/60 text-muted-foreground hover:text-foreground hover:bg-accent/40 border-border/60",
+                    )}
                   >
-                    <span
-                      aria-hidden
-                      className="absolute left-0 top-1 bottom-1 w-[2px] bg-transparent transition-colors group-data-[state=active]:bg-[var(--accent-primary)]"
-                    />
-                    <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1">
-                      <ItemIcon className="w-4 h-4 shrink-0" />
-                      <span className="block w-full max-w-full truncate text-center text-[9px] leading-none whitespace-nowrap">
-                        {item.shortLabel ?? compactTabLabel(item.label)}
-                      </span>
-                    </span>
+                    <ItemIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{item.shortLabel ?? compactTabLabel(item.label)}</span>
                   </TabsTrigger>
-                </div>
-              );
-            })}
-          </TabsList>
-        </div>
+                );
+              })}
+            </TabsList>
+          </div>
+        ) : (
+          /* Desktop Vertical Activity Rail */
+          <div
+            className="border-r border-[var(--rule-color)] shrink-0 w-12 sm:w-14 overflow-hidden"
+            style={{
+              background:
+                "color-mix(in oklab, var(--surface-rail) 75%, var(--surface-page))",
+            }}
+          >
+            <TabsList className="flex h-full w-full flex-col items-center justify-start rounded-none bg-transparent p-0 text-muted-foreground">
+              {tabItems.map((item, idx) => {
+                const ItemIcon = item.icon;
+                const afterFrameworkTabs = idx === 2;
+                const isActive = activeTab === item.value;
+                return (
+                  <div
+                    key={item.id}
+                    className="w-full flex flex-col items-center"
+                  >
+                    {afterFrameworkTabs && (
+                      <div
+                        aria-hidden
+                        className="w-6 h-px bg-border/80 my-1.5 shrink-0"
+                      />
+                    )}
+                    <TabsTrigger
+                      value={item.value}
+                      className={cn(
+                        "group relative min-h-12 w-full rounded-none border-0 px-0 py-1.5 text-muted-foreground shadow-none touch-manipulation transition-all duration-200",
+                        "hover:text-foreground hover:bg-accent/30",
+                        "data-[state=active]:bg-primary/[0.08] data-[state=active]:text-foreground data-[state=active]:shadow-none",
+                      )}
+                      title={item.title ?? item.label}
+                      aria-label={item.label}
+                    >
+                      {/* Active Left Indicator */}
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-r transition-all duration-200",
+                          isActive
+                            ? "bg-[var(--accent-primary)] shadow-[0_0_8px_var(--accent-primary)]"
+                            : "bg-transparent group-hover:bg-muted-foreground/30",
+                        )}
+                      />
+                      <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden px-1">
+                        <ItemIcon className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+                        <span className="block w-full max-w-full truncate text-center text-[9px] font-medium leading-none whitespace-nowrap">
+                          {item.shortLabel ?? compactTabLabel(item.label)}
+                        </span>
+                      </span>
+                    </TabsTrigger>
+                  </div>
+                );
+              })}
+            </TabsList>
+          </div>
+        )}
+
+        {/* Content Area */}
         <ScrollArea className="flex-1 min-h-0 min-w-0">
-          <TabsContent value="world" className="p-4 m-0 max-w-full">
-            <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-[var(--rule-color)] pb-3">
-              <BookOpen className="w-4 h-4 shrink-0 text-muted-foreground" />
-              <h3 className="ui-title text-sm font-semibold tracking-tight truncate">
-                {t("session.worldTab")}
-              </h3>
+          <TabsContent value="world" className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200">
+            <div className="mb-3.5 flex min-w-0 items-center justify-between gap-2 border-b border-[var(--rule-color)] pb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <BookOpen className="w-4 h-4 shrink-0 text-primary" />
+                <h3 className="ui-title text-sm font-semibold tracking-tight truncate text-foreground">
+                  {t("session.worldTab")}
+                </h3>
+              </div>
             </div>
             <WorldDocumentPanel world={world} />
           </TabsContent>
-          <TabsContent value="database" className="p-4 m-0 max-w-full">
-            <div className="mb-4 flex min-w-0 items-center gap-2 border-b border-[var(--rule-color)] pb-3">
-              <Database className="w-4 h-4 shrink-0 text-muted-foreground" />
-              <h3 className="ui-title text-sm font-semibold tracking-tight truncate">
-                {t("session.database")}
-              </h3>
+
+          <TabsContent value="database" className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200">
+            <div className="mb-3.5 flex min-w-0 items-center justify-between gap-2 border-b border-[var(--rule-color)] pb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Database className="w-4 h-4 shrink-0 text-primary" />
+                <h3 className="ui-title text-sm font-semibold tracking-tight truncate text-foreground">
+                  {t("session.database")}
+                </h3>
+              </div>
             </div>
             <DatabasePanel
               sessionId={sessionId}
@@ -284,7 +318,7 @@ export function RightPanel({
             />
           </TabsContent>
 
-          {/* Dynamic plugin panel content (memory, codex, npc-graph, etc.) */}
+          {/* Dynamic plugin panel content */}
           {pluginTabGroups.map((group) => {
             const subIdx = activePluginSubTab[group.id] ?? 0;
             const currentSub = group.subPanels[subIdx];
@@ -295,20 +329,22 @@ export function RightPanel({
               <TabsContent
                 key={`plugin-content-${group.id}`}
                 value={`plugin-${group.id}`}
-                className="p-4 m-0 max-w-full"
+                className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200"
               >
-                <div className="mb-3 flex min-w-0 items-center gap-2 border-b border-[var(--rule-color)] pb-3">
-                  <GroupIcon className="w-4 h-4 shrink-0 text-muted-foreground" />
-                  <h3 className="ui-title text-sm font-semibold tracking-tight truncate">
-                    {group.label}
-                  </h3>
+                <div className="mb-3 flex min-w-0 items-center justify-between gap-2 border-b border-[var(--rule-color)] pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <GroupIcon className="w-4 h-4 shrink-0 text-primary" />
+                    <h3 className="ui-title text-sm font-semibold tracking-tight truncate text-foreground">
+                      {group.label}
+                    </h3>
+                  </div>
                 </div>
 
                 {/* Provider switcher — only when 2+ plugins share the group */}
                 {providerPlan.multiProvider && (
-                  <div className="flex items-center gap-2 mb-2 ui-meta text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-2 mb-2.5 ui-meta text-[10px] text-muted-foreground">
                     <span>{t("session.provider", "provider")}</span>
-                    <div className="flex items-center border border-[var(--rule-color)] rounded-[var(--radius-control)] overflow-hidden">
+                    <div className="flex items-center border border-[var(--rule-color)] rounded-xl overflow-hidden p-0.5 bg-muted/20 backdrop-blur-xs">
                       {providerPlan.providers.map((p) => {
                         const isActive =
                           p.pluginId === providerPlan.activeProviderId;
@@ -317,7 +353,6 @@ export function RightPanel({
                             key={p.pluginId}
                             type="button"
                             onClick={() => {
-                              // jump to first sub-panel of this provider
                               const firstIdx = p.subs[0]?.idx;
                               if (typeof firstIdx === "number") {
                                 setActivePluginSubTab((prev) => ({
@@ -326,11 +361,12 @@ export function RightPanel({
                                 }));
                               }
                             }}
-                            className={`px-2 py-0.5 text-[10px] font-medium tracking-wider transition-colors max-w-[10rem] truncate ${
+                            className={cn(
+                              "px-2.5 py-1 text-[10px] font-medium tracking-wider transition-all rounded-lg max-w-[10rem] truncate cursor-pointer",
                               isActive
-                                ? "bg-foreground text-[var(--surface-page)]"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
+                                ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
+                            )}
                             title={p.pluginId}
                           >
                             {panelProviderLabel(
@@ -351,7 +387,7 @@ export function RightPanel({
                 {(providerPlan.activeProviderSubs.length > 1 ||
                   (!providerPlan.multiProvider &&
                     group.subPanels.length > 1)) && (
-                  <div className="flex items-center gap-2 mb-3 border-b border-[var(--rule-color)] pb-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 mb-3 border-b border-[var(--rule-color)] pb-2 flex-wrap">
                     {(providerPlan.multiProvider
                       ? providerPlan.activeProviderSubs
                       : group.subPanels.map((sub, idx) => ({ sub, idx }))
@@ -368,13 +404,14 @@ export function RightPanel({
                               [group.id]: idx,
                             }))
                           }
-                          className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium border-b-2 -mb-px transition-colors ${
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer",
                             isActive
-                              ? "border-[var(--accent-primary)] text-foreground"
-                              : "border-transparent text-muted-foreground hover:text-foreground"
-                          }`}
+                              ? "bg-primary/10 text-primary border border-primary/25 font-semibold"
+                              : "text-muted-foreground hover:text-foreground hover:bg-accent/30 border border-transparent",
+                          )}
                         >
-                          <SubIcon className="w-3 h-3" />
+                          <SubIcon className="w-3.5 h-3.5" />
                           <span className="truncate max-w-[8rem]">
                             {sub.label}
                           </span>

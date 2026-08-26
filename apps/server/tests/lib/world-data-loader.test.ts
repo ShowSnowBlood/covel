@@ -10,6 +10,17 @@ async function makeTempWorld(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), "covel-world-data-"));
 }
 
+async function createDirectoryLink(
+  target: string,
+  linkPath: string,
+): Promise<void> {
+  await symlink(
+    target,
+    linkPath,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+}
+
 describe("world data loader", () => {
   it("passes pluginPolicy from world.yaml into world metadata", async () => {
     const root = await makeTempWorld();
@@ -309,10 +320,7 @@ sources:
     const outside = await mkdtemp(path.join(tmpdir(), "covel-outside-"));
     await mkdir(path.join(root, "data"), { recursive: true });
     await writeFile(path.join(outside, "secret.yaml"), "x: 1\n");
-    await symlink(
-      path.join(outside, "secret.yaml"),
-      path.join(root, "data/link.yaml"),
-    );
+    await createDirectoryLink(outside, path.join(root, "data/link.yaml"));
     await writeFile(
       path.join(root, "data/world.data.yaml"),
       `schemaVersion: 1
@@ -462,8 +470,8 @@ sources:
       path.join(outside, "fact.schema.json"),
       JSON.stringify({ type: "object" }),
     );
-    await symlink(
-      path.join(outside, "fact.schema.json"),
+    await createDirectoryLink(
+      outside,
       path.join(root, "schemas/fact.schema.json"),
     );
     await writeFile(

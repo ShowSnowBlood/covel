@@ -19,6 +19,17 @@ import {
   syncWorldDataForSession,
 } from "../../src/world-data/session-import.js";
 
+async function createDirectoryLink(
+  target: string,
+  linkPath: string,
+): Promise<void> {
+  await symlink(
+    target,
+    linkPath,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+}
+
 const NOW = "2026-01-01T00:00:00.000Z";
 
 async function makeWorld(options: {
@@ -503,8 +514,8 @@ sources:
         },
       }),
     );
-    await symlink(
-      path.join(outside, "facts.schema.json"),
+    await createDirectoryLink(
+      outside,
       path.join(pluginRoot, "schemas/facts.schema.json"),
     );
     const { worldsDir, worldId } = await makeWorld({

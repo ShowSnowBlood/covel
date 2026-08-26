@@ -28,7 +28,7 @@ export const Card: ComponentRenderer = ({ element, children }) => {
     body = (
       <>
         <div
-          className="flex items-center gap-2 cursor-pointer select-none"
+          className="flex items-center gap-2 cursor-pointer select-none py-0.5"
           onClick={toggle}
           role="button"
           tabIndex={0}
@@ -41,36 +41,37 @@ export const Card: ComponentRenderer = ({ element, children }) => {
           }}
         >
           <Chevron
-            className="w-3 h-3 shrink-0 text-muted-foreground"
+            className="w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform duration-200"
             aria-hidden="true"
           />
           <div className="flex-1 min-w-0">{head}</div>
         </div>
-        {expanded && rest}
+        {expanded && <div className="animate-in fade-in-0 duration-200">{rest}</div>}
       </>
     );
   }
 
-  // Default Card now reads as a band — marker bar on the left, no enclosure.
   // Variants:
   //   glow    → highlighted band with primary marker
   //   subtle  → quiet section with just internal padding & breathable spacing
   //   frame   → opt-in enclosed frame for cases that genuinely need walls
   if (variant === "frame") {
-    return <div className="ui-frame p-4 space-y-2.5">{body}</div>;
+    return (
+      <div className="rounded-2xl border border-border/80 bg-card/75 p-3.5 sm:p-4 shadow-xs backdrop-blur-xs space-y-2.5">
+        {body}
+      </div>
+    );
   }
   if (variant === "subtle") {
-    // Used heavily by plugins for choice grids — needs comfortable padding
-    // and inter-child spacing or the content reads as a wall of text.
     return (
-      <div className="px-3 py-3 space-y-2 border-l-2 border-[var(--rule-color)] hover:border-[var(--accent-primary)] transition-colors">
+      <div className="rounded-xl px-3 py-2.5 space-y-2 border-l-2 border-primary/40 bg-muted/20 hover:border-primary transition-colors">
         {body}
       </div>
     );
   }
   return (
     <div
-      className="ui-band space-y-2"
+      className="group relative overflow-hidden rounded-xl border border-border/70 bg-card/60 p-3 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:border-primary/40 hover:shadow-xs space-y-2"
       data-tone={variant === "glow" ? undefined : "muted"}
     >
       {body}
@@ -79,7 +80,7 @@ export const Card: ComponentRenderer = ({ element, children }) => {
 };
 
 export const CardList: ComponentRenderer = ({ children }) => {
-  return <div className="space-y-2">{children}</div>;
+  return <div className="space-y-2.5">{children}</div>;
 };
 
 export const EntryCard: ComponentRenderer = ({ element }) => {
@@ -90,20 +91,12 @@ export const EntryCard: ComponentRenderer = ({ element }) => {
   const content = resolve(element.props?.content);
   const tags = toTextArray(element.props?.tags);
   const rarity = (element.props?.rarity as string) ?? "common";
-  // Optional plugin-supplied per-category icon + color (e.g. from a
-  // plugin's categoryMeta payload). When provided they override the
-  // built-in fallback map below; when missing the card still renders
-  // sensibly via the fallback so pre-enrichment entries keep working.
+
   const externalIcon = element.props?.icon as string | undefined;
   const externalColor = element.props?.color as string | undefined;
-  // Generic feature flags — any plugin can set these via itemLiteralProps
-  // or itemPropMap. collapsible toggles a chevron that hides body/tags;
-  // isNew renders a purple "NEW" sparkle next to the title.
   const collapsible = (element.props?.collapsible as boolean) ?? false;
   const defaultExpanded = (element.props?.defaultExpanded as boolean) ?? true;
   const isNew = (element.props?.isNew as boolean) ?? false;
-  // isActive renders a green "active" chip — generic, any plugin can map it
-  // (e.g. the currently-bound player voice). Distinct from isNew.
   const isActive = (element.props?.isActive as boolean) ?? false;
 
   const { expanded, toggle } = useCollapsible(defaultExpanded);
@@ -124,12 +117,21 @@ export const EntryCard: ComponentRenderer = ({ element }) => {
     collapsible && "cursor-pointer select-none",
   );
 
+  const markerColor = rarityMarkerColor[rarity] || "var(--accent-primary)";
+
   return (
     <div
-      className="ui-band space-y-2"
+      className="group relative overflow-hidden rounded-xl border border-border/75 bg-card/70 p-3 shadow-2xs backdrop-blur-xs transition-all duration-200 hover:border-primary/45 hover:shadow-xs space-y-2"
       data-tone={rarityTone[rarity] ?? "muted"}
-      style={{ ["--tw-band-marker" as string]: rarityMarkerColor[rarity] }}
+      style={{ ["--tw-band-marker" as string]: markerColor }}
     >
+      {/* Colored Left Accent Line */}
+      <div
+        aria-hidden="true"
+        className="absolute left-0 top-0 bottom-0 w-[3px] opacity-80 group-hover:opacity-100 transition-opacity"
+        style={{ background: markerColor }}
+      />
+
       <div
         className={titleRowClass}
         onClick={collapsible ? toggle : undefined}
@@ -149,7 +151,7 @@ export const EntryCard: ComponentRenderer = ({ element }) => {
       >
         {collapsible && (
           <Chevron
-            className="w-3 h-3 shrink-0 text-muted-foreground"
+            className="w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform duration-200"
             aria-hidden="true"
           />
         )}
@@ -158,18 +160,18 @@ export const EntryCard: ComponentRenderer = ({ element }) => {
             className={clsx("w-3.5 h-3.5 shrink-0", iconColorClass)}
           />
         )}
-        <span className="ui-entry-title text-[13px] font-medium flex-1 truncate text-foreground">
+        <span className="ui-entry-title text-[12.5px] sm:text-[13px] font-semibold flex-1 truncate text-foreground">
           {title}
         </span>
         {isActive && (
-          <span className="ui-chip inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30">
+          <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-semibold text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30">
             {ActiveIcon && <ActiveIcon className="w-2.5 h-2.5" />}
             {t("common.active", "Active")}
           </span>
         )}
         {isNew && (
           <span
-            className="ui-chip inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-500/30"
+            className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-semibold tracking-wider uppercase text-purple-600 dark:text-purple-300 bg-purple-500/10 border border-purple-500/30"
             aria-label={t("common.new", "new")}
           >
             <SparkleIcon className="w-2.5 h-2.5" />
@@ -179,7 +181,7 @@ export const EntryCard: ComponentRenderer = ({ element }) => {
         {category && (
           <span
             className={clsx(
-              "ui-chip inline-flex items-center px-1.5 py-0.5 text-[10px] border",
+              "inline-flex items-center rounded-md px-1.5 py-0.5 text-[9.5px] font-medium border",
               rarityBadgeColors[rarity],
             )}
           >
@@ -188,16 +190,16 @@ export const EntryCard: ComponentRenderer = ({ element }) => {
         )}
       </div>
       {showBody && content && (
-        <p className="text-[12.5px] text-muted-foreground leading-[1.6]">
+        <p className="text-[12px] text-muted-foreground leading-relaxed pl-1">
           {content}
         </p>
       )}
       {showBody && tags && tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 pl-1 pt-0.5">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="ui-chip text-[9px] px-1.5 py-0.5 bg-muted text-muted-foreground"
+              className="rounded-md border border-border/80 bg-muted/40 px-1.5 py-0.2 text-[9px] font-mono text-muted-foreground"
             >
               {tag}
             </span>

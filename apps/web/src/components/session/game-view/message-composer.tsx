@@ -1,5 +1,5 @@
 import { Send, Square } from "lucide-react";
-import type { Dispatch, KeyboardEvent, SetStateAction } from "react";
+import type { Dispatch, KeyboardEvent, ReactElement, SetStateAction } from "react";
 import type { TFunction } from "i18next";
 import type { SessionRecord } from "@/services/api.js";
 import { Button } from "@/components/ui/button.js";
@@ -31,7 +31,7 @@ export function MessageComposer({
   onSubmit,
   onAbort,
   onKeyDown,
-}: MessageComposerProps) {
+}: MessageComposerProps): ReactElement {
   const isPlaying = session.status === "active" && session.turnCount > 0;
   const isEnded = session.status === "ended";
 
@@ -40,15 +40,15 @@ export function MessageComposer({
       data-testid="game-composer"
       data-executing={executing}
       data-blocked={composerBlocked}
-      className="border-t border-border/80 shrink-0 px-2.5 sm:px-4 py-2.5 sm:py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-card/75 backdrop-blur-xl"
+      className="border-t border-border/80 shrink-0 px-3 sm:px-4 py-2.5 sm:py-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-card/85 backdrop-blur-2xl"
     >
       {isEnded ? (
-        <p className="ui-empty-copy mx-auto text-center text-xs sm:text-sm text-muted-foreground">
+        <p className="ui-empty-copy mx-auto text-center text-xs sm:text-sm text-muted-foreground py-2">
           {t("session.ended", "This session has ended.")}
         </p>
       ) : (
-        <div className="ui-composer-frame mx-auto">
-          <div className="flex items-center gap-1.5 rounded-2xl border border-border/80 bg-background/60 p-1 backdrop-blur-md focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xs">
+        <div className="ui-composer-frame mx-auto max-w-4xl">
+          <div className="flex items-center gap-1.5 rounded-2xl border border-border/80 bg-background/70 p-1.5 backdrop-blur-md focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-xs">
             <input
               data-testid="game-composer-input"
               type="text"
@@ -86,7 +86,7 @@ export function MessageComposer({
                 onClick={onAbort}
                 aria-label={t("session.abortTurn", "Stop the current turn")}
                 title={t("session.abortTurn", "Stop the current turn")}
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 rounded-xl h-8 w-8 sm:h-9 sm:w-9"
               >
                 <Square className="w-3.5 h-3.5 animate-pulse text-destructive fill-current" />
               </Button>
@@ -104,7 +104,7 @@ export function MessageComposer({
                   ? t("session.steerSend", "interject")
                   : t("session.inputKbdHint", "send")
               }
-              className="shrink-0 transition-all"
+              className="shrink-0 transition-all rounded-xl h-8 w-8 sm:h-9 sm:w-9 shadow-xs hover:scale-105 active:scale-95"
             >
               <Send className="w-3.5 h-3.5" />
             </Button>

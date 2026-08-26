@@ -23,7 +23,10 @@ import { useSlotConfig } from "@/hooks/use-slot-config.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
 import { ChatMessages } from "./chat-messages.js";
 import { StageView } from "./stage/StageView.js";
-import { hasSubmittedForm } from "./stage/stage-selectors.js";
+import {
+  findLatestStoryMessage,
+  hasSubmittedForm,
+} from "./stage/stage-selectors.js";
 import { useStageMediaPreload } from "./stage/use-stage-media-preload.js";
 import { useSession } from "@/stores/session-store.js";
 import {
@@ -221,12 +224,15 @@ export function GameView({ session }: GameViewProps) {
   // Warm the media cache with known stage art (sprites + scene backdrops)
   // during pre-game, so the opening turn paints them without a download stall.
   useStageMediaPreload(session.id, sessionPlugins);
-  // Enter the stage as soon as the player submits the opening (character
-  // creation) form, instead of waiting for pre-game to fully complete —
-  // the backdrop shows the world hero image until the narrator's first
-  // scene.set lands.
+  // Enter stage after the first playable output as well as after the opening
+  // form. Legacy sessions can have story messages while their mirrored
+  // turnCount is still zero; gating only on the counter silently leaves the
+  // player in parsed view when they switch modes.
+  const hasStoryOutput = findLatestStoryMessage(messages) !== undefined;
   const stageReady =
-    session.turnCount >= 1 || hasSubmittedForm(messages, submittedBlockIds);
+    session.turnCount >= 1 ||
+    hasSubmittedForm(messages, submittedBlockIds) ||
+    hasStoryOutput;
   const settings = useSettingsDialog(refreshSlots);
   // Publishes data-turn / data-session on <html> for theme CSS to hook into.
   useDocumentSessionState();
@@ -325,6 +331,109 @@ export function GameView({ session }: GameViewProps) {
     if (mode !== "stage") setImmersive(false);
     setViewMode(mode);
   };
+  // A session created before the visual-stage pack was selected can still be
+  // switched into stage mode. Re-enable the providers the mode needs by
+  // capability, not by assuming a particular plugin implementation. Image
+  // generation is enabled only for one available provider, preferring a
+  // world-recommended plugin so two image runtimes never compete for the HUD.
+  const stageAutoEnableRequested = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    stageAutoEnableRequested.current.clear();
+  }, [session.id]);
+  useEffect(() => {
+    if (viewMode !== "stage") return;
+
+    const visualCapabilities = new Set([
+      "scene-stage",
+      "scene-cast",
+      "scene-prompts",
+      "character-presence",
+      "character-blueprint",
+    ]);
+    const metadata = world?.metadata;
+    const policy =
+      metadata?.pluginPolicy &&
+      typeof metadata.pluginPolicy === "object" &&
+      !Array.isArray(metadata.pluginPolicy)
+        ? (metadata.pluginPolicy as Record<string, unknown>)
+        : undefined;
+    const excludedPlugins = new Set<string>(
+      [
+        ...(Array.isArray(metadata?.excludedPlugins)
+          ? metadata.excludedPlugins
+          : []),
+        ...(Array.isArray(policy?.excludedPlugins)
+          ? policy.excludedPlugins
+          : []),
+      ].filter((pluginId): pluginId is string => typeof pluginId === "string"),
+    );
+    const canAutoEnable = (plugin: (typeof sessionPlugins)[number]) =>
+      plugin.source !== "community" && !excludedPlugins.has(plugin.id);
+    const targets = new Set<string>();
+    for (const plugin of sessionPlugins) {
+      if (
+        plugin.isActive ||
+        !canAutoEnable(plugin) ||
+        !plugin.capabilities
+      ) continue;
+      if (
+        plugin.capabilities.some((capability) =>
+          visualCapabilities.has(capability),
+        )
+      ) {
+        targets.add(plugin.id);
+      }
+    }
+
+    const hasActiveImageProvider = sessionPlugins.some(
+      (plugin) =>
+        plugin.isActive &&
+        plugin.capabilities?.includes("image-generation") &&
+        plugin.runtimes?.some(
+          (runtime) =>
+            runtime.trigger?.type === "manual" &&
+            runtime.capabilities?.includes("image-prompt"),
+        ),
+    );
+    if (!hasActiveImageProvider) {
+      const recommended = new Set<string>(
+        [
+          ...(Array.isArray(metadata?.recommendedPlugins)
+            ? metadata.recommendedPlugins
+            : []),
+          ...(Array.isArray(policy?.recommendedPlugins)
+            ? policy.recommendedPlugins
+            : []),
+        ].filter(
+          (pluginId): pluginId is string => typeof pluginId === "string",
+        ),
+      );
+      const imageProvider = sessionPlugins
+        .filter(
+          (plugin) =>
+            !plugin.isActive &&
+            canAutoEnable(plugin) &&
+            plugin.capabilities?.includes("image-generation") &&
+            plugin.runtimes?.some(
+              (runtime) =>
+                runtime.trigger?.type === "manual" &&
+                runtime.capabilities?.includes("image-prompt"),
+            ),
+        )
+        .sort(
+          (a, b) =>
+            Number(recommended.has(b.id)) - Number(recommended.has(a.id)) ||
+            a.id.localeCompare(b.id),
+        )[0];
+      if (imageProvider) targets.add(imageProvider.id);
+    }
+
+    for (const pluginId of targets) {
+      if (stageAutoEnableRequested.current.has(pluginId)) continue;
+      stageAutoEnableRequested.current.add(pluginId);
+      void onTogglePlugin(pluginId, true);
+    }
+  }, [onTogglePlugin, sessionPlugins, viewMode, world]);
 
   // Sentinel ref for the bottom of the message list. Auto-scroll behaviour
   // (sticky-bottom + jump-to-latest) lives in ChatMessages via useAutoScroll;

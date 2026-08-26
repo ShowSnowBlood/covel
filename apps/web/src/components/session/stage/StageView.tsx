@@ -22,8 +22,11 @@ import {
 } from "@/components/ui/dialog.js";
 import { Button } from "@/components/ui/button.js";
 import { useMediaQuery } from "@/hooks/use-media-query.js";
+import { requestConfirm } from "@/lib/confirm-channel.js";
 import { usePluginNamespace } from "@/stores/plugin-data-store.js";
 import { useStreamingText } from "@/stores/streaming-text-store.js";
+import { AssetTurnSidebar } from "@/components/asset-render/index.js";
+import { useImageGeneration } from "../chat-messages/use-image-generation.js";
 import type { StreamMessage, ExecutionStep } from "@/stores/session-store.js";
 import type {
   SessionRecord,
@@ -41,7 +44,9 @@ import { StageChoices } from "./StageChoices.js";
 import {
   extractInteractionChoices,
   extractPendingFormMessages,
+  fallbackStageSpeakers,
   filterStalePrompts,
+  findLatestStoryMessage,
   mergeChoices,
   pluginIdForCapability,
   STAGE_CAPABILITIES,
@@ -86,17 +91,6 @@ export interface StageViewProps {
   readonly messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
-/** Latest `story` message drives the dialog; a `stream_`-prefixed id while
- *  the turn is still executing means the text is mid-stream (no dedicated
- *  streaming flag exists — see reducer.ts). */
-function findLatestStory(
-  messages: readonly StreamMessage[],
-): StreamMessage | undefined {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i].kind === "story") return messages[i];
-  }
-  return undefined;
-}
 
 export function StageView(props: StageViewProps): ReactElement {
   const {
@@ -119,15 +113,6 @@ export function StageView(props: StageViewProps): ReactElement {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-
-  // ── Plugin-data feeds ─────────────────────────────────────────
-  // Resolve the ACTIVE plugin id for each stage capability from the session's
-  // plugin list (framework↔plugin isolation rule — no hardcoded plugin ids in
-  // framework code). `pluginIdForCapability` returns undefined when no active
-  // plugin provides the capability; `?? ""` keeps the hook call unconditional
-  // and resolves to an empty namespace, so the layer renders empty/disabled.
-  // Namespaces below ("stage", "active-cast", …) are intra-plugin data keys
-  // defined by the resolved plugin, not plugin ids.
   const sceneStageId =
     pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.scene) ?? "";
   const sceneCastId =
@@ -136,28 +121,74 @@ export function StageView(props: StageViewProps): ReactElement {
     pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.prompts) ?? "";
   const presenceId =
     pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.presence) ?? "";
+  const characterBlueprintId =
+    pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.characters) ?? "";
 
   const sceneCurrent = usePluginNamespace(sceneStageId, "stage")["current"] as
     StageCurrentRecord | undefined;
   const activeCast = usePluginNamespace(sceneCastId, "active-cast")[
     "current"
   ] as { speakers?: readonly StageSpeaker[] } | undefined;
-  const speakers = activeCast?.speakers ?? [];
   const promptsNamespace = usePluginNamespace(scenePromptsId, "message");
   // Mirror portrait-gallery-panel: the presence namespace is consumed as a
   // characterId-keyed record of `{ sprite, avatar, ... }`.
   const presence = usePluginNamespace(presenceId, "presence") as Readonly<
     Record<string, PresenceRecord | undefined>
   >;
+  const characterBlueprints = usePluginNamespace(
+    characterBlueprintId,
+    "blueprints",
+  );
+  const fallbackCharacterNamespace = useMemo(() => {
+    if (Object.keys(characterBlueprints).length > 0) return characterBlueprints;
+    const records: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(presence)) {
+      if (!value || typeof value !== "object") continue;
+      const record = value as PresenceRecord;
+      if (record.displayName || record.characterId) {
+        records[key] = {
+          name: record.displayName ?? record.characterId,
+          characterId: record.characterId ?? key,
+        };
+      }
+    }
+    return records;
+  }, [characterBlueprints, presence]);
 
   // ── Latest story text + stream state ──────────────────────────
   // Streaming tokens no longer live in `messages[].content` — the placeholder
   // carries empty content and the live text is held in a fine-grained external
   // store. This view subscribes only to the latest story message.
-  const storyMsg = findLatestStory(messages);
+  const storyMsg = findLatestStoryMessage(messages);
   const liveStoryText = useStreamingText(storyMsg?.id ?? "");
   const storyText = storyMsg ? (liveStoryText ?? storyMsg.content) : "";
   const storyTurnId = storyMsg?.turnId;
+
+  // Use authored portraits while the opening turn has no cast/story record yet,
+  // and for older sessions that never enabled scene-cast. Once a real story
+  // exists, an explicit empty cast remains meaningful; StageSprites keeps its
+  // prior line-up sticky for narration-only beats.
+  const fallbackSpeakers = useMemo(
+    () => fallbackStageSpeakers(fallbackCharacterNamespace, storyText),
+    [fallbackCharacterNamespace, storyText],
+  );
+  const activeSpeakers = activeCast?.speakers ?? [];
+  const speakers =
+    activeSpeakers.length > 0 || (activeCast && storyMsg)
+      ? activeSpeakers
+      : fallbackSpeakers;
+
+  // Stage mode replaces ChatMessages, so it must own the same capability-driven
+  // image-generation entry and approval path instead of losing the parsed-view
+  // button when the player switches modes.
+  const { isImageGenActive, generatingImage, handleGenerateImage } =
+    useImageGeneration({
+      sessionPlugins,
+      sessionId: session.id,
+      confirm: requestConfirm,
+      t,
+    });
+  const imageGenerationAvailable = isImageGenActive;
   const isStreaming =
     executing && (storyMsg?.id.startsWith("stream_") ?? false);
 
@@ -223,6 +254,9 @@ export function StageView(props: StageViewProps): ReactElement {
         locale={locale}
         autoPlay={autoPlay}
         immersive={immersive}
+        imageGenerationAvailable={imageGenerationAvailable}
+        imageGenerationBusy={generatingImage || executing}
+        onGenerateImage={() => void handleGenerateImage()}
         onOpenHistory={() => setHistoryOpen(true)}
         onToggleAutoPlay={() => setAutoPlay((v) => !v)}
         onToggleImmersive={onToggleImmersive}
@@ -240,6 +274,14 @@ export function StageView(props: StageViewProps): ReactElement {
         onAllRead={() => setAllRead(true)}
         onSendMessage={onSendMessage}
       />
+      {storyTurnId && (
+        <div
+          className="pointer-events-auto absolute right-3 top-16 z-30 max-h-[34%] w-[min(18rem,calc(100%-1.5rem))] overflow-y-auto rounded-[var(--radius-card)] md:right-4 md:top-20"
+          data-testid="stage-assets"
+        >
+          <AssetTurnSidebar turnId={storyTurnId} sessionId={session.id} />
+        </div>
+      )}
       <StageChoices
         visible={choicesVisible}
         interactionChoices={interactionChoices}

@@ -79,7 +79,7 @@ export function StageSprites({
           // active lane is wider), so this reads as "stepping aside" / focus
           // shifting, never as drift. Active speaker sits on top for the
           // residual glow/shadow overlap at lane edges.
-          className="ui-stage-sprite absolute bottom-0 h-[92%] px-1 transition-[left,width] duration-500 ease-out"
+          className="ui-stage-sprite absolute bottom-0 h-[92%] overflow-hidden px-1 transition-[left,width] duration-500 ease-out"
           style={{
             left: `${lanes[index].leftPct}%`,
             width: `${lanes[index].widthPct}%`,
@@ -99,8 +99,10 @@ export function StageSprites({
                 src={slot.ref}
                 sessionId={sessionId}
                 alt={slot.displayName}
+                as="image"
                 fit="contain"
                 rounded="none"
+                className="h-full max-h-full max-w-full"
                 maxHeight="100%"
               />
             ) : (

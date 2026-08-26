@@ -5,9 +5,11 @@ import {
   assignStations,
   computeSpriteLanes,
   computeSpriteSlots,
+  fallbackStageSpeakers,
   extractInteractionChoices,
   extractPendingFormMessages,
   filterStalePrompts,
+  findLatestStoryMessage,
   hasSubmittedForm,
   mergeChoices,
   pluginIdForCapability,
@@ -164,6 +166,81 @@ describe("computeSpriteSlots", () => {
     expect(lin?.ref).toBeNull();
     expect(lin?.active).toBe(true);
     expect(slots.map((s) => s.pos)).toEqual(["left", "right"]);
+  });
+});
+
+describe("fallbackStageSpeakers", () => {
+  it("uses story mentions and preserves the presence-compatible character id", () => {
+    const blueprints = {
+      mio: {
+        blueprint: {
+          id: "kamishiro-mio",
+          name: "神代澪",
+          aliases: ["澪"],
+          instantiate: { characterId: "npc-kamishiro-mio" },
+        },
+      },
+      rin: {
+        blueprint: {
+          id: "asakura-rin",
+          name: "朝仓凛",
+          aliases: ["凛"],
+          instantiate: { characterId: "npc-asakura-rin" },
+        },
+      },
+    };
+    expect(fallbackStageSpeakers(blueprints, "神代澪把课程表递给你。")).toEqual(
+      [{ id: "npc-kamishiro-mio", name: "神代澪" }],
+    );
+  });
+
+  it("falls back to authored order only when the cast record is unavailable", () => {
+    const blueprints = {
+      first: {
+        id: "first",
+        name: "第一人",
+        instantiate: { characterId: "npc-first" },
+      },
+      second: {
+        id: "second",
+        name: "第二人",
+        instantiate: { characterId: "npc-second" },
+      },
+      third: {
+        id: "third",
+        name: "第三人",
+        instantiate: { characterId: "npc-third" },
+      },
+    };
+    expect(fallbackStageSpeakers(blueprints, "海风掠过空教室。", 2)).toEqual([
+      { id: "npc-first", name: "第一人" },
+      { id: "npc-second", name: "第二人" },
+    ]);
+  });
+});
+
+describe("findLatestStoryMessage", () => {
+  const message = (
+    id: string,
+    content: string,
+    overrides: Partial<StreamMessage> = {},
+  ): StreamMessage => ({
+    id,
+    role: "assistant",
+    content,
+    timestamp: "2026-07-03T00:00:00.000Z",
+    ...overrides,
+  });
+
+  it("ignores newer plugin text and returns the newest story message", () => {
+    const story = message("story-1", "真正的叙事", { kind: "story" });
+    const plugin = message("plugin-1", "插件状态", { kind: "plugin" });
+    expect(findLatestStoryMessage([story, plugin])).toBe(story);
+  });
+
+  it("keeps assistant messages from older persisted sessions as a fallback", () => {
+    const legacy = message("legacy-1", "旧会话叙事");
+    expect(findLatestStoryMessage([legacy])).toBe(legacy);
   });
 });
 

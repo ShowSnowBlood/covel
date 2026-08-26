@@ -26,6 +26,7 @@ export const STAGE_CAPABILITIES = {
   cast: "scene-cast",
   prompts: "scene-prompts",
   presence: "character-presence",
+  characters: "character-blueprint",
 } as const;
 
 interface CapabilityCarrier {
@@ -55,6 +56,33 @@ export function pluginIdForCapability(
     if (best === undefined || p.id < best) best = p.id;
   }
   return best;
+}
+
+/**
+ * Select the newest narrative message for stage dialogue.
+ *
+ * Current SSE messages are tagged `kind: "story"`; older persisted messages
+ * may have no kind at all. Never treat a plugin message or UI block as spoken
+ * dialogue merely because it has assistant text.
+ */
+export function findLatestStoryMessage(
+  messages: readonly StreamMessage[],
+): StreamMessage | undefined {
+  let legacyFallback: StreamMessage | undefined;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.kind === "story") return message;
+    if (
+      legacyFallback === undefined &&
+      message.kind === undefined &&
+      message.role === "assistant" &&
+      !message.block &&
+      (message.content.trim().length > 0 || message.id.startsWith("stream_"))
+    ) {
+      legacyFallback = message;
+    }
+  }
+  return legacyFallback;
 }
 
 // ── Backdrop (scene-stage `stage/current`) ──────────────────────
@@ -107,6 +135,76 @@ export function resolveBackdrop(
 export interface StageSpeaker {
   readonly id: string;
   readonly name: string;
+}
+/**
+ * Minimal blueprint shape consumed by the stage fallback. The canonical
+ * character id is usually scoped by the session; `instantiate.characterId`
+ * remains the stable bare id and `findPresence` reconciles both forms.
+ */
+export interface StageCharacterBlueprint {
+  readonly id: string;
+  readonly name: string;
+  readonly aliases: readonly string[];
+  readonly characterId: string;
+}
+
+/**
+ * Recover a small cast when scene-cast has not published `active-cast` yet
+ * (opening hydration, an older session, or a world that does not enable the
+ * optional cast runtime). Prefer names mentioned in the current story; when
+ * there is no textual signal, preserve the authored blueprint order for the
+ * opening frame. An explicit `{ speakers: [] }` record is handled by the
+ * caller and is deliberately not passed here, so transitional narration does
+ * not invent a new cast.
+ */
+export function fallbackStageSpeakers(
+  blueprintNamespace: Readonly<Record<string, unknown>>,
+  storyText: string,
+  maxSpeakers = 2,
+): StageSpeaker[] {
+  if (maxSpeakers <= 0) return [];
+
+  const blueprints: StageCharacterBlueprint[] = [];
+  for (const [key, rawValue] of Object.entries(blueprintNamespace)) {
+    if (!rawValue || typeof rawValue !== "object") continue;
+    const raw = rawValue as Record<string, unknown>;
+    const value =
+      raw.blueprint && typeof raw.blueprint === "object"
+        ? (raw.blueprint as Record<string, unknown>)
+        : raw;
+    const id = typeof value.id === "string" ? value.id : key;
+    const name = typeof value.name === "string" ? value.name.trim() : "";
+    if (!name) continue;
+    const aliases = Array.isArray(value.aliases)
+      ? value.aliases.filter(
+          (alias): alias is string =>
+            typeof alias === "string" && alias.trim().length > 0,
+        )
+      : [];
+    const instantiate =
+      value.instantiate && typeof value.instantiate === "object"
+        ? (value.instantiate as Record<string, unknown>)
+        : undefined;
+    const characterId =
+      (typeof instantiate?.characterId === "string"
+        ? instantiate.characterId
+        : typeof value.characterId === "string"
+          ? value.characterId
+          : undefined) ?? `npc-${id}`;
+    blueprints.push({ id, name, aliases, characterId });
+  }
+
+  const normalizedStory = storyText.toLocaleLowerCase();
+  const mentioned = blueprints.filter((blueprint) =>
+    [blueprint.name, ...blueprint.aliases].some((term) =>
+      normalizedStory.includes(term.toLocaleLowerCase()),
+    ),
+  );
+  const selected = mentioned.length > 0 ? mentioned : blueprints;
+  return selected.slice(0, maxSpeakers).map((blueprint) => ({
+    id: blueprint.characterId,
+    name: blueprint.name,
+  }));
 }
 
 /** Presence record shape — mirrors `portrait-gallery-panel.tsx`'s local type. */

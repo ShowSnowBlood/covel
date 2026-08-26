@@ -1,14 +1,19 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { ImageIcon, Loader2, Upload } from "lucide-react";
+import { ImageIcon, Loader2, Upload, Sparkles } from "lucide-react";
 import type { MediaRef } from "@covel/shared";
 import { Media } from "@/components/Media.js";
 import { MediaPreviewDialog } from "@/components/MediaPreviewDialog.js";
 import { isMediaRef } from "@/lib/media-ref-utils.js";
 import { usePluginNamespace } from "@/stores/plugin-data-store.js";
 import { useActiveSessionId } from "@/lib/catalog/session-context.js";
-import { postPluginRpc, uploadSessionMedia } from "@/services/api.js";
+import { uploadSessionMedia } from "@/services/api.js";
 import { emitToast } from "@/lib/toast-channel.js";
+import { requestConfirm } from "@/lib/confirm-channel.js";
+import {
+  emitPluginRpcRuntimeResponse,
+  postPluginRpcWithApproval,
+} from "./plugin-rpc-ui.js";
 
 interface PresenceRecord {
   readonly characterId?: string;
@@ -27,15 +32,9 @@ interface PresenceEntry {
  * PortraitGalleryPanel — player-facing character portrait gallery.
  *
  * Shows each character's portrait as a framed, click-to-enlarge thumbnail, and
- * lets the player replace it by picking an image file. The file is uploaded as
- * session-owned media (`uploadSessionMedia`), then the resulting `MediaRef` is
- * written back as the character's presence via the plugin's own runtime
- * (`postPluginRpc` → `presence` payload) — no sha256 / MIME / size hand-entry.
- *
- * `pluginId` comes from the panel spec (the plugin names itself), so this stays
- * a generic framework component with no hard-coded plugin id.
+ * lets the player replace it by picking an image file.
  */
-export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
+export function PortraitGalleryPanel({ pluginId }: { pluginId: string }): ReactElement {
   const { t } = useTranslation();
   const sessionId = useActiveSessionId();
   const presence = usePluginNamespace(pluginId, "presence");
@@ -57,23 +56,39 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
     setUploadingKey(entry.key);
     try {
       const ref = await uploadSessionMedia(sessionId, file);
-      await postPluginRpc(sessionId, {
-        pluginId,
-        runtimeId: pluginId,
-        payload: {
-          presence: {
-            schemaVersion: 1,
-            characterId,
-            ...(entry.value.displayName
-              ? { displayName: entry.value.displayName }
-              : {}),
-            avatar: { id: ref.id, mime: ref.mime, size: ref.size },
-            sprite: { id: ref.id, mime: ref.mime, size: ref.size },
+      const response = await postPluginRpcWithApproval({
+        sessionId,
+        request: {
+          pluginId,
+          runtimeId: pluginId,
+          payload: {
+            presence: {
+              schemaVersion: 1,
+              characterId,
+              ...(entry.value.displayName
+                ? { displayName: entry.value.displayName }
+                : {}),
+              avatar: { id: ref.id, mime: ref.mime, size: ref.size },
+              sprite: { id: ref.id, mime: ref.mime, size: ref.size },
+            },
           },
         },
+        pluginId,
+        actionLabel: `runtime ${pluginId}`,
+        confirm: requestConfirm,
+        t,
       });
-      // The plugin.data commit emits `plugin-data.changed`, which refreshes the
-      // presence store and re-renders this gallery with the new portrait.
+      if (response) {
+        emitPluginRpcRuntimeResponse({
+          response,
+          t,
+          runtimeId: pluginId,
+          fallbackFailureMessage: t(
+            "characterPresence.uploadFailed",
+            "Portrait update failed",
+          ),
+        });
+      }
     } catch (err) {
       emitToast("error", err instanceof Error ? err.message : String(err));
     } finally {
@@ -83,28 +98,35 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
 
   if (entries.length === 0) {
     return (
-      <p className="px-4 pt-6 text-center text-xs italic leading-relaxed text-muted-foreground">
-        {t(
-          "characterPresence.empty",
-          "This world ships no character portraits yet.",
-        )}
-      </p>
+      <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+        <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
+        <p className="text-xs text-muted-foreground">
+          {t(
+            "characterPresence.empty",
+            "This world ships no character portraits yet.",
+          )}
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">
-        {t(
-          "characterPresence.hint",
-          "Click a portrait to enlarge, or hover and pick an image to replace it.",
-        )}
-      </p>
-      <div className="grid grid-cols-3 gap-2">
+    <div className="space-y-3 animate-in fade-in-0 duration-200">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground font-light">
+          {t(
+            "characterPresence.hint",
+            "Click a portrait to enlarge, or hover and pick an image to replace it.",
+          )}
+        </p>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-[9px] font-mono text-muted-foreground shrink-0">
+          <Sparkles className="h-2.5 w-2.5 text-primary" />
+          <span>{entries.length}</span>
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         {entries.map((entry) => {
-          // Prefer the dedicated full-body 立绘 (sprite) when a world ships one,
-          // else fall back to the avatar — so the panel's "立绘" name is truthful
-          // and the sprite field a world may provide is actually rendered.
           const ref = isMediaRef(entry.value.sprite)
             ? entry.value.sprite
             : isMediaRef(entry.value.avatar)
@@ -112,8 +134,8 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
               : null;
           const busy = uploadingKey === entry.key;
           return (
-            <div key={entry.key} className="space-y-1">
-              <div className="group relative overflow-hidden rounded-[var(--radius-card)] border border-border bg-card/60 transition-colors hover:border-primary/40">
+            <div key={entry.key} className="space-y-1.5 min-w-0">
+              <div className="group relative overflow-hidden rounded-2xl border border-border/80 bg-card/75 shadow-xs backdrop-blur-xs transition-all duration-300 hover:border-primary/50 hover:shadow-md hover:scale-[1.02]">
                 <button
                   type="button"
                   className="block w-full cursor-zoom-in disabled:cursor-default"
@@ -134,20 +156,23 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
                       fit="cover"
                     />
                   ) : (
-                    <div className="flex aspect-[3/4] items-center justify-center text-muted-foreground/50">
-                      <ImageIcon className="h-5 w-5" />
+                    <div className="flex aspect-[3/4] items-center justify-center text-muted-foreground/40 bg-muted/20">
+                      <ImageIcon className="h-6 w-6" />
                     </div>
                   )}
                 </button>
-                <label className="absolute inset-x-0 bottom-0 flex cursor-pointer items-center justify-center gap-1 bg-black/60 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+
+                <label className="absolute inset-x-0 bottom-0 flex cursor-pointer items-center justify-center gap-1 bg-black/75 py-1.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100 backdrop-blur-xs">
                   {busy ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
                     <Upload className="h-3 w-3" />
                   )}
-                  {busy
-                    ? t("characterPresence.uploading", "Uploading…")
-                    : t("characterPresence.replace", "Replace")}
+                  <span>
+                    {busy
+                      ? t("characterPresence.uploading", "Uploading…")
+                      : t("characterPresence.replace", "Replace")}
+                  </span>
                   <input
                     type="file"
                     accept="image/*"
@@ -161,13 +186,15 @@ export function PortraitGalleryPanel({ pluginId }: { pluginId: string }) {
                   />
                 </label>
               </div>
-              <span className="block truncate text-xs text-muted-foreground">
-                {entry.value.displayName}
+
+              <span className="block truncate text-[11px] font-semibold text-foreground/90 px-0.5">
+                {entry.value.displayName || entry.key}
               </span>
             </div>
           );
         })}
       </div>
+
       <MediaPreviewDialog
         mediaRef={preview}
         sessionId={sessionId}

@@ -1,26 +1,32 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { History, KeyRound, Plus, Trash2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area.js";
-import { Badge } from "@/components/ui/badge.js";
+import {
+  History,
+  KeyRound,
+  RotateCcw,
+  SlidersHorizontal,
+  Trash2,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.js";
+import { Badge } from "@/components/ui/badge.js";
+import { ScrollArea } from "@/components/ui/scroll-area.js";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog.js";
-import { ActiveModelSlots } from "./active-model-slots.js";
-import { PluginListPanel } from "./plugin-list-panel.js";
-import type { ResolvedSlot } from "@/hooks/use-slot-config.js";
 import type {
-  SessionRecord,
   PackageSummary,
   PluginLoadError,
   SessionPluginInfo,
+  SessionRecord,
 } from "@/services/api.js";
+import type { ResolvedSlot } from "@/hooks/use-slot-config.js";
+import { ActiveModelSlots } from "./active-model-slots.js";
+import { PluginListPanel } from "./plugin-list-panel.js";
 
 export interface LeftPanelProps {
   session: SessionRecord;
@@ -39,11 +45,12 @@ export interface LeftPanelProps {
   onCloseSessionList: () => void;
   onOpenSettings: () => void;
   onResetSession: () => void;
-  onTogglePlugin: (pluginId: string, enable: boolean) => void;
+  onTogglePlugin: (pluginId: string, enabled: boolean) => void;
 }
 
 export function LeftPanel({
   session,
+  isLeftCollapsed: _isLeftCollapsed,
   showSessionList,
   otherSessions,
   enabledPackages,
@@ -51,6 +58,7 @@ export function LeftPanel({
   sessionPlugins,
   executing,
   resolvedSlots,
+  onToggleLeftPanel: _onToggleLeftPanel,
   onToggleSessionList,
   onSwitchSession,
   onDeleteSession,
@@ -58,7 +66,7 @@ export function LeftPanel({
   onOpenSettings,
   onResetSession,
   onTogglePlugin,
-}: LeftPanelProps) {
+}: LeftPanelProps): ReactElement {
   const { t } = useTranslation();
   const [deleteTarget, setDeleteTarget] = useState<SessionRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -75,81 +83,96 @@ export function LeftPanel({
   }, [deleteTarget, onDeleteSession]);
 
   return (
-    <>
-      <div className="ui-panel-header px-3 flex items-center gap-2">
-        <span className="ui-meta text-[10px] text-muted-foreground">
-          § STUDIO
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-background text-foreground">
+      <div className="ui-panel-header px-3.5 py-2.5 flex items-center justify-between gap-2 border-b border-border/80 bg-card/40 backdrop-blur-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-primary shrink-0" />
+          <h2 className="ui-title text-xs sm:text-sm font-semibold whitespace-nowrap truncate text-foreground">
+            {t("session.config", "Studio Config")}
+          </h2>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-[9px] font-mono text-muted-foreground shrink-0">
+          <Sparkles className="h-2.5 w-2.5 text-primary" />
+          <span>§ STUDIO</span>
         </span>
-        <h2 className="ui-title text-sm font-medium whitespace-nowrap truncate">
-          {t("session.config", "Studio Config")}
-        </h2>
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
-        <div className="flex flex-col">
-          {/* ── Current Session ── */}
-          <div className="ui-panel-section border-b border-border space-y-2">
-            <span className="ui-eyebrow">{t("session.currentWorld")}</span>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${session ? "bg-green-500 animate-pulse" : "bg-muted-foreground"}`}
-                />
-                <Badge variant="secondary" className="ui-chip text-[10px]">
-                  {session.status} · turn {session.turnCount}
-                </Badge>
-              </div>
+        <div className="flex flex-col p-3 space-y-3.5">
+          {/* Current Session Card */}
+          <div className="rounded-2xl border border-border/80 bg-card/75 p-3.5 shadow-xs backdrop-blur-xs space-y-2.5 transition-all">
+            <div className="flex items-center justify-between gap-2">
+              <span className="ui-eyebrow text-[9.5px] font-mono tracking-wider text-muted-foreground">
+                {t("session.currentWorld")}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 gap-1 px-2 text-[10px] rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/40"
                 onClick={onToggleSessionList}
                 title={t("session.switchSession")}
               >
                 <History className="w-3 h-3" />
+                <span>{t("session.sessions", "Sessions")}</span>
               </Button>
             </div>
-            <p className="text-[11px] font-mono text-muted-foreground break-all leading-relaxed">
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    session ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"
+                  }`}
+                />
+                <Badge variant="secondary" className="text-[10px] font-medium rounded-md px-2 py-0.5">
+                  {session.status} · turn {session.turnCount}
+                </Badge>
+              </div>
+            </div>
+
+            <p className="text-[10.5px] font-mono text-muted-foreground break-all leading-relaxed bg-background/50 p-2 rounded-lg border border-border/60">
               {session.id}
             </p>
           </div>
 
-          {/* ── Session List (expandable) ── */}
+          {/* Session List Dropdown */}
           {showSessionList && (
-            <div className="px-3 py-2.5 border-b border-border space-y-1.5 bg-muted/20">
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="p-3 rounded-2xl border border-border/80 bg-muted/20 backdrop-blur-xs space-y-2 animate-in fade-in-0 duration-200">
+              <h3 className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground font-mono">
                 {t("session.sessions")}
               </h3>
               {otherSessions.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground italic">
+                <p className="text-[11px] text-muted-foreground italic py-1">
                   {t("session.noOtherSessions")}
                 </p>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1.5 max-h-48 overflow-y-auto ui-scroll pr-1">
                   {otherSessions.map((s) => (
                     <div
                       key={s.id}
-                      className="flex items-center gap-1 bg-background border border-border hover:border-primary/50 transition-colors"
+                      className="flex items-center gap-1.5 rounded-xl bg-card/90 border border-border/80 p-1.5 hover:border-primary/50 transition-all shadow-2xs"
                     >
                       <button
+                        type="button"
                         onClick={() => {
                           onSwitchSession(s);
                           onCloseSessionList();
                         }}
-                        className="flex-1 text-left px-2 py-1.5 text-[11px] font-mono truncate min-w-0"
+                        className="flex-1 text-left px-2 py-1 text-[11px] font-mono truncate min-w-0 cursor-pointer"
                       >
-                        <span className="block truncate">{s.id}</span>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="block truncate font-medium text-foreground">{s.id}</span>
+                        <span className="text-[9.5px] text-muted-foreground block truncate">
                           {s.status} · turn {s.turnCount} ·{" "}
-                          {new Date(s.createdAt).toLocaleString()}
+                          {new Date(s.createdAt).toLocaleDateString()}
                         </span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => setDeleteTarget(s)}
-                        className="shrink-0 p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                        className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                         title={t("common.delete", "Delete")}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
@@ -158,20 +181,20 @@ export function LeftPanel({
             </div>
           )}
 
-          {/* ── Models ── */}
-          <div className="ui-panel-section border-b border-border space-y-3">
-            <h3 className="ui-eyebrow text-[11px]">
+          {/* Models Section */}
+          <div className="rounded-2xl border border-border/80 bg-card/65 p-3.5 shadow-xs backdrop-blur-xs space-y-3">
+            <h3 className="ui-eyebrow text-[10.5px] font-mono tracking-wider text-muted-foreground">
               {t("session.activeModels", "Models")}
             </h3>
             <ActiveModelSlots slots={resolvedSlots} variant="compact" />
           </div>
 
-          {/* ── Plugins ── */}
-          <div className="ui-panel-section border-b border-border space-y-3">
-            <h3 className="ui-eyebrow text-[11px] flex items-center justify-between">
+          {/* Plugins Section */}
+          <div className="rounded-2xl border border-border/80 bg-card/65 p-3.5 shadow-xs backdrop-blur-xs space-y-3">
+            <h3 className="ui-eyebrow text-[10.5px] font-mono tracking-wider text-muted-foreground flex items-center justify-between">
               <span>{t("session.plugins", "Plugins")}</span>
               {enabledPackages.length > 0 && (
-                <span className="ml-1 font-normal text-muted-foreground">
+                <span className="rounded-full bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.2 text-[9px] font-mono">
                   {enabledPackages.length}
                 </span>
               )}
@@ -191,69 +214,64 @@ export function LeftPanel({
         </div>
       </ScrollArea>
 
-      {/* ── Bottom Actions (sticky) ── */}
-      <div className="ui-panel-footer border-t border-border shrink-0 space-y-2">
+      {/* Bottom Sticky Action Bar */}
+      <div className="p-3 border-t border-border/80 bg-card/50 backdrop-blur-md shrink-0 flex flex-col gap-2">
         <Button
-          className="w-full h-9 text-xs border-border/80"
+          className="w-full h-9 text-xs rounded-xl border border-border/80 bg-background/80 hover:bg-accent/40 text-foreground transition-all"
           variant="outline"
           onClick={onOpenSettings}
         >
-          <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-          {t("nav.settings", "Settings")}
+          <KeyRound className="w-3.5 h-3.5 mr-1.5 text-primary" />
+          <span>{t("nav.settings", "Settings")}</span>
         </Button>
         <Button
-          className="w-full h-9 text-xs border border-dashed border-border/80"
+          className="w-full h-8 text-[11px] rounded-xl text-muted-foreground hover:text-foreground transition-all"
           variant="ghost"
           onClick={onResetSession}
         >
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
-          {t("common.newSession")}
+          <RotateCcw className="w-3 h-3 mr-1.5" />
+          <span>{t("session.worldConfig", "Configure World")}</span>
         </Button>
       </div>
 
-      {/* Delete session confirmation */}
+      {/* Delete Confirmation Dialog */}
       <Dialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
       >
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-xs rounded-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {t("session.deleteConfirmTitle", "Delete Session")}
+            <DialogTitle className="text-sm">
+              {t("session.deleteConfirmTitle", "Delete session?")}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               {t(
                 "session.deleteConfirmDesc",
-                "This will permanently delete the session and all its data (messages, game state, etc.). This action cannot be undone.",
+                "This permanently deletes session history.",
               )}
             </DialogDescription>
           </DialogHeader>
-          {deleteTarget && (
-            <p className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1.5 break-all">
-              {deleteTarget.id}
-            </p>
-          )}
-          <div className="flex justify-end gap-2 mt-2">
-            <DialogClose asChild>
-              <Button variant="outline" size="sm" disabled={deleting}>
-                {t("common.cancel", "Cancel")}
-              </Button>
-            </DialogClose>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl text-xs"
+              onClick={() => setDeleteTarget(null)}
+            >
+              {t("common.cancel", "Cancel")}
+            </Button>
             <Button
               variant="destructive"
               size="sm"
+              className="rounded-xl text-xs"
               disabled={deleting}
-              onClick={handleConfirmDelete}
+              onClick={() => void handleConfirmDelete()}
             >
-              {deleting
-                ? t("common.deleting", "Deleting...")
-                : t("common.delete", "Delete")}
+              {t("common.delete", "Delete")}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

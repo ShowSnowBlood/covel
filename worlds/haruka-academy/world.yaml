@@ -34,6 +34,8 @@ pluginPolicy:
     - branch-reply
     - npc-graph
     # Makes the festival and club routes visible without enabling traditional guide menus.
+    # Stage mode exposes the illustration action; keep its prompt/follower pair available.
+    - openai-image-gen
     - core-quest
   excludedPlugins:
     - narrator

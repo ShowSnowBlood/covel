@@ -5,6 +5,7 @@
  */
 import {
   BookOpen,
+  ImageIcon,
   Maximize2,
   MessagesSquare,
   Minimize2,
@@ -29,6 +30,10 @@ export interface StageHudProps {
   readonly onToggleAutoPlay: () => void;
   readonly onToggleImmersive: () => void;
   readonly onExit: () => void;
+  /** Available only when an active plugin declares the image-prompt entry. */
+  readonly imageGenerationAvailable?: boolean;
+  readonly imageGenerationBusy?: boolean;
+  readonly onGenerateImage?: () => void;
 }
 
 export function StageHud({
@@ -40,6 +45,9 @@ export function StageHud({
   onToggleAutoPlay,
   onToggleImmersive,
   onExit,
+  imageGenerationAvailable = false,
+  imageGenerationBusy = false,
+  onGenerateImage,
 }: StageHudProps): ReactElement {
   const { t } = useTranslation();
   const isPending = sceneCurrent?.source === "pending";
@@ -77,6 +85,24 @@ export function StageHud({
       </div>
 
       <div className="ui-stage-panel pointer-events-auto flex items-center gap-1 rounded-[var(--radius-control)] p-1">
+        {imageGenerationAvailable && onGenerateImage && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onGenerateImage}
+            disabled={imageGenerationBusy}
+            aria-label={t("coreImage.generateButton", "Generate image")}
+            title={t("coreImage.generateButton", "Generate image")}
+            data-testid="stage-generate-image"
+          >
+            <ImageIcon
+              className={clsx(
+                "h-3.5 w-3.5",
+                imageGenerationBusy && "animate-pulse",
+              )}
+            />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
