@@ -80,10 +80,10 @@ pipeline {
       steps {
         sh '''
           set -eu
-          curl --fail --silent --show-error --retry 10 --retry-delay 3 \
+          curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-max-time 180 --retry-delay 3 \
             https://game.frostfox.ai/api/health \
             | grep -q '"status":"ok"'
-          curl --fail --silent --show-error --retry 10 --retry-delay 3 \
+          curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-max-time 180 --retry-delay 3 \
             https://game.frostfox.ai/api/frostfox/account \
             | grep -q '"clientId":"covel-game"'
         '''
