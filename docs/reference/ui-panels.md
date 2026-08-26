@@ -351,17 +351,19 @@ guide 分析叙事 → `generate-guide` 写入 `plugin_data[message]`
 
 ### 层级与数据源
 
-五层绝对定位、`z-index` 分档，DOM 顺序 Backdrop → Sprites → Hud → Dialog → Choices，全部套在一个 `relative` 有界容器里。数据全部经 `usePluginNamespace(pluginId, namespace)` 读取（`StageView` 保持薄，逻辑在 `stage-selectors.ts`）：
+五层绝对定位、`z-index` 分档，DOM 顺序 Backdrop → Sprites → Hud → Dialog → Choices，全部套在一个 `relative` 有界容器里。舞台层通过插件声明的 capability 解析实际 plugin id，再经 `usePluginNamespace(pluginId, namespace)` 读取数据（`StageView` 保持薄，逻辑在 `stage-selectors.ts`）：
 
-| 层           | 数据源                                                                                        | 选择器                                                              |
-| ------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **Backdrop** | `("scene-stage","stage")["current"]`                                                          | `resolveBackdrop`（四档回退，见下）                                 |
-| **Sprites**  | `("scene-cast","active-cast")["current"].speakers` × `("character-presence","presence")`      | `computeSpriteSlots`（站位/高亮，无立绘则过滤）                     |
-| **Hud**      | `("scene-stage","stage")["current"]`（`name` / `variant` / `sourceLabel` / `source`）         | —（无状态，按钮回调上抛）                                           |
-| **Dialog**   | 最新 `kind === "story"` 消息的 `content`                                                      | `use-typewriter`（流式驱动、`\n\n` 分段、▼ 暂停）                   |
-| **Choices**  | 未提交的 choice 类 interaction block + `("scene-prompts","message")` 的 `prompt{N}Text/Label` | `extractInteractionChoices` + `mergeChoices`（末位追加 ✎ 自由输入） |
+| 层           | 数据源                                                                                                                                         | 选择器                                                                               |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Backdrop** | `("scene-stage","stage")["current"]`                                                                                                           | `resolveBackdrop`（四档回退，见下）                                                  |
+| **Sprites**  | 仅限世界包声明 `defaultViewMode: stage`；`("scene-cast","active-cast")["current"].speakers` × `("character-presence","presence")`              | `computeSpriteSlots`（站位/高亮；只接受显式 `sprite`，不把带背景的 `avatar` 当立绘） |
+| **Hud**      | `("scene-stage","stage")["current"]`（`name` / `variant` / `sourceLabel` / `source`）                                                          | —（无状态，按钮回调上抛）                                                            |
+| **Dialog**   | 最新 `kind === "story"` 消息的 `content`                                                                                                       | `use-typewriter`（流式驱动、`\n\n` 分段、▼ 暂停）                                    |
+| **Choices**  | 未提交的 choice 类 interaction block + `scene-prompts/message` 的 `prompt{N}Text/Label` + `action-guide/message` 的 `category{N}Suggestion{M}` | `extractInteractionChoices` + `mergeChoices`（末位追加 ✎ 自由输入）                  |
 
-“流式中”判定沿用内核约定——无 streaming 布尔，`executing && story 消息 id 以 stream_ 开头`；打字机读完（`done`）且 `!executing` 才浮现选择肢。
+传统世界也可以手动切换到舞台档，但只复用场景背景、对话框和行动引导，不会把角色头像或不透明 portrait 当作前景立绘。没有叙事文本时，舞台在执行结束后仍显示行动引导/自由输入入口，避免 provider 空响应把玩家锁死。
+
+“流式中”判定沿用内核约定——无 streaming 布尔，`executing && story 消息 id 以 stream_ 开头`；打字机读完（`done`）且 `!executing` 才浮现有文本回合的选择肢，空响应回合直接解锁入口。
 
 ### 背景回退链（`resolveBackdrop`）
 

@@ -343,13 +343,19 @@ export function GameView({ session }: GameViewProps) {
   useEffect(() => {
     if (viewMode !== "stage") return;
 
-    const visualCapabilities = new Set([
-      "scene-stage",
-      "scene-cast",
-      "scene-prompts",
-      "character-presence",
-      "character-blueprint",
-    ]);
+    const authoredStageWorld = world?.metadata?.defaultViewMode === "stage";
+    const visualCapabilities = new Set(
+      authoredStageWorld
+        ? [
+            "scene-stage",
+            "scene-cast",
+            "scene-prompts",
+            "action-guide",
+            "character-presence",
+            "character-blueprint",
+          ]
+        : ["scene-prompts", "action-guide"],
+    );
     const metadata = world?.metadata;
     const policy =
       metadata?.pluginPolicy &&
@@ -371,11 +377,8 @@ export function GameView({ session }: GameViewProps) {
       plugin.source !== "community" && !excludedPlugins.has(plugin.id);
     const targets = new Set<string>();
     for (const plugin of sessionPlugins) {
-      if (
-        plugin.isActive ||
-        !canAutoEnable(plugin) ||
-        !plugin.capabilities
-      ) continue;
+      if (plugin.isActive || !canAutoEnable(plugin) || !plugin.capabilities)
+        continue;
       if (
         plugin.capabilities.some((capability) =>
           visualCapabilities.has(capability),

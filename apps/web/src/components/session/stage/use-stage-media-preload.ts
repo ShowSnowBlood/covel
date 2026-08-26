@@ -1,13 +1,15 @@
 /**
  * Warm the IDB media cache with the stage art the session is known to need
- * — character sprites/avatars (character-presence `presence`) and world
- * scene backdrops (scene-stage `scenes` registry) — as soon as the session
- * opens, instead of on first `<Media>` mount (StageView only mounts once
+ * — character sprites (character-presence `presence`) and world scene
+ * backdrops (scene-stage `scenes` registry) — as soon as the session opens,
+ * instead of on first `<Media>` mount (StageView only mounts once
  * `turnCount >= 1`, so without this every image download starts after the
- * pre-game turn fully ends). World-package media bytes are imported into
- * the MediaStore at session creation, so pre-fetching during turn 0 is
- * pure cache warm-up: when the opening turn lands, backdrops and sprites
- * resolve from IDB instantly.
+ * pre-game turn fully ends). World-package media bytes are imported into the
+ * MediaStore at session creation, so pre-fetching during turn 0 is pure
+ * cache warm-up: when the opening turn lands, backdrops and sprites resolve
+ * from IDB instantly. Portrait `avatar` badges are intentionally not warmed;
+ * they are not stage composition assets.
+
  */
 import { useEffect, useRef } from "react";
 import type { MediaRef } from "@covel/shared";
@@ -59,10 +61,8 @@ export function useStageMediaPreload(
   useEffect(() => {
     const refs: MediaRef[] = [];
     for (const value of Object.values(presence)) {
-      const record = value as
-        { sprite?: unknown; avatar?: unknown } | undefined;
+      const record = value as { sprite?: unknown } | undefined;
       if (isMediaRef(record?.sprite)) refs.push(record.sprite);
-      if (isMediaRef(record?.avatar)) refs.push(record.avatar);
     }
     void warmRefs(sessionId, refs, warmed.current);
   }, [sessionId, presence]);

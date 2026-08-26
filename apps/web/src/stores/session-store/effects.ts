@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import * as api from "@/services/api";
 import type { DataService } from "@/services/data-service.js";
 import { ignoreError } from "@/lib/ignore-error.js";
+import { loadPluginData } from "@/stores/plugin-data-store.js";
 import type { SessionDispatch, SessionState } from "./types.js";
 
 export function useBootEffect(
@@ -52,15 +53,25 @@ export function useMessageUiSpecHydrationEffect(
             .listPluginData(sessionId, pluginId, "message")
             .then((items) => {
               if (cancelled || items.length === 0) return;
+              const changes = items.map((item) => ({
+                namespace: item.namespace,
+                key: item.key,
+                value: item.value,
+                operation: "set" as const,
+              }));
+              // The reducer mirror feeds json-render's persisted message
+              // surface; StageView reads the fine-grained external store.
+              // Hydrating only one of the two leaves stage-only consumers
+              // blind to message UI data after a session restore.
+              loadPluginData(
+                pluginId,
+                "message",
+                items.map((item) => ({ key: item.key, value: item.value })),
+              );
               dispatch({
                 type: "PLUGIN_DATA_CHANGED",
                 pluginId,
-                changes: items.map((item) => ({
-                  namespace: item.namespace,
-                  key: item.key,
-                  value: item.value,
-                  operation: "set",
-                })),
+                changes,
               });
             })
             .catch(ignoreError("load plugin data for message ui spec"));

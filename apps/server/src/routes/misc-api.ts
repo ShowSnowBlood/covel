@@ -476,7 +476,16 @@ export function createMiscApiRoutes(
           event.type === "reasoning-delta" &&
           event.reasoningDelta.length > 0
         ) {
-          if (ttfbMs === null) ttfbMs = Date.now() - startedAt;
+          if (ttfbMs === null) {
+            ttfbMs = Date.now() - startedAt;
+            // Reasoning is still provider output and is enough to prove the
+            // connection. Stop immediately instead of waiting for a model that
+            // may deliberately emit no visible text in a short probe.
+            if (!aborted) {
+              aborted = true;
+              abort.abort();
+            }
+          }
         } else if (event.type === "done") {
           finalUsage = event.usage;
         }

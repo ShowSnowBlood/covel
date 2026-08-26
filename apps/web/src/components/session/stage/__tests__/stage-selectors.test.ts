@@ -9,8 +9,9 @@ import {
   extractInteractionChoices,
   extractPendingFormMessages,
   filterStalePrompts,
-  findLatestStoryMessage,
   hasSubmittedForm,
+  findLatestStoryMessage,
+  findLatestStoryTurnId,
   mergeChoices,
   pluginIdForCapability,
   resolveBackdrop,
@@ -130,10 +131,11 @@ describe("computeSpriteSlots", () => {
     expect(slots.map((s) => s.pos)).toEqual(["center", "left", "right"]);
   });
 
-  it("marks speakers[0] active, falls back to avatar, and keeps artless speakers as null slots", () => {
+  it("marks speakers[0] active, rejects avatar fallback, and keeps artless speakers as null slots", () => {
     const presence = {
       lin: { characterId: "lin", sprite: ref("lin-sprite") },
-      archivist: { characterId: "archivist", avatar: ref("archivist-avatar") }, // falls back to avatar
+      // Avatar is a portrait badge, not a transparent stage asset.
+      archivist: { characterId: "archivist", avatar: ref("archivist-avatar") },
       // ghost has no presence entry at all — kept on stage with ref: null
     };
     const slots = computeSpriteSlots(speakers, presence);
@@ -146,7 +148,7 @@ describe("computeSpriteSlots", () => {
     ).toBe(false);
     expect(
       slots.find((s) => s.characterId === `${SESSION}-archivist`)?.ref,
-    ).toEqual(ref("archivist-avatar"));
+    ).toBeNull();
     const ghost = slots.find((s) => s.characterId === `${SESSION}-ghost`);
     expect(ghost?.ref).toBeNull();
     expect(ghost?.displayName).toBe("无立绘的角色");
@@ -241,6 +243,32 @@ describe("findLatestStoryMessage", () => {
   it("keeps assistant messages from older persisted sessions as a fallback", () => {
     const legacy = message("legacy-1", "旧会话叙事");
     expect(findLatestStoryMessage([legacy])).toBe(legacy);
+  });
+
+  it("skips a completed empty story instead of hiding prior narrative", () => {
+    const previous = message("story-1", "可见叙事", { kind: "story" });
+    const empty = message("story-2", "", { kind: "story" });
+    expect(findLatestStoryMessage([previous, empty])).toBe(previous);
+    expect(findLatestStoryMessage([empty])).toBeUndefined();
+  });
+
+  it("keeps an empty live streaming placeholder", () => {
+    const streaming = message("stream_turn-1_narrator", "", {
+      kind: "story",
+    });
+    expect(findLatestStoryMessage([streaming])).toBe(streaming);
+  });
+
+  it("returns the newest story turn even when its result is empty", () => {
+    const previous = message("story-1", "可见叙事", {
+      kind: "story",
+      turnId: "turn-1",
+    });
+    const empty = message("story-2", "", {
+      kind: "story",
+      turnId: "turn-2",
+    });
+    expect(findLatestStoryTurnId([previous, empty])).toBe("turn-2");
   });
 });
 
@@ -550,6 +578,27 @@ describe("mergeChoices", () => {
     expect(merged.items.map((i) => i.label)).toEqual([
       "环顾四周",
       "追问档案员",
+    ]);
+  });
+
+  it("merges the traditional action-guide category shape", () => {
+    const guide = {
+      category1Label: { zh: "稳妥", en: "Safe" },
+      category1Suggestion1: "先观察门锁",
+      category1Suggestion2: "询问守卫",
+      category2Label: { zh: "激进", en: "Aggressive" },
+      category2Suggestion1: "直接撞门",
+    };
+    const merged = mergeChoices([], {}, "zh-CN", [guide]);
+    expect(merged.items.map((item) => item.label)).toEqual([
+      "先观察门锁",
+      "询问守卫",
+      "直接撞门",
+    ]);
+    expect(merged.items.map((item) => item.description)).toEqual([
+      "稳妥",
+      "稳妥",
+      "激进",
     ]);
   });
 

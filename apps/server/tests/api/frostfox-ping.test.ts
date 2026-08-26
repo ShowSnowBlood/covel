@@ -189,7 +189,7 @@ describe("FrostFox account model ping", () => {
   });
 
   it("counts reasoning output as proof of provider connectivity", async () => {
-    const { app } = makeHarness([
+    const { app, streamCalls } = makeHarness([
       { type: "reasoning-delta", reasoningDelta: "thinking" },
       { type: "done", usage: { inputTokens: 1, outputTokens: 1 } },
     ]);
@@ -203,6 +203,9 @@ describe("FrostFox account model ping", () => {
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.ttfbMs).toEqual(expect.any(Number));
+    expect(
+      (streamCalls[0]?.options as { signal?: AbortSignal }).signal?.aborted,
+    ).toBe(true);
   });
 
   it("reports a deliberate no-content response instead of throwing", async () => {

@@ -47,6 +47,7 @@ import {
   fallbackStageSpeakers,
   filterStalePrompts,
   findLatestStoryMessage,
+  findLatestStoryTurnId,
   mergeChoices,
   pluginIdForCapability,
   STAGE_CAPABILITIES,
@@ -91,7 +92,6 @@ export interface StageViewProps {
   readonly messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
-
 export function StageView(props: StageViewProps): ReactElement {
   const {
     session,
@@ -119,6 +119,8 @@ export function StageView(props: StageViewProps): ReactElement {
     pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.cast) ?? "";
   const scenePromptsId =
     pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.prompts) ?? "";
+  const actionGuideId =
+    pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.guide) ?? "";
   const presenceId =
     pluginIdForCapability(sessionPlugins, STAGE_CAPABILITIES.presence) ?? "";
   const characterBlueprintId =
@@ -130,6 +132,7 @@ export function StageView(props: StageViewProps): ReactElement {
     "current"
   ] as { speakers?: readonly StageSpeaker[] } | undefined;
   const promptsNamespace = usePluginNamespace(scenePromptsId, "message");
+  const guideNamespace = usePluginNamespace(actionGuideId, "message");
   // Mirror portrait-gallery-panel: the presence namespace is consumed as a
   // characterId-keyed record of `{ sprite, avatar, ... }`.
   const presence = usePluginNamespace(presenceId, "presence") as Readonly<
@@ -160,19 +163,26 @@ export function StageView(props: StageViewProps): ReactElement {
   // carries empty content and the live text is held in a fine-grained external
   // store. This view subscribes only to the latest story message.
   const storyMsg = findLatestStoryMessage(messages);
+  const latestNarrativeTurnId = findLatestStoryTurnId(messages);
   const liveStoryText = useStreamingText(storyMsg?.id ?? "");
-  const storyText = storyMsg ? (liveStoryText ?? storyMsg.content) : "";
-  const storyTurnId = storyMsg?.turnId;
-
-  // Use authored portraits while the opening turn has no cast/story record yet,
-  // and for older sessions that never enabled scene-cast. Once a real story
-  // exists, an explicit empty cast remains meaningful; StageSprites keeps its
-  // prior line-up sticky for narration-only beats.
+  const storyText = storyMsg
+    ? liveStoryText?.trim()
+      ? liveStoryText
+      : storyMsg.content
+    : "";
+  // Only worlds that opt into the authored visual-novel stage may synthesize
+  // or consume character sprites. Traditional worlds can still use the stage
+  // presentation for their backdrop and action guide, but an old/explicit
+  // scene-cast payload must not turn portrait cards into foreground scenery.
+  const stageArtAllowed = world?.metadata?.defaultViewMode === "stage";
   const fallbackSpeakers = useMemo(
-    () => fallbackStageSpeakers(fallbackCharacterNamespace, storyText),
-    [fallbackCharacterNamespace, storyText],
+    () =>
+      stageArtAllowed
+        ? fallbackStageSpeakers(fallbackCharacterNamespace, storyText)
+        : [],
+    [stageArtAllowed, fallbackCharacterNamespace, storyText],
   );
-  const activeSpeakers = activeCast?.speakers ?? [];
+  const activeSpeakers = stageArtAllowed ? (activeCast?.speakers ?? []) : [];
   const speakers =
     activeSpeakers.length > 0 || (activeCast && storyMsg)
       ? activeSpeakers
@@ -206,7 +216,7 @@ export function StageView(props: StageViewProps): ReactElement {
   useEffect(() => {
     setAllRead(false);
     setInputMode(false);
-  }, [storyTurnId]);
+  }, [latestNarrativeTurnId]);
 
   const interactionChoices = useMemo(
     () => extractInteractionChoices(messages, submittedBlockIds),
@@ -216,22 +226,38 @@ export function StageView(props: StageViewProps): ReactElement {
     () => extractPendingFormMessages(messages, submittedBlockIds),
     [messages, submittedBlockIds],
   );
-  // Drop scene-prompts left over from a previous turn (StageChoices merges them
-  // in via mergeChoices, which doesn't itself check freshness).
+  // Drop quick replies left over from a previous turn. Both the scene-prompts
+  // and traditional action-guide providers use the same freshness contract.
   const freshPrompts = useMemo(
-    () => filterStalePrompts(promptsNamespace, storyTurnId),
-    [promptsNamespace, storyTurnId],
+    () => filterStalePrompts(promptsNamespace, latestNarrativeTurnId),
+    [promptsNamespace, latestNarrativeTurnId],
+  );
+  const freshGuide = useMemo(
+    () => filterStalePrompts(guideNamespace, latestNarrativeTurnId),
+    [guideNamespace, latestNarrativeTurnId],
+  );
+  const mergedChoiceItems = useMemo(
+    () => mergeChoices(interactionChoices, freshPrompts, locale, [freshGuide]),
+    [interactionChoices, freshPrompts, freshGuide, locale],
   );
   const activeForm = pendingForms.find((m) => !dismissedFormIds.has(m.id));
   // The overlay always carries the free-input entry; only *real* choice items
-  // (interaction choices / scene-prompts) justify dimming the sprites.
-  const hasChoiceItems = useMemo(
-    () =>
-      mergeChoices(interactionChoices, freshPrompts, locale).items.length > 0,
-    [interactionChoices, freshPrompts, locale],
-  );
-
-  const choicesVisible = allRead && !executing && !inputMode;
+  // (interaction choices / either quick-reply provider) justify dimming sprites.
+  const hasChoiceItems = mergedChoiceItems.items.length > 0;
+  // `findLatestStoryMessage` deliberately keeps the previous readable line
+  // when a persisted completed turn has empty content. The turn-id selector
+  // still sees that newest turn; treat the mismatch as an already-settled
+  // empty response so it cannot gate the next action forever.
+  const emptyLatestNarrative =
+    latestNarrativeTurnId !== undefined &&
+    latestNarrativeTurnId !== storyMsg?.turnId;
+  const choicesVisible =
+    (allRead ||
+      !storyMsg ||
+      storyText.trim().length === 0 ||
+      emptyLatestNarrative) &&
+    !executing &&
+    !inputMode;
 
   return (
     <div
@@ -263,7 +289,7 @@ export function StageView(props: StageViewProps): ReactElement {
         onExit={() => onViewModeChange("parsed")}
       />
       <StageDialog
-        turnId={storyTurnId}
+        turnId={latestNarrativeTurnId}
         storyText={storyText}
         streamEnded={!isStreaming}
         speakerName={speakers[0]?.name}
@@ -274,18 +300,22 @@ export function StageView(props: StageViewProps): ReactElement {
         onAllRead={() => setAllRead(true)}
         onSendMessage={onSendMessage}
       />
-      {storyTurnId && (
+      {latestNarrativeTurnId && (
         <div
           className="pointer-events-auto absolute right-3 top-16 z-30 max-h-[34%] w-[min(18rem,calc(100%-1.5rem))] overflow-y-auto rounded-[var(--radius-card)] md:right-4 md:top-20"
           data-testid="stage-assets"
         >
-          <AssetTurnSidebar turnId={storyTurnId} sessionId={session.id} />
+          <AssetTurnSidebar
+            turnId={latestNarrativeTurnId}
+            sessionId={session.id}
+          />
         </div>
       )}
       <StageChoices
         visible={choicesVisible}
         interactionChoices={interactionChoices}
         promptsNamespace={freshPrompts}
+        additionalPromptNamespaces={[freshGuide]}
         locale={locale}
         onSubmitInteraction={onSubmitInteraction}
         onSendMessage={onSendMessage}

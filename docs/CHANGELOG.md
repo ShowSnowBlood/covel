@@ -31,6 +31,9 @@ This release rebuilds provider and model configuration around explicit connectio
 - **Post-turn trackers no longer exhaust their deadlines after doing the work.** Codex, action guide, and NPC graph writes now terminate their runtime directly instead of requiring another provider call solely for `runtime-done`; EOF-truncated tool JSON can recover omitted closing delimiters; the default shared-channel concurrency cap drops from four to two; and the three affected runtimes have explicit 90-second call budgets.
 - **Image models now stay in the image role.** Metadata-light models from FrostFox's dedicated image channel are classified as image generators instead of text LLMs; model-role selectors exclude incompatible managed models and deployment-bound provider duplicates; existing `openai-image` assignments migrate into the single canonical `image` role.
 
+- **会话面包屑返回会正确离开当前会话。** 从游戏中返回配置或世界选择时清除 URL 中的旧 `sid`，避免会话状态被自动恢复。
+- **舞台世界 UI 恢复了正确的视觉与行动契约。** 透明 `sprite` 才会进入前景合成，带背景的 `avatar` 不再变成立绘矩形；传统世界切入舞台时保留场景背景与 `action-guide` 建议而不显示头像，消息数据在会话恢复后也会水合到舞台所用的 store。
+
 ## [0.0.25] - 2026-08-11
 
 This release hardens the complete default game flow, from choosing a world and running setup plugins through narrative execution, post-turn plugins, persistence, and client recovery.

@@ -119,6 +119,9 @@ function SessionPage() {
   const { sid } = Route.useSearch();
   const navigate = useNavigate();
   const autoResumeAttempted = useRef(false);
+  // The URL's session is settled once it has either been restored or matched
+  // to the live store. This also covers sessions started in the current page:
+  // clearing one for the prep screen must not auto-resume its old `sid`.
   // Tracks the session id currently reflected in the URL. Updated whenever
   // state.session.id matches the URL sid (URL/state are in sync). When the URL
   // drops its sid while state.session still references the matching id, the
@@ -133,6 +136,9 @@ function SessionPage() {
   useEffect(() => {
     if (state.session?.id && state.session.id === sid) {
       lastSyncedSessionIdRef.current = state.session.id;
+      // A URL/state match is already settled, whether this session was
+      // restored from the URL or created by the current page.
+      autoResumeAttempted.current = true;
     }
   }, [state.session?.id, sid]);
 
@@ -154,7 +160,9 @@ function SessionPage() {
         });
       }
     } else if (!state.session && sid && autoResumeAttempted.current) {
-      // Session was cleared (back to world select) — remove sid from URL
+      // Session was cleared (back to prep or world select) — remove the old
+      // sid and forget it before a later session is started.
+      lastSyncedSessionIdRef.current = null;
       navigate({ to: "/session", search: {}, replace: true });
     }
   }, [state.session, sid, navigate, backToWorldSelect]);

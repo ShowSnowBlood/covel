@@ -17,14 +17,16 @@ import { isPendingInteractionMessage } from "../game-view/interaction-blocks.js"
 // declared capabilities). A plugin declares one of these capabilities in its
 // PLUGIN.md; the stage resolves the owning plugin id at runtime from the
 // session's active plugin list. The bundled plugins (scene-stage / scene-cast /
-// scene-prompts / character-presence) declare the matching capability, so
-// discovery resolves to them today; a third-party equivalent that declares the
-// same capability transparently replaces them without touching this code.
+// scene-prompts / action-guide / character-presence) declare the matching
+// capabilities, so discovery resolves to them today; a third-party equivalent
+// that declares the same capability transparently replaces them without
+// touching this code.
 
 export const STAGE_CAPABILITIES = {
   scene: "scene-stage",
   cast: "scene-cast",
   prompts: "scene-prompts",
+  guide: "action-guide",
   presence: "character-presence",
   characters: "character-blueprint",
 } as const;
@@ -71,18 +73,45 @@ export function findLatestStoryMessage(
   let legacyFallback: StreamMessage | undefined;
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i];
-    if (message.kind === "story") return message;
+    const hasContent = message.content.trim().length > 0;
+    // Streaming placeholders are empty while their text lives in the external
+    // streaming store. A completed empty narrative is not renderable and must
+    // not hide the previous usable turn or keep stage choices gated forever.
+    if (
+      message.kind === "story" &&
+      (hasContent || message.id.startsWith("stream_"))
+    ) {
+      return message;
+    }
     if (
       legacyFallback === undefined &&
       message.kind === undefined &&
       message.role === "assistant" &&
       !message.block &&
-      (message.content.trim().length > 0 || message.id.startsWith("stream_"))
+      (hasContent || message.id.startsWith("stream_"))
     ) {
       legacyFallback = message;
     }
   }
   return legacyFallback;
+}
+
+/** Return the newest narrative turn, including an empty completed result. */
+export function findLatestStoryTurnId(
+  messages: readonly StreamMessage[],
+): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.kind === "story") return message.turnId;
+    if (
+      message.kind === undefined &&
+      message.role === "assistant" &&
+      !message.block
+    ) {
+      return message.turnId;
+    }
+  }
+  return undefined;
 }
 
 // ── Backdrop (scene-stage `stage/current`) ──────────────────────
@@ -221,7 +250,7 @@ export type SpritePosition =
 export interface StageSpriteSlot {
   readonly characterId: string;
   readonly displayName: string;
-  /** `null` when the speaker has no resolvable sprite/avatar — the sprite
+  /** `null` when the speaker has no resolvable stage sprite — the sprite
    * layer renders a name-initial fallback card so the dialog nameplate never
    * points at an empty stage. */
   readonly ref: MediaRef | null;
@@ -399,11 +428,12 @@ function findPresence(
 }
 
 /**
- * Station speakers on stage. Speakers without a resolvable sprite/avatar are
- * kept as `ref: null` slots (the sprite layer renders a fallback card) rather
- * than dropped — dropping the primary speaker left the dialog nameplate
- * pointing at nobody on stage. `speakers[0]` (the highest-salience speaker
- * from scene-cast) is always flagged `active`.
+ * Station speakers on stage. Speakers without a resolvable *sprite* are kept
+ * as `ref: null` slots; an avatar is a portrait badge and is not a stage asset.
+ * Falling back from `sprite` to `avatar` puts a scene-baked portrait card on
+ * top of the backdrop and is the visual bug this selector must prevent.
+ * `speakers[0]` (the highest-salience speaker from scene-cast) is always
+ * flagged `active`.
  *
  * `stations` is the sticky assignment from {@link assignStations} — pass the
  * previous render's map through it so sprites keep their spots across speaker
@@ -425,11 +455,10 @@ export function computeSpriteSlots(
 
   return staged.map((speaker) => {
     const presence = findPresence(presenceMap, speaker.id);
-    const ref = isMediaRef(presence?.sprite)
-      ? presence.sprite
-      : isMediaRef(presence?.avatar)
-        ? presence.avatar
-        : null;
+    // `avatar` is a portrait badge and may contain a scene background. Stage
+    // composition accepts only the explicitly authored `sprite` asset; using
+    // the avatar fallback turns the whole portrait rectangle into a backdrop.
+    const ref = isMediaRef(presence?.sprite) ? presence.sprite : null;
     return {
       characterId: speaker.id,
       displayName: speaker.name,
@@ -598,6 +627,7 @@ export function mergeChoices(
   interactionChoices: readonly StageInteractionChoice[],
   promptsNamespace: Readonly<Record<string, unknown>>,
   locale: string,
+  additionalPromptNamespaces: readonly Readonly<Record<string, unknown>>[] = [],
 ): MergedChoices {
   const items: StageChoiceItem[] = [];
 
@@ -617,17 +647,55 @@ export function mergeChoices(
     }
   }
 
-  for (let n = 1; n <= MAX_PROMPT_SLOTS; n += 1) {
-    const text = promptsNamespace[`prompt${n}Text`];
-    if (typeof text !== "string" || text.trim().length === 0) continue;
-    items.push({
-      kind: "prompt",
-      id: `prompt:${n}`,
-      label: text,
-      description:
-        resolveI18n(promptsNamespace[`prompt${n}Label`], locale) || undefined,
-    });
-  }
+  // Both built-in quick-reply plugins write to a `message` namespace. The
+  // dialogue world uses prompt{N}Text; the traditional world uses
+  // category{N}Suggestion{M}. Read both shapes behind one stage contract so
+  // changing presentation mode never drops the world's action guide.
+  let promptCount = 0;
+  const namespaces = [promptsNamespace, ...additionalPromptNamespaces];
+  namespaces.forEach((namespace, sourceIndex) => {
+    for (
+      let n = 1;
+      n <= MAX_PROMPT_SLOTS && promptCount < MAX_PROMPT_SLOTS;
+      n += 1
+    ) {
+      const text = namespace[`prompt${n}Text`];
+      if (typeof text !== "string" || text.trim().length === 0) continue;
+      const description =
+        resolveI18n(namespace[`prompt${n}Label`], locale) || undefined;
+      items.push({
+        kind: "prompt",
+        id: sourceIndex === 0 ? `prompt:${n}` : `prompt:${sourceIndex}:${n}`,
+        label: text.trim(),
+        description,
+      });
+      promptCount += 1;
+    }
+
+    for (
+      let category = 1;
+      category <= 3 && promptCount < MAX_PROMPT_SLOTS;
+      category += 1
+    ) {
+      const description =
+        resolveI18n(namespace[`category${category}Label`], locale) || undefined;
+      for (
+        let suggestion = 1;
+        suggestion <= 3 && promptCount < MAX_PROMPT_SLOTS;
+        suggestion += 1
+      ) {
+        const text = namespace[`category${category}Suggestion${suggestion}`];
+        if (typeof text !== "string" || text.trim().length === 0) continue;
+        items.push({
+          kind: "prompt",
+          id: `guide:${sourceIndex}:${category}:${suggestion}`,
+          label: text.trim(),
+          description,
+        });
+        promptCount += 1;
+      }
+    }
+  });
 
   return { items, twoColumn: items.length > TWO_COLUMN_THRESHOLD };
 }

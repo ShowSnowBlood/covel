@@ -72,7 +72,7 @@ describe("useStageMediaPreload", () => {
     vi.clearAllMocks();
   });
 
-  it("warms presence sprites/avatars and scene registry backdrops, images only", async () => {
+  it("warms stage sprites and scene registry backdrops, images only", async () => {
     renderHook(() => useStageMediaPreload("s1", PLUGINS));
 
     await waitFor(() => {
@@ -82,7 +82,6 @@ describe("useStageMediaPreload", () => {
         .sort();
       expect(warmedIds).toEqual([
         "a".repeat(64),
-        "b".repeat(64),
         "d".repeat(64),
         "e".repeat(64),
       ]);

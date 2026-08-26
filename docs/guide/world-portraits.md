@@ -45,10 +45,10 @@ npx tsx scripts/generate-portraits.mjs haruka-academy --limit 1 --dry-run
 
 ## 接入 character-presence（已接线）
 
-展示立绘的插件就是 **`character-presence`**：右侧角色面板显示头像，舞台模式（stage mode）下作为立绘。两个世界的 `data/world.data.yaml` 已加好两条 source：
+展示角色资源的插件就是 **`character-presence`**：右侧角色面板显示 `avatar` 头像；只有世界包声明 `defaultViewMode: stage` 的视觉小说世界，舞台模式才把 `sprite` 作为前景立绘。舞台不会把 `avatar` 回退成 `sprite`，因为头像可能包含完整场景背景，叠到舞台上会形成不透明矩形。两个世界的 `data/world.data.yaml` 已加好两条 source：
 
 - `media` source：导入 `media/portraits/` 下的图，按 **sha256 内容寻址**存入媒体库，`to: media` + `indexTo: plugin:character-presence/assets`；
-- `presence` source（`media/presence.json`）：把 `characterId: npc-<id>` 的 `avatar` / `sprite` 指向上面导入的媒体（`mediaRef.id` = 该图的 sha256）。
+- `presence` source（`media/presence.json`）：把 `characterId: npc-<id>` 的 `avatar` / `sprite` 指向上面导入的媒体（`mediaRef.id` = 该图的 sha256）。传统世界仍可保留同一资源的 `sprite` 引用以兼容旧数据，但舞台层会按世界视图能力忽略它。
 
 `presence.json` 由 `scripts/emit-presence.mjs <world>` 从 `portraits/` 目录按 sha256 自动生成：
 
@@ -59,7 +59,7 @@ node scripts/emit-presence.mjs haruka-academy
 
 > ⚠️ **重生成立绘后必须重跑 `emit-presence` 刷新哈希**，否则 presence 的 `avatar.id` 与新图对不上。
 
-两个世界都已把 `character-presence` 列入 `recommendedPlugins`，session 创建即自动导入、开局右侧面板与对话立绘直接显示。立绘 PNG 通过 `.gitignore` 负向规则 `!worlds/**/media/portraits/*.png` 纳入版本库，随世界包分发。
+两个世界都已把 `character-presence` 列入 `recommendedPlugins`，session 创建即自动导入；右侧面板直接显示头像，视觉小说世界的舞台才显示前景立绘。立绘 PNG 通过 `.gitignore` 负向规则 `!worlds/**/media/portraits/*.png` 纳入版本库，随世界包分发。
 
 ## 复用与重生成
 

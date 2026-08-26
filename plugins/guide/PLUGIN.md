@@ -29,6 +29,10 @@ tags:
   - role:quick-reply
   - cost:llm
   - ui:message-block
+# StageChoices discovers this provider by capability instead of hardcoding the
+# plugin id, so traditional worlds retain their action guide in stage mode.
+capabilities:
+  - action-guide
 trigger:
   type: scheduled
   interval: 1
