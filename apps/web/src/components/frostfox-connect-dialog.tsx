@@ -77,14 +77,11 @@ export function FrostFoxConnectDialog({
             <DialogHeader className="space-y-1.5 text-center sm:text-center">
               <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                 <ShinyText speed={4} className="text-foreground">
-                  {t("frostfox.connectTitle", "连接 FrostFox 账号")}
+                  {t("frostfox.connectTitle")}
                 </ShinyText>
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                {t(
-                  "frostfox.connectSubtitle",
-                  "登录即可一键解锁高性能官方云端模型、跨设备数据漫游与全模态视觉剧场体验。",
-                )}
+                {t("frostfox.connectSubtitle")}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -98,13 +95,10 @@ export function FrostFoxConnectDialog({
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">
-                {t("frostfox.benefitModelTitle", "官方云端智能大模型")}
+                {t("frostfox.benefitModelTitle")}
               </div>
               <div className="text-[11px] leading-relaxed text-muted-foreground mt-0.5">
-                {t(
-                  "frostfox.benefitModelDesc",
-                  "原生接入超高智力故事叙事与角色交互模型，免配置 API Key 即可畅享极速响应。",
-                )}
+                {t("frostfox.benefitModelDesc")}
               </div>
             </div>
           </div>
@@ -115,13 +109,10 @@ export function FrostFoxConnectDialog({
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">
-                {t("frostfox.benefitCloudTitle", "世界设定与冒险存档漫游")}
+                {t("frostfox.benefitCloudTitle")}
               </div>
               <div className="text-[11px] leading-relaxed text-muted-foreground mt-0.5">
-                {t(
-                  "frostfox.benefitCloudDesc",
-                  "跨设备无缝漫游、自动备份世界档案，随时随地继续未尽的传奇篇章。",
-                )}
+                {t("frostfox.benefitCloudDesc")}
               </div>
             </div>
           </div>
@@ -132,13 +123,10 @@ export function FrostFoxConnectDialog({
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">
-                {t("frostfox.benefitVisualTitle", "多模态立绘与舞台剧场")}
+                {t("frostfox.benefitVisualTitle")}
               </div>
               <div className="text-[11px] leading-relaxed text-muted-foreground mt-0.5">
-                {t(
-                  "frostfox.benefitVisualDesc",
-                  "支持实时 AI 角色立绘绘制、生动舞台对话与沉浸式场景渲染。",
-                )}
+                {t("frostfox.benefitVisualDesc")}
               </div>
             </div>
           </div>
@@ -154,7 +142,7 @@ export function FrostFoxConnectDialog({
             disabled={connecting}
             className="w-full sm:w-auto text-xs text-muted-foreground hover:text-foreground rounded-xl"
           >
-            {t("frostfox.maybeLater", "稍后再说")}
+            {t("frostfox.maybeLater")}
           </Button>
 
           <Button
@@ -167,12 +155,12 @@ export function FrostFoxConnectDialog({
             {connecting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                {t("frostfox.connecting", "正在前往授权…")}
+                {t("frostfox.connecting")}
               </>
             ) : (
               <>
                 <ShieldCheck className="h-4 w-4 mr-1.5" />
-                {t("frostfox.connectNow", "立即前往连接")}
+                {t("frostfox.connectNow")}
                 <ArrowRight className="h-3.5 w-3.5 ml-1" />
               </>
             )}

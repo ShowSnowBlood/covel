@@ -119,7 +119,7 @@ export function GameView({ session }: GameViewProps) {
     const visual = world ? worldVisual(world) : null;
     setViewTransition({
       image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
-      title: t("session.breadcrumbWorldSelect", "选择世界"),
+      title: t("session.breadcrumbWorldSelect"),
       subtitle: t("transition.returningWorldSelect"),
       steps: [
         t("transition.saveSession"),

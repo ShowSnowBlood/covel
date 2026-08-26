@@ -130,7 +130,7 @@ function RootLayout() {
     const visual = sessionState.world ? worldVisual(sessionState.world) : null;
     setNavTransition({
       image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
-      title: t("session.breadcrumbWorldSelect", "选择世界"),
+      title: t("session.breadcrumbWorldSelect"),
       subtitle: t("transition.returningWorldSelect"),
       steps: [
         t("transition.saveSession"),

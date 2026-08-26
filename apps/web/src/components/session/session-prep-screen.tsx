@@ -644,7 +644,7 @@ export function SessionPrepScreen({
       {isBacking && (
         <SceneLoadingTransition
           image={visual.image}
-          title={t("session.breadcrumbWorldSelect", "选择世界")}
+          title={t("session.breadcrumbWorldSelect")}
           subtitle={t("transition.returningWorldSelect")}
           steps={[
             t("transition.saveSession"),

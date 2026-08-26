@@ -10,7 +10,8 @@ class MockResizeObserver {
   unobserve() {}
   disconnect() {}
 }
-globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+globalThis.ResizeObserver =
+  MockResizeObserver as unknown as typeof ResizeObserver;
 
 const { formatTranslation, transitionSpies } = vi.hoisted(() => {
   const format = (
@@ -18,7 +19,12 @@ const { formatTranslation, transitionSpies } = vi.hoisted(() => {
     options?: string | { defaultValue?: string; [k: string]: unknown },
   ) => {
     if (typeof options === "string") return options;
-    if (options && typeof options === "object" && typeof options.defaultValue === "string") {
+    if (key === "session.breadcrumbWorldSelect") return "选择世界";
+    if (
+      options &&
+      typeof options === "object" &&
+      typeof options.defaultValue === "string"
+    ) {
       return options.defaultValue;
     }
     return key;
@@ -203,14 +209,12 @@ describe("Navigation loading progress transitions", () => {
     render(<GameView session={session} />);
 
     const worldSelectBtn = screen.getByRole("button", {
-      name: "session.breadcrumbWorldSelect",
+      name: "选择世界",
     });
     fireEvent.click(worldSelectBtn);
 
     expect(screen.getByTestId("scene-loading-transition")).toBeTruthy();
-    expect(screen.getByTestId("transition-title").textContent).toBe(
-      "选择世界",
-    );
+    expect(screen.getByTestId("transition-title").textContent).toBe("选择世界");
     fireEvent.click(screen.getByTestId("complete-transition"));
     expect(mockBackToWorldSelect).toHaveBeenCalledTimes(1);
   });
@@ -233,7 +237,9 @@ describe("Navigation loading progress transitions", () => {
     fireEvent.click(worldTitleBtn);
 
     expect(screen.getByTestId("scene-loading-transition")).toBeTruthy();
-    expect(screen.getByTestId("transition-title").textContent).toBe("雾港·裂潮纪");
+    expect(screen.getByTestId("transition-title").textContent).toBe(
+      "雾港·裂潮纪",
+    );
 
     fireEvent.click(screen.getByTestId("complete-transition"));
     expect(mockResetSession).toHaveBeenCalledTimes(1);
@@ -269,8 +275,6 @@ describe("Navigation loading progress transitions", () => {
     fireEvent.click(backButton);
 
     expect(screen.getByTestId("scene-loading-transition")).toBeTruthy();
-    expect(screen.getByTestId("transition-title").textContent).toBe(
-      "选择世界",
-    );
+    expect(screen.getByTestId("transition-title").textContent).toBe("选择世界");
   });
 });

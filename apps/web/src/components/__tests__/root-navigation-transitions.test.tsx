@@ -63,7 +63,10 @@ vi.mock("@tanstack/react-router-devtools", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, defaultVal?: string) => defaultVal ?? key,
+    t: (key: string, defaultVal?: string) =>
+      key === "session.breadcrumbWorldSelect"
+        ? "选择世界"
+        : (defaultVal ?? key),
   }),
 }));
 
@@ -129,7 +132,8 @@ vi.mock("@/components/reactbits/index.js", () => ({
 }));
 
 function getRouteComponent(): () => React.JSX.Element {
-  return (Route.options?.component ?? (Route as { component?: unknown }).component) as () => React.JSX.Element;
+  return (Route.options?.component ??
+    (Route as { component?: unknown }).component) as () => React.JSX.Element;
 }
 
 describe("Root layout navigation transitions", () => {
@@ -205,9 +209,7 @@ describe("Root layout navigation transitions", () => {
     fireEvent.click(worldBtn);
 
     expect(screen.getByTestId("scene-loading-transition")).toBeTruthy();
-    expect(screen.getByTestId("transition-title").textContent).toBe(
-      "选择世界",
-    );
+    expect(screen.getByTestId("transition-title").textContent).toBe("选择世界");
 
     fireEvent.click(screen.getByTestId("complete-transition"));
     expect(mockBackToWorldSelect).toHaveBeenCalledTimes(1);
