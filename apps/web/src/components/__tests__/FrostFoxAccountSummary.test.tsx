@@ -42,11 +42,14 @@ describe("FrostFoxAccountSummary", () => {
         <FrostFoxAccountSummary />
       </FrostFoxAccountProvider>,
     );
-
     const button = await screen.findByRole("button", {
       name: "Connect Account",
     });
     expect(button).toBeTruthy();
+
+    fireEvent.click(button);
+    expect(screen.getByTestId("frostfox-connect-dialog")).toBeTruthy();
+    expect(screen.getByText("Connect FrostFox Account")).toBeTruthy();
   });
 
   it("renders interactive pill and opens popover on click when authenticated", async () => {

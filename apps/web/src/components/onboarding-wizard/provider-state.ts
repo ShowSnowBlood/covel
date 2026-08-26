@@ -83,3 +83,38 @@ export function defaultManagedModelRef(
 ): string {
   return managedModelOptions(catalog, slotName)[0]?.ref ?? "";
 }
+
+export function managedModelOptionForRef(
+  catalog: FrostFoxModelCatalog | null,
+  slotName: SlotName,
+  ref: string,
+): ManagedModelOption | undefined {
+  return managedModelOptions(catalog, slotName).find(
+    (option) => option.ref === ref,
+  );
+}
+
+export function managedFormIsReady(
+  form: ProviderFormState,
+  catalog: FrostFoxModelCatalog | null,
+  slotName: SlotName,
+): boolean {
+  return (
+    form.modelSource === "managed" &&
+    !!managedModelOptionForRef(catalog, slotName, form.managedModelRef)
+  );
+}
+
+export function defaultManagedFormState(
+  form: ProviderFormState,
+  catalog: FrostFoxModelCatalog | null,
+  slotName: SlotName,
+): ProviderFormState {
+  if (form.modelSource !== "managed" || form.managedModelRef.trim()) {
+    return form;
+  }
+  const option = managedModelOptions(catalog, slotName)[0];
+  return option
+    ? { ...form, managedModelRef: option.ref, apiKey: "" }
+    : form;
+}

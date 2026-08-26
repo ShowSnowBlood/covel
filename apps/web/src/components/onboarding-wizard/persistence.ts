@@ -6,6 +6,7 @@ import {
   listPresets,
   getSlotConfig,
   setSlotConfig,
+  isManagedFrostFoxModelRef,
   slotBindingId,
 } from "@/services/api.js";
 import type { CustomPreset, PresetSummary } from "@/services/api.js";
@@ -72,7 +73,15 @@ export async function persistSlot(
 ): Promise<string | undefined> {
   if (form.modelSource === "managed") {
     const modelRef = form.managedModelRef.trim();
-    if (!modelRef) return undefined;
+    const isKnownManagedModel = presetCatalog.some(
+      (preset) =>
+        preset.id === modelRef &&
+        preset.enabled &&
+        preset.scope === "frostfox",
+    );
+    if (!modelRef || !isManagedFrostFoxModelRef(modelRef) || !isKnownManagedModel) {
+      return undefined;
+    }
     const slots = getSlotConfig();
     setSlotConfig({ ...slots, [slotName]: { modelRef } });
     return modelRef;

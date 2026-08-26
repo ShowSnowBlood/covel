@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { FrostFoxConnectDialog } from "@/components/frostfox-connect-dialog.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
@@ -26,12 +27,13 @@ export function GameHome() {
   const settings = useSettingsDialog();
   const [currentLevel, setCurrentLevel] = useState(1);
   const [transitioning, setTransitioning] = useState(false);
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
 
   const homeCover = "/visuals/backgrounds/frostfox-game-cover-image2.png";
 
   function handleStartGame() {
     if (status?.enabled && !status.authenticated) {
-      window.location.assign("/auth/frostfox/start");
+      setConnectDialogOpen(true);
       return;
     }
     if (transitioning) return;
@@ -163,7 +165,11 @@ export function GameHome() {
       <SettingsDialog
         open={settings.open}
         onOpenChange={settings.onOpenChange}
-        initialKey={settings.initialKey}
+      />
+
+      <FrostFoxConnectDialog
+        open={connectDialogOpen}
+        onOpenChange={setConnectDialogOpen}
       />
     </section>
   );

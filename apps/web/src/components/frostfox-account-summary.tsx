@@ -10,8 +10,9 @@ import {
 import {
   Check,
   ChevronDown,
-  CircleUserRound,
   Copy,
+  ExternalLink,
+  KeyRound,
   LogOut,
   RefreshCw,
   Settings2,
@@ -21,6 +22,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { FrostFoxConnectDialog } from "@/components/frostfox-connect-dialog.js";
 import {
   fetchFrostFoxAccount,
   getManagedFrostFoxCatalog,
@@ -113,6 +115,7 @@ export function FrostFoxAccountSummary({
   const [refreshing, setRefreshing] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Close popover when clicking outside
@@ -185,19 +188,26 @@ export function FrostFoxAccountSummary({
 
   if (!status.authenticated || !status.account) {
     return (
-      <button
-        type="button"
-        onClick={() => window.location.assign("/auth/frostfox/start")}
-        aria-label={t("nav.frostfoxConnect", "Connect Account")}
-        className={`group relative flex h-8.5 items-center gap-2 rounded-full px-3 text-xs font-semibold backdrop-blur-md transition-all duration-200 border cursor-pointer select-none active:scale-[0.98] ${
-          overlay
-            ? "bg-white/10 hover:bg-white/20 active:bg-white/25 border-white/20 hover:border-white/35 text-white shadow-lg shadow-black/20"
-            : "bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white dark:border-white/20 shadow-xs"
-        }`}
-      >
-        <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-80 group-hover:scale-110 transition-transform" aria-hidden="true" />
-        <span>{t("nav.frostfoxConnect", "Connect Account")}</span>
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={() => setConnectDialogOpen(true)}
+          aria-label={t("nav.frostfoxConnect", "Connect Account")}
+          className={`group relative flex h-8.5 items-center gap-2 rounded-full px-3 text-xs font-semibold backdrop-blur-md transition-all duration-200 border cursor-pointer select-none active:scale-[0.98] ${
+            overlay
+              ? "bg-white/10 hover:bg-white/20 active:bg-white/25 border-white/20 hover:border-white/35 text-white shadow-lg shadow-black/20"
+              : "bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white dark:border-white/20 shadow-xs"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-80 group-hover:scale-110 transition-transform" aria-hidden="true" />
+          <span>{t("nav.frostfoxConnect", "Connect Account")}</span>
+        </button>
+
+        <FrostFoxConnectDialog
+          open={connectDialogOpen}
+          onOpenChange={setConnectDialogOpen}
+        />
+      </>
     );
   }
 

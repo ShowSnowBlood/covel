@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { PresetSummary } from "@/services/api.js";
-import { listPresets } from "@/services/api.js";
+import type { FrostFoxModelCatalog, PresetSummary } from "@/services/api.js";
+import {
+  listPresets,
+  managedCatalogToPresetSummaries,
+} from "@/services/api.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
 import { useLocalePreference } from "@/hooks/useLocalePreference";
 import { TOTAL_STEPS } from "./onboarding-wizard/constants.js";
 import {
@@ -18,6 +22,8 @@ import {
 } from "./onboarding-wizard/persistence.js";
 import {
   defaultModelForProvider,
+  defaultManagedFormState,
+  managedModelOptions,
   emptyFormState,
 } from "./onboarding-wizard/provider-state.js";
 import {
@@ -45,52 +51,99 @@ function previousStep(step: OnboardingStep): OnboardingStep {
   return Math.max(step - 1, 0) as OnboardingStep;
 }
 
-function useAvailablePresets(): PresetSummary[] {
-  const [availablePresets, setAvailablePresets] = useState<PresetSummary[]>([]);
+function useAvailablePresets(
+  managedCatalog: FrostFoxModelCatalog | null,
+): PresetSummary[] {
+  const [localPresets, setLocalPresets] = useState<PresetSummary[]>([]);
 
   useEffect(() => {
     let alive = true;
     void listPresets()
       .then((presets) => {
-        if (!alive) return;
-        setAvailablePresets(presets.filter((preset) => preset.enabled));
+        if (alive) setLocalPresets(presets.filter((preset) => preset.enabled));
       })
       .catch(() => {
-        if (!alive) return;
-        setAvailablePresets([]);
+        if (alive) setLocalPresets([]);
       });
     return () => {
       alive = false;
     };
   }, []);
 
-  return availablePresets;
+  return useMemo(() => {
+    const managed = managedCatalogToPresetSummaries(managedCatalog);
+    const managedIds = new Set(managed.map((preset) => preset.id));
+    return [
+      ...localPresets.filter((preset) => !managedIds.has(preset.id)),
+      ...managed,
+    ];
+  }, [localPresets, managedCatalog]);
 }
 
 function useDefaultModelSelection(
   form: ProviderFormState,
   setForm: Dispatch<SetStateAction<ProviderFormState>>,
   availablePresets: PresetSummary[],
+  managedCatalog: FrostFoxModelCatalog | null,
+  managedOnly: boolean,
+  slotName: "story" | "plugin",
 ): void {
   useEffect(() => {
-    if (form.selected === "__custom__" || form.builtInModel.trim()) return;
+    if (managedOnly) {
+      const managedOption = managedModelOptions(managedCatalog, slotName)[0];
+      if (!managedOption) return;
+      setForm((current) =>
+        current.modelSource === "managed" && current.managedModelRef
+          ? current
+          : defaultManagedFormState(
+              { ...current, modelSource: "managed" },
+              managedCatalog,
+              slotName,
+            ),
+      );
+      return;
+    }
+
+    if (
+      form.modelSource === "managed" ||
+      form.selected === "__custom__" ||
+      form.builtInModel.trim()
+    ) {
+      return;
+    }
 
     const nextModel = defaultModelForProvider(availablePresets, form.selected);
     if (!nextModel) return;
 
     setForm((current) =>
-      current.selected === "__custom__" || current.builtInModel.trim()
+      current.modelSource === "managed" ||
+      current.selected === "__custom__" ||
+      current.builtInModel.trim()
         ? current
         : { ...current, builtInModel: nextModel },
     );
-  }, [availablePresets, form.selected, form.builtInModel, setForm]);
+  }, [
+    availablePresets,
+    form.builtInModel,
+    form.managedModelRef,
+    form.modelSource,
+    form.selected,
+    managedCatalog,
+    managedOnly,
+    setForm,
+    slotName,
+  ]);
 }
 
 export function OnboardingWizard() {
   const [visible, setVisible] = useState(() => !isOnboarded());
   const { locale, setLocale } = useLocalePreference();
+  const { status, catalog: managedCatalog, loading: managedLoading } =
+    useFrostFoxAccount();
+  const managedOnly = Boolean(status?.enabled && status.authenticated);
+  const managedModelsLoading = managedOnly && managedLoading;
   const [step, setStep] = useState<OnboardingStep>(0);
-  const availablePresets = useAvailablePresets();
+  const availablePresets = useAvailablePresets(managedCatalog);
 
   const [storyForm, setStoryForm] = useState<ProviderFormState>(() =>
     emptyFormState(),
@@ -100,8 +153,22 @@ export function OnboardingWizard() {
     emptyFormState(),
   );
 
-  useDefaultModelSelection(storyForm, setStoryForm, availablePresets);
-  useDefaultModelSelection(pluginForm, setPluginForm, availablePresets);
+  useDefaultModelSelection(
+    storyForm,
+    setStoryForm,
+    availablePresets,
+    managedCatalog,
+    managedOnly,
+    "story",
+  );
+  useDefaultModelSelection(
+    pluginForm,
+    setPluginForm,
+    availablePresets,
+    managedCatalog,
+    managedOnly,
+    "plugin",
+  );
 
   const dismiss = useCallback(() => {
     markOnboarded();
@@ -135,7 +202,10 @@ export function OnboardingWizard() {
   }, [storyForm, availablePresets]);
 
   const handleContinueFromPlugin = useCallback(async () => {
-    if (pluginMode === "different" && pluginForm.apiKey.trim()) {
+    if (
+      pluginMode === "different" &&
+      (pluginForm.modelSource === "managed" || pluginForm.apiKey.trim())
+    ) {
       await persistSlot(pluginForm, "plugin", availablePresets);
     } else {
       persistPluginModeSame();
@@ -167,7 +237,13 @@ export function OnboardingWizard() {
               storyForm={storyForm}
               setStoryForm={setStoryForm}
               availablePresets={availablePresets}
-              storyContinueDisabled={isStoryContinueDisabled(storyForm)}
+              managedCatalog={managedCatalog}
+              managedModelsLoading={managedModelsLoading}
+              managedOnly={managedOnly}
+              storyContinueDisabled={isStoryContinueDisabled(
+                storyForm,
+                managedCatalog,
+              )}
               onBeforePingStory={handleBeforePingStory}
               onContinue={handleContinueFromStory}
               onSkip={handleNext}
@@ -176,15 +252,19 @@ export function OnboardingWizard() {
 
           {step === 2 && (
             <PluginStep
-              storySummary={summarizeStoryProvider(storyForm)}
+              storySummary={summarizeStoryProvider(storyForm, managedCatalog)}
               pluginMode={pluginMode}
               setPluginMode={setPluginMode}
               pluginForm={pluginForm}
               setPluginForm={setPluginForm}
               availablePresets={availablePresets}
+              managedCatalog={managedCatalog}
+              managedModelsLoading={managedModelsLoading}
+              managedOnly={managedOnly}
               pluginContinueDisabled={isPluginContinueDisabled(
                 pluginMode,
                 pluginForm,
+                managedCatalog,
               )}
               onBeforePingPlugin={handleBeforePingPlugin}
               onBack={handleBack}

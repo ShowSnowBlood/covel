@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
+import { FrostFoxConnectDialog } from "@/components/frostfox-connect-dialog.js";
 import { WorldDetailView } from "@/components/world/world-detail-view.js";
 import { WorldEditor } from "@/components/world/world-editor.js";
 import { AiWorldGenerator } from "@/components/world/ai-world-generator.js";
@@ -87,10 +88,11 @@ export function WorldSelectScreen({
 
   const [mode, setMode] = useState<ViewMode>("list");
   const [selectedWorldId, setSelectedWorldId] = useState<string | null>(null);
-  const [generatorOpen, setGeneratorOpen] = useState(false);
   const [enteringWorldId, setEnteringWorldId] = useState<string | null>(null);
   const [deletingWorldId, setDeletingWorldId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [progressionMode, setProgressionMode] =
     useState<LevelProgressionMode>("loading");
   const [progression, setProgression] =
@@ -300,10 +302,15 @@ export function WorldSelectScreen({
 
         onOpenSettings={() => onSettingsOpenChange(true)}
         onEnterWorld={handleEnterWorld}
-        onConnectAccount={() => window.location.assign("/auth/frostfox/start")}
+        onConnectAccount={() => setConnectDialogOpen(true)}
 
         onViewDetails={handleViewDetails}
         onDeleteWorld={handleDeleteClick}
+      />
+
+      <FrostFoxConnectDialog
+        open={connectDialogOpen}
+        onOpenChange={setConnectDialogOpen}
       />
     </div>
   );

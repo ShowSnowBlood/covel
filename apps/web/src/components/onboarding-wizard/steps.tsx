@@ -9,9 +9,13 @@ import {
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.js";
 import { Label } from "@/components/ui/label.js";
-import type { PresetSummary } from "@/services/api.js";
+import type { FrostFoxModelCatalog, PresetSummary } from "@/services/api.js";
 import { CUSTOM_PROVIDER_ID, PROVIDERS } from "./constants.js";
 import { ProviderForm } from "./provider-form.js";
+import {
+  managedFormIsReady,
+  managedModelOptionForRef,
+} from "./provider-state.js";
 import type {
   LocaleControlsProps,
   PluginMode,
@@ -87,6 +91,9 @@ interface StoryStepProps {
   storyForm: ProviderFormState;
   setStoryForm: (next: ProviderFormState) => void;
   availablePresets: PresetSummary[];
+  managedCatalog?: FrostFoxModelCatalog | null;
+  managedModelsLoading?: boolean;
+  managedOnly?: boolean;
   storyContinueDisabled: boolean;
   onBeforePingStory: () => Promise<void>;
   onContinue: () => void | Promise<void>;
@@ -97,6 +104,9 @@ export function StoryStep({
   storyForm,
   setStoryForm,
   availablePresets,
+  managedCatalog = null,
+  managedModelsLoading = false,
+  managedOnly = false,
   storyContinueDisabled,
   onBeforePingStory,
   onContinue,
@@ -106,29 +116,14 @@ export function StoryStep({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-primary" />
-          <h2 className="ui-title text-sm">
-            {t("onboarding.narratorModel", "Narrator Model")}
-          </h2>
-          <code className="text-[10px] text-muted-foreground font-mono">
-            covel.story
-          </code>
-        </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {t(
-            "onboarding.narratorModelDesc",
-            "The core model that drives the main story. Pick a provider and paste your key.",
-          )}
-        </p>
-      </div>
-
       <ProviderForm
         state={storyForm}
         onChange={setStoryForm}
         onBeforePing={onBeforePingStory}
         presets={availablePresets}
+        managedCatalog={managedCatalog}
+        managedModelsLoading={managedModelsLoading}
+        managedOnly={managedOnly}
         slotName="story"
       />
 
@@ -175,6 +170,9 @@ interface PluginStepProps {
   pluginForm: ProviderFormState;
   setPluginForm: (next: ProviderFormState) => void;
   availablePresets: PresetSummary[];
+  managedCatalog?: FrostFoxModelCatalog | null;
+  managedModelsLoading?: boolean;
+  managedOnly?: boolean;
   pluginContinueDisabled: boolean;
   onBeforePingPlugin: () => Promise<void>;
   onBack: () => void;
@@ -188,6 +186,9 @@ export function PluginStep({
   pluginForm,
   setPluginForm,
   availablePresets,
+  managedCatalog = null,
+  managedModelsLoading = false,
+  managedOnly = false,
   pluginContinueDisabled,
   onBeforePingPlugin,
   onBack,
@@ -275,6 +276,9 @@ export function PluginStep({
           onChange={setPluginForm}
           onBeforePing={onBeforePingPlugin}
           presets={availablePresets}
+          managedCatalog={managedCatalog}
+          managedModelsLoading={managedModelsLoading}
+          managedOnly={managedOnly}
           slotName="plugin"
         />
       )}
@@ -377,7 +381,21 @@ export function ReadyStep({ onDismiss }: ReadyStepProps) {
   );
 }
 
-export function summarizeStoryProvider(storyForm: ProviderFormState): string {
+export function summarizeStoryProvider(
+  storyForm: ProviderFormState,
+  managedCatalog: FrostFoxModelCatalog | null = null,
+): string {
+  if (storyForm.modelSource === "managed") {
+    const managed = managedModelOptionForRef(
+      managedCatalog,
+      "story",
+      storyForm.managedModelRef,
+    );
+    return managed
+      ? `${managed.channelName} — ${managed.name}`
+      : "FrostFox account model";
+  }
+
   const storyCustom = storyForm.selected === CUSTOM_PROVIDER_ID;
   if (storyCustom) {
     return (
@@ -391,7 +409,13 @@ export function summarizeStoryProvider(storyForm: ProviderFormState): string {
   return `${storyProvider.name}${storyForm.builtInModel.trim() ? ` — ${storyForm.builtInModel.trim()}` : ""}`;
 }
 
-export function isStoryContinueDisabled(storyForm: ProviderFormState): boolean {
+export function isStoryContinueDisabled(
+  storyForm: ProviderFormState,
+  managedCatalog: FrostFoxModelCatalog | null = null,
+): boolean {
+  if (storyForm.modelSource === "managed") {
+    return !managedFormIsReady(storyForm, managedCatalog, "story");
+  }
   const storyCustom = storyForm.selected === CUSTOM_PROVIDER_ID;
   return (
     !storyForm.apiKey.trim() ||
@@ -404,13 +428,17 @@ export function isStoryContinueDisabled(storyForm: ProviderFormState): boolean {
 export function isPluginContinueDisabled(
   pluginMode: PluginMode,
   pluginForm: ProviderFormState,
+  managedCatalog: FrostFoxModelCatalog | null = null,
 ): boolean {
+  if (pluginMode !== "different") return false;
+  if (pluginForm.modelSource === "managed") {
+    return !managedFormIsReady(pluginForm, managedCatalog, "plugin");
+  }
   const pluginCustom = pluginForm.selected === CUSTOM_PROVIDER_ID;
   return (
-    pluginMode === "different" &&
-    (!pluginForm.apiKey.trim() ||
-      (pluginCustom
-        ? !pluginForm.customBaseUrl.trim()
-        : !pluginForm.builtInModel.trim()))
+    !pluginForm.apiKey.trim() ||
+    (pluginCustom
+      ? !pluginForm.customBaseUrl.trim()
+      : !pluginForm.builtInModel.trim())
   );
 }

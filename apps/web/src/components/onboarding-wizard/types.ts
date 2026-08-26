@@ -36,6 +36,7 @@ export interface ProviderFormProps {
   onBeforePing: () => Promise<void>;
   presets: PresetSummary[];
   managedCatalog?: FrostFoxModelCatalog | null;
+  managedModelsLoading?: boolean;
   managedOnly?: boolean;
   slotName: SlotName;
 }

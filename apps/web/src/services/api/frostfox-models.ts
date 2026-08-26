@@ -52,19 +52,30 @@ export function isManagedFrostFoxModelRef(value: string): boolean {
   return value.startsWith(FROSTFOX_MODEL_REF_PREFIX);
 }
 
+export function managedCatalogToPresetSummaries(
+  catalog: FrostFoxModelCatalog | null,
+): PresetSummary[] {
+  if (!catalog) return [];
+  return catalog.channels.flatMap((channel) =>
+    channel.enabled && !channel.error
+      ? channel.models.map((model) => ({
+          id: frostFoxModelRef(channel.channelKey, model.id),
+          name: `${channel.displayName} · ${model.name}`,
+          provider: channel.providerId,
+          model: model.id,
+          enabled: true,
+          isDefault: false,
+          scope: "frostfox",
+          baseUrl: channel.baseUrl,
+          protocol: channel.protocol,
+          capability: model.capability,
+        }))
+      : [],
+  );
+}
+
 export function getManagedFrostFoxPresetSummaries(): PresetSummary[] {
-  return getManagedFrostFoxPresets().map((preset) => ({
-    id: preset.id,
-    name: preset.name,
-    provider: preset.provider,
-    model: preset.model,
-    enabled: true,
-    isDefault: false,
-    scope: "frostfox",
-    baseUrl: preset.baseUrl,
-    protocol: preset.protocol,
-    capability: preset.capability,
-  }));
+  return managedCatalogToPresetSummaries(managedCatalog);
 }
 
 export async function hydrateManagedFrostFoxModels(

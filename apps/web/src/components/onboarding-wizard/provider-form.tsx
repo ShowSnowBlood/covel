@@ -8,10 +8,15 @@ import { CUSTOM_PROVIDER_ID, PROVIDERS } from "./constants.js";
 import { clearCachedPing } from "./persistence.js";
 import {
   defaultModelForProvider,
+  managedFormIsReady,
   managedModelOptions,
   modelOptionsForProvider,
 } from "./provider-state.js";
-import type { ProviderFormProps, ProviderFormState } from "./types.js";
+import type {
+  ModelSource,
+  ProviderFormProps,
+  ProviderFormState,
+} from "./types.js";
 
 /**
  * Provider picker + API key form. Reused for both the story slot (narrator)
@@ -24,6 +29,7 @@ export function ProviderForm({
   onBeforePing,
   presets,
   managedCatalog = null,
+  managedModelsLoading = false,
   managedOnly = false,
   slotName,
 }: ProviderFormProps) {
@@ -33,7 +39,14 @@ export function ProviderForm({
     PROVIDERS.find((p) => p.id === state.selected) ?? PROVIDERS[0];
   const modelOptions = modelOptionsForProvider(presets, state.selected);
   const managedOptions = managedModelOptions(managedCatalog, slotName);
-  const showLocalForm = state.modelSource === "local";
+  const effectiveSource: ModelSource = managedOnly ? "managed" : state.modelSource;
+  const managedReady = managedFormIsReady(
+    { ...state, modelSource: effectiveSource },
+    managedCatalog,
+    slotName,
+  );
+  const showLocalForm = effectiveSource === "local";
+  const showManagedForm = effectiveSource === "managed";
   const modelListId = `onboarding-models-${slotName}`;
 
   const handleProviderSelect = (providerId: string) => {
@@ -41,6 +54,7 @@ export function ProviderForm({
     clearCachedPing(slotName);
     onChange({
       ...state,
+      modelSource: "local",
       selected: providerId,
       apiKey:
         providerId === CUSTOM_PROVIDER_ID ? "" : (existing[providerId] ?? ""),
@@ -57,9 +71,16 @@ export function ProviderForm({
     });
   };
 
-  const handleModelSourceSelect = (modelSource: "managed" | "local") => {
+  const handleModelSourceSelect = (modelSource: ModelSource) => {
     clearCachedPing(slotName);
-    onChange({ ...state, modelSource });
+    const nextRef = managedOptions[0]?.ref ?? state.managedModelRef;
+    onChange({
+      ...state,
+      modelSource,
+      managedModelRef:
+        modelSource === "managed" ? nextRef : state.managedModelRef,
+      apiKey: modelSource === "managed" ? "" : state.apiKey,
+    });
   };
 
   const updateField = <K extends keyof ProviderFormState>(
@@ -72,7 +93,7 @@ export function ProviderForm({
 
   return (
     <div className="space-y-4">
-      {managedOptions.length > 0 && (
+      {managedOptions.length > 0 && !managedOnly && (
         <div className="space-y-2">
           <Label className="ui-eyebrow text-[10px]">
             {t("onboarding.modelSource", "Model source")}
@@ -96,27 +117,52 @@ export function ProviderForm({
               <Cloud className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {t("onboarding.managedModels", "FrostFox account models")}
             </button>
-            {!managedOnly && (
-              <button
-                type="button"
-                role="radio"
-                aria-checked={state.modelSource === "local"}
-                onClick={() => handleModelSourceSelect("local")}
-                className={`flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  state.modelSource === "local"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/40"
-                }`}
-              >
-                <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {t("onboarding.localProvider", "Local provider key")}
-              </button>
-            )}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={state.modelSource === "local"}
+              onClick={() => handleModelSourceSelect("local")}
+              className={`flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                state.modelSource === "local"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40"
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {t("onboarding.localProvider", "Local provider key")}
+            </button>
           </div>
         </div>
       )}
 
-      {state.modelSource === "managed" && (
+      {managedOnly && managedOptions.length === 0 && (
+        <div className="flex items-start gap-2 rounded-[var(--radius-card)] border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+          {managedModelsLoading ? (
+            <span
+              className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
+              aria-hidden="true"
+            />
+          ) : (
+            <Cloud
+              className="h-3.5 w-3.5 shrink-0 text-amber-500"
+              aria-hidden="true"
+            />
+          )}
+          <span>
+            {managedModelsLoading
+              ? t(
+                  "onboarding.loadingManagedModels",
+                  "Loading account models…",
+                )
+              : t(
+                  "onboarding.noManagedModels",
+                  "No usable account models are available yet. Refresh your FrostFox account and try again.",
+                )}
+          </span>
+        </div>
+      )}
+
+      {showManagedForm && managedOptions.length > 0 && (
         <div className="space-y-1.5">
           <Label
             htmlFor={`onboarding-managed-model-${slotName}`}
@@ -126,7 +172,7 @@ export function ProviderForm({
           </Label>
           <select
             id={`onboarding-managed-model-${slotName}`}
-            value={state.managedModelRef}
+            value={state.managedModelRef || managedOptions[0]!.ref}
             onChange={(event) =>
               updateField("managedModelRef", event.target.value)
             }
@@ -144,6 +190,14 @@ export function ProviderForm({
               "Uses your FrostFox account balance. No provider key is required.",
             )}
           </p>
+          {managedReady && (
+            <div className="flex items-center gap-2">
+              <PingButton
+                target={{ kind: "slot", slotId: slotName }}
+                onBeforePing={onBeforePing}
+              />
+            </div>
+          )}
         </div>
       )}
       {showLocalForm && (

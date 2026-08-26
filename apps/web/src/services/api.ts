@@ -30,6 +30,7 @@ export {
   getManagedFrostFoxPresets,
   hydrateManagedFrostFoxModels,
   isManagedFrostFoxModelRef,
+  managedCatalogToPresetSummaries,
   setManagedFrostFoxCatalog,
 } from "./api/frostfox-models.js";
 export {
