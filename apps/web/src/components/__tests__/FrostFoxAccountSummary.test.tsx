@@ -208,6 +208,33 @@ describe("FrostFoxAccountSummary", () => {
     expect(api.signOutFrostFox).toHaveBeenCalledTimes(1);
     expect(api.fetchAccount).toHaveBeenCalledTimes(2);
   });
+  it("does not reload the model catalog on a same-account refresh", async () => {
+    api.fetchAccount.mockResolvedValue({
+      enabled: true,
+      authenticated: true,
+      account: {
+        id: "account-same",
+        name: "same-account",
+        balance: 1,
+        credentialState: "active",
+        lastVerifiedAt: "2026-08-26T00:00:00.000Z",
+      },
+    });
+    api.hydrateManagedFrostFoxModels.mockResolvedValue(null);
+
+    render(
+      <FrostFoxAccountProvider>
+        <RefreshProbe />
+      </FrostFoxAccountProvider>,
+    );
+    await waitFor(() =>
+      expect(api.hydrateManagedFrostFoxModels).toHaveBeenCalledTimes(1),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await waitFor(() => expect(api.fetchAccount).toHaveBeenCalledTimes(2));
+    expect(api.hydrateManagedFrostFoxModels).toHaveBeenCalledTimes(1);
+  });
 
   it("keeps the newest account state when refreshes resolve out of order", async () => {
     const first = deferred<AccountStatusFixture>();

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check,
@@ -20,117 +20,36 @@ import { Button } from "@/components/ui/button.js";
 import {
   clearManagedFrostFoxSlots,
   disconnectFrostFox,
-  fetchFrostFoxAccount,
-  fetchFrostFoxModels,
-  reconcileManagedFrostFoxSlots,
   setManagedFrostFoxCatalog,
   signOutFrostFox,
-  type FrostFoxAccountStatus,
-  type FrostFoxModelCatalog,
 } from "@/services/api.js";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
-
 export function FrostFoxAccountPane() {
   const { t, i18n } = useTranslation();
-  const { refresh: refreshSharedAccount } = useFrostFoxAccount();
-  const [status, setStatus] = useState<FrostFoxAccountStatus | null>(null);
-  const [catalog, setCatalog] = useState<FrostFoxModelCatalog | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { status, catalog, loading, error, refresh } = useFrostFoxAccount();
   const [action, setAction] = useState<"signout" | "disconnect" | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [error, setError] = useState(false);
-  const [modelsError, setModelsError] = useState(false);
-  const refreshVersion = useRef(0);
-  const activeAccountId = useRef<string | null | undefined>(undefined);
-  const refresh = async () => {
-    const requestVersion = ++refreshVersion.current;
-    setLoading(true);
-    setError(false);
-    setModelsError(false);
-    try {
-      const next = await fetchFrostFoxAccount(true);
-      if (requestVersion !== refreshVersion.current) return;
-      const nextAccountId =
-        next.authenticated && next.account ? next.account.id : null;
-      if (
-        activeAccountId.current !== undefined &&
-        activeAccountId.current !== nextAccountId
-      ) {
-        setManagedFrostFoxCatalog(null);
-        clearManagedFrostFoxSlots();
-        setCatalog(null);
-      }
-      activeAccountId.current = nextAccountId;
-      setStatus(next);
-      if (next.enabled && next.authenticated && next.account) {
-        try {
-          const nextCatalog = await fetchFrostFoxModels(true);
-          if (requestVersion !== refreshVersion.current) return;
-          setCatalog(nextCatalog);
-          setManagedFrostFoxCatalog(nextCatalog);
-          reconcileManagedFrostFoxSlots();
-        } catch {
-          if (requestVersion !== refreshVersion.current) return;
-          setCatalog(null);
-          setManagedFrostFoxCatalog(null);
-          setModelsError(true);
-        }
-      } else {
-        setCatalog(null);
-        setManagedFrostFoxCatalog(null);
-        clearManagedFrostFoxSlots();
-      }
-    } catch {
-      if (requestVersion !== refreshVersion.current) return;
-      setManagedFrostFoxCatalog(null);
-      setError(true);
-    } finally {
-      if (requestVersion === refreshVersion.current) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void refresh();
-  }, []);
 
   const signOut = async () => {
-    refreshVersion.current += 1;
     setAction("signout");
     try {
       await signOutFrostFox();
       setManagedFrostFoxCatalog(null);
       clearManagedFrostFoxSlots();
-      setCatalog(null);
-      activeAccountId.current = null;
-      setModelsError(false);
-      setStatus((current) =>
-        current
-          ? { ...current, authenticated: false, account: undefined }
-          : current,
-      );
-      await refreshSharedAccount();
+      await refresh();
     } finally {
       setAction(null);
     }
   };
 
   const disconnect = async () => {
-    refreshVersion.current += 1;
     setAction("disconnect");
     try {
       await disconnectFrostFox();
       setManagedFrostFoxCatalog(null);
-      setCatalog(null);
       clearManagedFrostFoxSlots();
-      activeAccountId.current = null;
-      setModelsError(false);
-      setStatus((current) =>
-        current
-          ? { ...current, authenticated: false, account: undefined }
-          : current,
-      );
-      await refreshSharedAccount();
+      await refresh();
       setConfirmDisconnect(false);
     } finally {
       setAction(null);
@@ -224,6 +143,9 @@ export function FrostFoxAccountPane() {
       (sum, channel) => sum + channel.models.length,
       0,
     ) ?? 0;
+  const modelsError = Boolean(
+    !loading && status.authenticated && status.account && !catalog,
+  );
 
   const handleCopyId = async () => {
     try {

@@ -100,7 +100,7 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 | POST   | `/api/frostfox/logout`                              | 清除当前 Covel 会话 Cookie，不解绑账户凭据                                                    |
 | DELETE | `/api/frostfox/account`                             | 显式解绑当前 SaaS 本地账户、删除服务端账户 Key 密文并撤销会话；不轮转 Router 账户 Key         |
 
-`/api/frostfox/models` 的目录按 `client-config.configurationVersion` 和凭据世代短时缓存。模型请求最终仍由 Router Gateway 执行渠道启用态、分组货架、余额、限流、计费和模型上架判断。渠道映射是命名同步，不是 ACL。
+- `/api/frostfox/models` 的目录按 `client-config.configurationVersion` 和凭据世代缓存；同一账号登录周期内复用结果，账号重新登录、解绑或配置版本变化时失效，并发读取共享同一个上游请求。模型请求最终仍由 Router Gateway 执行渠道启用态、分组货架、余额、限流、计费和模型上架判断。渠道映射是命名同步，不是 ACL。
 
 `/api/frostfox/models` 返回每个同步渠道的完整可用模型列表。每个模型条目包含方向能力 `capability.input` / `capability.output`；服务端优先读取 Router 目录声明的 modality / mode，再使用本地能力数据库补全。单个渠道读取失败只在该渠道返回 `error`，不会隐藏其它渠道的模型。
 

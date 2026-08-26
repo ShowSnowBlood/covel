@@ -95,16 +95,55 @@ describe("FrostFox managed model projection", () => {
 });
 
 describe("managed catalog hydration ordering", () => {
-  it("does not let a stale request overwrite a newer catalog", async () => {
+  const accountA = {
+    enabled: true,
+    authenticated: true,
+    account: {
+      id: "account-a",
+      name: "A",
+      balance: 0,
+      credentialState: "active" as const,
+      lastVerifiedAt: "2026-08-26T00:00:00.000Z",
+    },
+  };
+  const accountB = {
+    ...accountA,
+    account: { ...accountA.account, id: "account-b", name: "B" },
+  };
+
+  it("shares one request for repeated hydration of the same account", async () => {
+    const catalog = { configurationVersion: "current", channels: [] as [] };
+    api.fetchFrostFoxModels.mockResolvedValue(catalog);
+
+    const [first, second] = await Promise.all([
+      hydrateManagedFrostFoxModels(accountA),
+      hydrateManagedFrostFoxModels(accountA),
+    ]);
+
+    expect(api.fetchFrostFoxModels).toHaveBeenCalledTimes(1);
+    expect(first).toBe(catalog);
+    expect(second).toBe(catalog);
+    expect(await hydrateManagedFrostFoxModels(accountA)).toBe(catalog);
+    expect(api.fetchFrostFoxModels).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a failed catalog during the same account lifecycle", async () => {
+    api.fetchFrostFoxModels.mockRejectedValue(new Error("catalog unavailable"));
+
+    expect(await hydrateManagedFrostFoxModels(accountA)).toBeNull();
+    expect(await hydrateManagedFrostFoxModels(accountA)).toBeNull();
+    expect(api.fetchFrostFoxModels).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let a stale request from a previous account overwrite a newer catalog", async () => {
     const first = deferred<{ configurationVersion: string; channels: [] }>();
     const second = deferred<{ configurationVersion: string; channels: [] }>();
     api.fetchFrostFoxModels
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
-    const account = { enabled: true, authenticated: true };
 
-    const firstRun = hydrateManagedFrostFoxModels(account);
-    const secondRun = hydrateManagedFrostFoxModels(account);
+    const firstRun = hydrateManagedFrostFoxModels(accountA);
+    const secondRun = hydrateManagedFrostFoxModels(accountB);
     const latestCatalog = {
       configurationVersion: "latest",
       channels: [] as [],

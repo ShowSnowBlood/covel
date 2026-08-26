@@ -815,7 +815,7 @@
       "channelError": "渠道不可用：{{code}}",
       "noModels": "当前渠道没有可用模型",
       "modelCount": "{{count}} 个模型",
-      "modelsLoadFailed": "无法读取托管模型目录，请刷新账号后重试。",
+      "modelsLoadFailed": "无法读取托管模型目录，请重新登录账号后重试。",
       "modality": {
         "text": "文本",
         "image": "图像",

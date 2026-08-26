@@ -201,8 +201,10 @@ describe("FrostFox first-party SaaS", () => {
       await service!.completeLevel(connected.principal, "haruka-academy"),
     ).toMatchObject({ completedLevel: 2, unlockedLevel: 3 });
 
-    const context = await service!.prepareAiContext(connected.principal);
-    const models = await service!.listModels(connected.principal);
+    const [context, models] = await Promise.all([
+      service!.prepareAiContext(connected.principal),
+      service!.listModels(connected.principal),
+    ]);
     const providers = service!.clientConfig.providers();
     const providerId = providers.find(
       (provider) => provider.channelKey === "deepseek",
@@ -300,6 +302,20 @@ describe("FrostFox first-party SaaS", () => {
       authorization: `Bearer ${deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel")}`,
       "X-FrostFox-Channel-Id": CHANNEL_ID,
     });
+    const modelRequestCount = () =>
+      requests.filter((request) => request.url.endsWith("/v1/models")).length;
+    expect(modelRequestCount()).toBe(2);
+    const modelRequestsBefore = modelRequestCount();
+    const baseline = Date.now();
+    const dateNow = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(baseline + 10 * 60_000);
+    try {
+      expect(await service!.listModels(connected.principal)).toBe(models);
+    } finally {
+      dateNow.mockRestore();
+    }
+    expect(modelRequestCount()).toBe(modelRequestsBefore);
 
     const generated = await ai.gateway.generateImage(
       {

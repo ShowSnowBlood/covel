@@ -44,7 +44,6 @@ const AUTHORIZATION_CODE_RE = /^ffac_[A-Za-z0-9_-]+$/;
 const BASE64URL_32_RE = /^[A-Za-z0-9_-]{43}$/;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const ROUTER_REQUEST_TIMEOUT_MS = 15_000;
-const MODEL_CACHE_TTL_MS = 60_000;
 const FROSTFOX_PROVIDER_PREFIX = "frostfox-";
 
 export interface FrostFoxPrincipal {
@@ -108,10 +107,17 @@ interface RouterAccount {
   readonly balance: number;
 }
 
+/**
+ * The catalog is keyed by config version and credential generation rather
+ * than wall-clock expiry, so one login does not repeatedly probe every channel.
+ */
 interface ModelCacheEntry {
   readonly key: string;
-  readonly expiresAt: number;
   readonly value: FrostFoxModelCatalog;
+}
+interface ModelRequestEntry {
+  readonly key: string;
+  readonly promise: Promise<FrostFoxModelCatalog>;
 }
 
 export interface FrostFoxHostEnvironment {
@@ -134,6 +140,7 @@ export class FrostFoxServiceError extends Error {
 export class FrostFoxService {
   private readonly sessionSigningKey: Buffer;
   private readonly modelCache = new Map<string, ModelCacheEntry>();
+  private readonly modelRequests = new Map<string, ModelRequestEntry>();
 
   private constructor(
     readonly runtimeConfig: FrostFoxRuntimeConfig,
@@ -204,6 +211,7 @@ export class FrostFoxService {
     this.clientConfig.stop();
     this.sessionSigningKey.fill(0);
     this.modelCache.clear();
+    this.modelRequests.clear();
     await this.store.close();
   }
 
@@ -320,6 +328,7 @@ export class FrostFoxService {
       updatedAt: now,
     });
     this.modelCache.delete(binding.localUserId);
+    this.modelRequests.delete(binding.localUserId);
 
     return {
       principal: principalFromBinding(binding),
@@ -340,6 +349,7 @@ export class FrostFoxService {
   async unbind(principal: FrostFoxPrincipal): Promise<void> {
     await this.store.deleteBinding(principal.localUserId);
     this.modelCache.delete(principal.localUserId);
+    this.modelRequests.delete(principal.localUserId);
   }
   async getProgression(
     principal: FrostFoxPrincipal,
@@ -406,6 +416,7 @@ export class FrostFoxService {
         updatedAt: now,
       });
       this.modelCache.delete(binding.localUserId);
+      this.modelRequests.delete(binding.localUserId);
       return principalFromBinding(updated);
     }
     if (!response.ok) return principalFromBinding(binding);
@@ -520,64 +531,79 @@ export class FrostFoxService {
     }
     const cacheKey = `${this.clientConfig.snapshot.configurationVersion}\n${binding.credentialGenerationUpdatedAt}`;
     const cached = this.modelCache.get(binding.localUserId);
-    if (cached && cached.key === cacheKey && cached.expiresAt > Date.now()) {
+    if (cached && cached.key === cacheKey) {
       return cached.value;
     }
+    const pending = this.modelRequests.get(binding.localUserId);
+    if (pending?.key === cacheKey) return pending.promise;
+    if (pending) this.modelRequests.delete(binding.localUserId);
 
     const accountKey = this.openAccountKey(binding);
     const gatewayKey = deriveFrostFoxGatewayKey(
       accountKey,
       this.runtimeConfig.clientId,
     );
-    const providers = new Map(
-      this.clientConfig
-        .providers()
-        .map((provider) => [provider.channelKey, provider] as const),
-    );
-    const channels = await Promise.all(
-      this.clientConfig.snapshot.channelMappings.map(async (mapping) => {
-        const provider = providers.get(mapping.channelKey);
-        if (!mapping.enabled || !provider) {
-          return {
-            channelKey: mapping.channelKey,
-            providerId: providerIdForChannel(mapping.channelKey),
-            displayName: mapping.routerChannelDisplayName,
-            enabled: false,
-            protocol: "openai-chat-v1" as const,
-            baseUrl: `${this.runtimeConfig.routerBaseUrl}/v1`,
-            models: [],
-            error: "channel_unavailable",
-          };
-        }
-        try {
-          return await this.fetchChannelModels(provider, gatewayKey);
-        } catch (error) {
-          return {
-            channelKey: provider.channelKey,
-            providerId: provider.providerId,
-            displayName: provider.displayName,
-            enabled: true,
-            protocol: provider.protocol,
-            baseUrl: provider.baseUrl,
-            models: [],
-            error:
-              error instanceof FrostFoxServiceError
-                ? error.code
-                : "channel_request_failed",
-          };
-        }
-      }),
-    );
-    const value = {
-      configurationVersion: this.clientConfig.snapshot.configurationVersion,
-      channels,
-    } satisfies FrostFoxModelCatalog;
-    this.modelCache.set(binding.localUserId, {
-      key: cacheKey,
-      expiresAt: Date.now() + MODEL_CACHE_TTL_MS,
-      value,
+    const request = (async () => {
+      const providers = new Map(
+        this.clientConfig
+          .providers()
+          .map((provider) => [provider.channelKey, provider] as const),
+      );
+      const channels = await Promise.all(
+        this.clientConfig.snapshot.channelMappings.map(async (mapping) => {
+          const provider = providers.get(mapping.channelKey);
+          if (!mapping.enabled || !provider) {
+            return {
+              channelKey: mapping.channelKey,
+              providerId: providerIdForChannel(mapping.channelKey),
+              displayName: mapping.routerChannelDisplayName,
+              enabled: false,
+              protocol: "openai-chat-v1" as const,
+              baseUrl: `${this.runtimeConfig.routerBaseUrl}/v1`,
+              models: [],
+              error: "channel_unavailable",
+            };
+          }
+          try {
+            return await this.fetchChannelModels(provider, gatewayKey);
+          } catch (error) {
+            return {
+              channelKey: provider.channelKey,
+              providerId: provider.providerId,
+              displayName: provider.displayName,
+              enabled: true,
+              protocol: provider.protocol,
+              baseUrl: provider.baseUrl,
+              models: [],
+              error:
+                error instanceof FrostFoxServiceError
+                  ? error.code
+                  : "channel_request_failed",
+            };
+          }
+        }),
+      );
+      const value = {
+        configurationVersion: this.clientConfig.snapshot.configurationVersion,
+        channels,
+      } satisfies FrostFoxModelCatalog;
+      this.modelCache.set(binding.localUserId, {
+        key: cacheKey,
+        value,
+      });
+      return value;
+    })();
+    let tracked: Promise<FrostFoxModelCatalog>;
+    tracked = request.finally(() => {
+      if (this.modelRequests.get(binding.localUserId)?.promise === tracked) {
+        this.modelRequests.delete(binding.localUserId);
+      }
     });
-    return value;
+    this.modelRequests.set(binding.localUserId, {
+      key: cacheKey,
+      promise: tracked,
+    });
+    return tracked;
   }
 
   private async fetchChannelModels(

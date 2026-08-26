@@ -59,6 +59,7 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
   const mounted = useRef(true);
   const refreshVersion = useRef(0);
   const activeAccountId = useRef<string | null | undefined>(undefined);
+  const hydratedAccountId = useRef<string | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     const requestVersion = ++refreshVersion.current;
@@ -69,28 +70,37 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
       if (!mounted.current || requestVersion !== refreshVersion.current) return;
       const nextAccountId =
         next.authenticated && next.account ? next.account.id : null;
-      if (
-        activeAccountId.current !== undefined &&
-        activeAccountId.current !== nextAccountId
-      ) {
+      const accountChanged = activeAccountId.current !== nextAccountId;
+      if (accountChanged && activeAccountId.current !== undefined) {
         setManagedFrostFoxCatalog(null);
         clearManagedFrostFoxSlots();
         setCatalog(null);
       }
+      if (accountChanged) hydratedAccountId.current = undefined;
       activeAccountId.current = nextAccountId;
       setStatus(next);
-      const hydratedCatalog = await hydrateManagedFrostFoxModels(next);
-      if (!mounted.current || requestVersion !== refreshVersion.current) return;
-      if (!next.enabled || !next.authenticated || !next.account) {
-        clearManagedFrostFoxSlots();
-      } else {
+
+      let hydratedCatalog = getManagedFrostFoxCatalog();
+      if (next.enabled && next.authenticated && next.account) {
+        // Model discovery is account-scoped. Balance/status refreshes may run
+        // periodically, but they must not re-read the model directory.
+        if (hydratedAccountId.current !== nextAccountId) {
+          hydratedCatalog = await hydrateManagedFrostFoxModels(next);
+          hydratedAccountId.current = nextAccountId;
+        }
         reconcileManagedFrostFoxSlots();
+      } else {
+        hydratedAccountId.current = null;
+        if (hydratedCatalog !== null) setManagedFrostFoxCatalog(null);
+        clearManagedFrostFoxSlots();
+        hydratedCatalog = null;
       }
+      if (!mounted.current || requestVersion !== refreshVersion.current) return;
       setCatalog(hydratedCatalog ?? getManagedFrostFoxCatalog());
     } catch {
       if (mounted.current && requestVersion === refreshVersion.current) {
-        setManagedFrostFoxCatalog(null);
-        setCatalog(null);
+        // A transient account-status failure must not discard the catalog that
+        // was already loaded for this login.
         setError(true);
       }
     } finally {

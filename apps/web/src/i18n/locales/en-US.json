@@ -816,7 +816,7 @@
       "channelError": "Channel unavailable: {{code}}",
       "noModels": "No models are available on this channel",
       "modelCount": "{{count}} models",
-      "modelsLoadFailed": "Could not load the managed model catalog. Refresh the account to try again.",
+      "modelsLoadFailed": "Could not load the managed model catalog. Sign in again to try again.",
       "modality": {
         "text": "Text",
         "image": "Image",

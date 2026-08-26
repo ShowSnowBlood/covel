@@ -95,7 +95,7 @@ providerRequestMetadata = { speechWire = "mimo-tts/mimo" }
 
 ## FrostFox 托管模型（商业 Web）
 
-启用第一方 SaaS 后，服务端从 Router `client-config` 原子同步渠道映射，并用已连接账号的派生 Gateway Key 分别调用每个渠道的 `/v1/models`。设置界面将返回目录显示在“服务商与模型”，玩家可在“用途分配”中选择具体模型；模型 ID 仍作为不透明字符串原样发送。
+启用第一方 SaaS 后，服务端从 Router `client-config` 原子同步渠道映射，并用已连接账号的派生 Gateway Key 分别调用每个渠道的 `/v1/models`。模型目录在账号登录后的首次水合阶段读取，并在同一账号登录周期内复用；账号切换、重新登录或解绑后才重新读取。服务端缓存会在凭据世代或 `client-config` 版本变化时失效。设置界面将返回目录显示在“服务商与模型”，玩家可在“用途分配”中选择具体模型；模型 ID 仍作为不透明字符串原样发送。
 
 每个同步渠道在请求内编译为保留的 `frostfox-*` provider，服务端固定其 Router `baseUrl`、`openai-chat-v1` 协议和 `X-FrostFox-Channel-Id`。浏览器只能提交模型 ID 与用途绑定，不能覆盖派生 Key、Router origin 或渠道 UUID。`X-Provider-Keys` 中伪造的同名 provider key 会被服务端托管凭据覆盖。
 
