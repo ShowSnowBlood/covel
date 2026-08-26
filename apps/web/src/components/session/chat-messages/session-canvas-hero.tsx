@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Flame } from "lucide-react";
+import { Flame, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
+import { ShinyText } from "@/components/reactbits/index.js";
 import { resolveI18n } from "@/lib/catalog/helpers.js";
 import { worldVisual } from "@/lib/world-visuals.js";
 import type { WorldRecord } from "@/services/api.js";
@@ -42,7 +43,7 @@ export function SessionCanvasHero({
 
   return (
     <div
-      className="ui-session-canvas relative mx-auto my-2 max-w-4xl overflow-hidden rounded-[var(--radius-card)] border border-[var(--rule-color)] bg-card"
+      className="ui-session-canvas relative mx-auto my-2 max-w-4xl overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xl transition-all duration-300"
       style={{ "--world-accent": visual.accent } as React.CSSProperties}
     >
       <img
@@ -53,7 +54,7 @@ export function SessionCanvasHero({
         height={1024}
         loading="eager"
         fetchPriority="high"
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover brightness-[0.95]"
         draggable={false}
       />
       <div
@@ -61,51 +62,62 @@ export function SessionCanvasHero({
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.58) 55%, rgba(0,0,0,.24) 100%)",
+            "linear-gradient(90deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,.65) 55%, rgba(0,0,0,.35) 100%)",
         }}
       />
       <div
         aria-hidden
-        className="absolute left-0 top-0 h-1 w-28"
+        className="absolute left-0 top-0 h-1.5 w-36 shadow-[0_0_16px_var(--world-accent)] rounded-r-full"
         style={{ background: "var(--world-accent)" }}
       />
 
-      <div className="relative z-10 flex min-h-[280px] sm:min-h-[360px] flex-col justify-between p-4 sm:p-5 text-white md:min-h-[420px] md:p-7">
+      <div className="relative z-10 flex min-h-[280px] sm:min-h-[360px] flex-col justify-between p-5 sm:p-7 text-white md:min-h-[420px] md:p-8">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="ui-eyebrow text-white/62">§ SESSION CANVAS</span>
+          <span className="ui-eyebrow flex items-center gap-1 text-[11px] font-mono tracking-wider text-white/80 uppercase">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            § SESSION CANVAS
+          </span>
           {chips.map((chip, i) => (
             <span
               key={`${chip}-${i}`}
-              className="ui-tag border-white/16 bg-black/20 text-white/70 backdrop-blur-sm"
+              className="rounded-lg border border-white/20 bg-black/40 px-2.5 py-0.5 text-xs font-medium text-white/90 backdrop-blur-md shadow-xs"
             >
               {chip}
             </span>
           ))}
         </div>
 
-        <div className="max-w-2xl">
+        <div className="max-w-2xl space-y-4">
           <h2
-            className="ui-title text-xl sm:text-3xl leading-tight tracking-tight text-white md:text-[2.65rem]"
+            className="ui-title text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight tracking-tight text-white drop-shadow-md"
             style={{ textWrap: "balance" } as React.CSSProperties}
           >
-            {hook || hintLabel}
+            {hook ? (
+              <ShinyText disabled={false} speed={4} className="text-white">
+                {hook}
+              </ShinyText>
+            ) : (
+              hintLabel
+            )}
           </h2>
 
           {(summary || hintLabel) && (
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/72 md:text-base">
+            <p className="max-w-xl text-xs sm:text-sm md:text-base leading-relaxed text-white/85 drop-shadow-xs line-clamp-4">
               {summary || hintLabel}
             </p>
           )}
 
-          <Button
-            size="lg"
-            className="mt-5 sm:mt-7 px-5 sm:px-7 py-3.5 sm:py-5 text-xs sm:text-sm font-bold uppercase tracking-widest"
-            style={{ background: "var(--world-accent)", color: "black" }}
-            onClick={onBegin}
-          >
-            <Flame className="w-4 h-4 mr-2" />
-            {beginLabel}
-          </Button>
+          <div>
+            <Button
+              size="lg"
+              className="mt-2 sm:mt-4 px-6 sm:px-8 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-2xl shadow-lg hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200"
+              style={{ background: "var(--world-accent)", color: "black" }}
+              onClick={onBegin}
+            >
+              <Flame className="w-4 h-4 mr-2 text-black" />
+              {beginLabel}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -127,6 +127,7 @@
     "refresh": "Refresh",
     "retry": "Retry",
     "resetLore": "Reset to original",
+    "worldConfig": "Configure World",
     "filterTags": "Tags",
     "worldDocument": "World Document & Lore",
     "loreDoc": "Knowledge Base",
@@ -1089,6 +1090,7 @@
     "empty": "This world ships no character portraits yet.",
     "replace": "Replace",
     "uploading": "Uploading…",
+    "uploadFailed": "Portrait update failed",
     "enlarge": "Enlarge portrait"
   },
   "sceneCast": {

@@ -645,11 +645,11 @@ export function SessionPrepScreen({
         <SceneLoadingTransition
           image={visual.image}
           title={t("session.breadcrumbWorldSelect", "选择世界")}
-          subtitle={t("transition.returningWorldSelect", "正在返回世界档案库…")}
+          subtitle={t("transition.returningWorldSelect")}
           steps={[
-            t("transition.saveSession", "正在保存当前配置…"),
-            t("transition.loadArchives", "正在载入世界档案库…"),
-            t("transition.readyWorldSelect", "准备就绪，即将进入世界选择…"),
+            t("transition.saveSession"),
+            t("transition.loadArchives"),
+            t("transition.readyWorldSelect"),
           ]}
           durationMs={1200}
           onComplete={() => {

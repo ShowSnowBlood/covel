@@ -56,6 +56,8 @@ describe("onboarding provider state helpers", () => {
       customBaseUrl: "",
       customModel: "",
       customProviderName: "",
+      managedModelRef: "",
+      modelSource: "local",
     });
   });
 

@@ -1,6 +1,10 @@
-import type { PresetSummary } from "@/services/api.js";
+import type {
+  FrostFoxModelCatalog,
+  PresetSummary,
+} from "@/services/api.js";
+import { frostFoxModelRef } from "@/services/api.js";
 import { PROVIDERS } from "./constants.js";
-import type { ProviderFormState } from "./types.js";
+import type { ProviderFormState, SlotName } from "./types.js";
 
 export function emptyFormState(
   initialProvider = PROVIDERS[0].id,
@@ -13,6 +17,8 @@ export function emptyFormState(
     customBaseUrl: "",
     customModel: "",
     customProviderName: "",
+    managedModelRef: "",
+    modelSource: "local",
   };
 }
 
@@ -38,4 +44,42 @@ export function defaultModelForProvider(
   providerId: string,
 ): string {
   return modelOptionsForProvider(presets, providerId)[0] ?? "";
+}
+
+export interface ManagedModelOption {
+  ref: string;
+  name: string;
+  channelName: string;
+  model: string;
+}
+
+export function managedModelOptions(
+  catalog: FrostFoxModelCatalog | null,
+  slotName: SlotName,
+): ManagedModelOption[] {
+  if (!catalog) return [];
+
+  return catalog.channels.flatMap((channel) =>
+    channel.enabled && !channel.error
+      ? channel.models
+          .filter((model) =>
+            slotName === "story" || slotName === "plugin"
+              ? model.capability.output.includes("text")
+              : true,
+          )
+          .map((model) => ({
+            ref: frostFoxModelRef(channel.channelKey, model.id),
+            name: model.name,
+            channelName: channel.displayName,
+            model: model.id,
+          }))
+      : [],
+  );
+}
+
+export function defaultManagedModelRef(
+  catalog: FrostFoxModelCatalog | null,
+  slotName: SlotName,
+): string {
+  return managedModelOptions(catalog, slotName)[0]?.ref ?? "";
 }

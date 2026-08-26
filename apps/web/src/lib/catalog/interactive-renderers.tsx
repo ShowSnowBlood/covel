@@ -101,24 +101,24 @@ export const Button: ComponentRenderer = ({ element, emit }) => {
       data-selected={isSelected ? "true" : undefined}
       data-pending={isPending ? "true" : undefined}
       className={clsx(
-        "font-medium rounded-[var(--radius-control)] transition-all text-left relative inline-flex items-center gap-1.5",
+        "font-medium rounded-xl transition-all text-left relative inline-flex items-center gap-1.5 shadow-xs hover:scale-[1.02] active:scale-[0.98]",
         size === "compact"
           ? "px-2.5 py-1 text-[11px]"
           : "px-3.5 py-1.5 text-xs",
         !isSelected &&
           variant === "primary" &&
-          "bg-foreground text-[var(--surface-page)] hover:bg-foreground/90",
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs",
         !isSelected &&
           variant === "default" &&
-          "bg-transparent text-foreground border border-border hover:border-foreground/40 hover:bg-foreground/5",
+          "bg-card/75 text-foreground border border-border/80 hover:border-primary/50 hover:bg-accent/40 backdrop-blur-xs",
         !isSelected &&
           variant === "ghost" &&
-          "bg-transparent text-muted-foreground border border-dashed border-border hover:border-foreground/40 hover:text-foreground",
+          "bg-transparent text-muted-foreground border border-dashed border-border/70 hover:border-primary/40 hover:text-foreground",
         !isSelected &&
           variant === "danger" &&
-          "bg-[var(--accent-danger)] text-white hover:opacity-90",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xs",
         isSelected &&
-          "bg-[color-mix(in_oklab,var(--accent-primary)_8%,transparent)] text-[var(--accent-primary)] border border-[var(--accent-primary)]",
+          "bg-primary/15 text-primary border border-primary/60 shadow-[0_0_8px_rgba(var(--primary),0.15)] font-semibold",
         isPending && "opacity-70 cursor-progress",
       )}
     >

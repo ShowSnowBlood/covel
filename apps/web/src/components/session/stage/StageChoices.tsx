@@ -89,15 +89,15 @@ export function StageChoices({
             key={item.id}
             type="button"
             onClick={() => handleSelect(item)}
-            className="ui-stage-panel ui-stage-choice-item rounded-[var(--radius-control)] px-3.5 py-2 text-left text-sm transition-colors hover:border-[var(--accent-primary)]"
+            className="rounded-2xl border border-border/80 bg-card/85 backdrop-blur-xl px-4 py-3 text-left text-xs sm:text-sm font-medium text-foreground shadow-md hover:shadow-xl hover:border-primary/60 hover:bg-card/95 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
             style={{ animationDelay: `${index * STAGGER_STEP_MS}ms` }}
           >
             <span className="flex items-center justify-between gap-3">
-              <span className="min-w-0 flex-1">{item.label}</span>
+              <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
               {item.description && (
                 <span
                   className={clsx(
-                    "ui-stage-cat shrink-0",
+                    "shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-mono font-semibold border",
                     `ui-stage-cat-${index % CATEGORY_HUES}`,
                   )}
                 >
@@ -110,7 +110,7 @@ export function StageChoices({
         <button
           type="button"
           onClick={onFreeInput}
-          className="ui-stage-panel ui-stage-choice-item rounded-[var(--radius-control)] px-4 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:border-[var(--accent-primary)]"
+          className="rounded-2xl border border-dashed border-border/80 bg-background/60 backdrop-blur-md px-4 py-3 text-left text-xs sm:text-sm text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-card/80 transition-all duration-200 shadow-xs"
           style={{ animationDelay: `${items.length * STAGGER_STEP_MS}ms` }}
         >
           {t("stage.freeInputLabel")}

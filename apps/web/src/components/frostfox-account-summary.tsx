@@ -23,10 +23,12 @@ import {
 import { useTranslation } from "react-i18next";
 import {
   fetchFrostFoxAccount,
+  getManagedFrostFoxCatalog,
   hydrateManagedFrostFoxModels,
   setManagedFrostFoxCatalog,
   signOutFrostFox,
   type FrostFoxAccountStatus,
+  type FrostFoxModelCatalog,
 } from "@/services/api.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
 
@@ -34,6 +36,7 @@ const REFRESH_INTERVAL_MS = 60_000;
 
 interface FrostFoxAccountContextValue {
   readonly status: FrostFoxAccountStatus | null;
+  readonly catalog: FrostFoxModelCatalog | null;
   readonly loading: boolean;
   readonly error: boolean;
   readonly refresh: () => Promise<void>;
@@ -44,6 +47,9 @@ const FrostFoxAccountContext =
 
 export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<FrostFoxAccountStatus | null>(null);
+  const [catalog, setCatalog] = useState<FrostFoxModelCatalog | null>(() =>
+    getManagedFrostFoxCatalog(),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const mounted = useRef(true);
@@ -55,8 +61,12 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
       const next = await fetchFrostFoxAccount(true);
       if (mounted.current) setStatus(next);
       await hydrateManagedFrostFoxModels(next);
+      if (mounted.current) setCatalog(getManagedFrostFoxCatalog());
     } catch {
-      if (mounted.current) setError(true);
+      if (mounted.current) {
+        setCatalog(null);
+        setError(true);
+      }
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -77,7 +87,7 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
 
   return (
     <FrostFoxAccountContext.Provider
-      value={{ status, loading, error, refresh }}
+      value={{ status, catalog, loading, error, refresh }}
     >
       {children}
     </FrostFoxAccountContext.Provider>

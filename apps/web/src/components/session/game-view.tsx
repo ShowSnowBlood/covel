@@ -120,11 +120,11 @@ export function GameView({ session }: GameViewProps) {
     setViewTransition({
       image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
       title: t("session.breadcrumbWorldSelect", "选择世界"),
-      subtitle: t("transition.returningWorldSelect", "正在返回世界档案库…"),
+      subtitle: t("transition.returningWorldSelect"),
       steps: [
-        t("transition.saveSession", "正在保存当前进度…"),
-        t("transition.loadArchives", "正在载入世界档案库…"),
-        t("transition.readyWorldSelect", "准备就绪，即将进入世界选择…"),
+        t("transition.saveSession"),
+        t("transition.loadArchives"),
+        t("transition.readyWorldSelect"),
       ],
       onComplete: () => {
         setViewTransition(null);
@@ -142,11 +142,11 @@ export function GameView({ session }: GameViewProps) {
     setViewTransition({
       image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
       title: text(world?.name),
-      subtitle: t("transition.enteringWorldPrep", "正在返回世界配置…"),
+      subtitle: t("transition.enteringWorldPrep"),
       steps: [
-        t("transition.pauseSession", "正在保存当前会话…"),
-        t("transition.loadWorldConfig", "正在加载世界配置与插件…"),
-        t("transition.readyPrep", "准备就绪，进入世界工作台…"),
+        t("transition.pauseSession"),
+        t("transition.loadWorldConfig"),
+        t("transition.readyPrep"),
       ],
       onComplete: () => {
         setViewTransition(null);

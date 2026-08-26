@@ -129,6 +129,7 @@
     "refresh": "刷新",
     "retry": "重试",
     "resetLore": "重置为原始",
+    "worldConfig": "配置世界",
     "filterTags": "标签",
     "worldDocument": "世界文档与设定",
     "loreDoc": "知识库",
@@ -1088,6 +1089,7 @@
     "empty": "本世界暂未提供角色立绘。",
     "replace": "替换",
     "uploading": "上传中…",
+    "uploadFailed": "立绘更新失败",
     "enlarge": "放大立绘"
   },
   "sceneCast": {

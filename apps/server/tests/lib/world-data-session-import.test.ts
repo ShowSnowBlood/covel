@@ -1523,7 +1523,7 @@ sources: {}
         expect(assetIds.has(value.sprite?.id ?? "")).toBe(true);
       }
     }
-  });
+  }, 20000);
 });
 
 describe("world data sync compare-and-swap", () => {

@@ -107,13 +107,18 @@ export function StageDialog({
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleTextareaKeyDown}
               placeholder={t("stage.inputPlaceholder")}
-              className="resize-none bg-transparent text-base sm:text-sm outline-none placeholder:text-muted-foreground text-foreground"
+              className="resize-none bg-transparent text-sm sm:text-base outline-none placeholder:text-muted-foreground text-foreground"
             />
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] text-muted-foreground">
                 {t("stage.inputSendHint")}
               </span>
-              <Button size="sm" onClick={submitDraft} disabled={!draft.trim()}>
+              <Button
+                size="sm"
+                onClick={submitDraft}
+                disabled={!draft.trim()}
+                className="rounded-xl shadow-xs hover:scale-105 active:scale-95 transition-all"
+              >
                 <Send className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -123,18 +128,18 @@ export function StageDialog({
             type="button"
             onClick={handleFrameClick}
             aria-label={t("stage.advanceLabel")}
-            className="flex w-full cursor-pointer flex-col gap-1.5 rounded-2xl p-3.5 sm:p-4 text-left transition-colors hover:bg-[color-mix(in_oklab,var(--color-foreground)_5%,transparent)]"
+            className="flex w-full cursor-pointer flex-col gap-1.5 rounded-2xl p-4 sm:p-5 text-left transition-colors hover:bg-foreground/5"
           >
             {speakerName && (
-              <span className="ui-stage-panel absolute -top-3 left-3 sm:left-4 rounded-full border border-primary/40 bg-card px-3 py-0.5 text-xs font-semibold text-primary shadow-xs">
+              <span className="absolute -top-3.5 left-4 sm:left-6 rounded-full border border-primary/50 bg-card/95 backdrop-blur-md px-3.5 py-1 text-xs font-bold text-primary shadow-sm tracking-wide">
                 {speakerName}
               </span>
             )}
-            <p className="min-h-[3.6em] whitespace-pre-line text-sm leading-relaxed">
+            <p className="min-h-[3.6em] whitespace-pre-line text-sm sm:text-base leading-relaxed text-foreground/95">
               {visible}
               {status === "pause" && (
                 <span
-                  className="ui-stage-caret ml-1 inline-block"
+                  className="ui-stage-caret ml-1 inline-block text-primary"
                   aria-hidden="true"
                 >
                   ▼

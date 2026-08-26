@@ -108,11 +108,11 @@ function RootLayout() {
     setNavTransition({
       image: "/visuals/backgrounds/frostfox-game-cover-image2.png",
       title: t("home.gameTitle", "FrostFox Game"),
-      subtitle: t("transition.returningHome", "正在返回主页…"),
+      subtitle: t("transition.returningHome"),
       steps: [
-        t("transition.saveState", "正在保存会话与状态…"),
-        t("transition.unloadPipeline", "正在卸载叙事引擎…"),
-        t("transition.returnHome", "准备就绪，正在返回主页…"),
+        t("transition.saveState"),
+        t("transition.unloadPipeline"),
+        t("transition.returnHome"),
       ],
       onComplete: () => {
         setNavTransition(null);
@@ -131,11 +131,11 @@ function RootLayout() {
     setNavTransition({
       image: visual?.image ?? "/visuals/backgrounds/home-hero.webp",
       title: t("session.breadcrumbWorldSelect", "选择世界"),
-      subtitle: t("transition.returningWorldSelect", "正在返回世界档案库…"),
+      subtitle: t("transition.returningWorldSelect"),
       steps: [
-        t("transition.saveSession", "正在保存当前进度…"),
-        t("transition.loadArchives", "正在载入世界档案库…"),
-        t("transition.readyWorldSelect", "准备就绪，即将进入世界选择…"),
+        t("transition.saveSession"),
+        t("transition.loadArchives"),
+        t("transition.readyWorldSelect"),
       ],
       onComplete: () => {
         setNavTransition(null);

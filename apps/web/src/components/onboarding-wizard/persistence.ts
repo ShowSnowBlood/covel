@@ -6,6 +6,7 @@ import {
   listPresets,
   getSlotConfig,
   setSlotConfig,
+  slotBindingId,
 } from "@/services/api.js";
 import type { CustomPreset, PresetSummary } from "@/services/api.js";
 import { invalidatePingResult } from "@/components/shared/ping-button.js";
@@ -60,20 +61,23 @@ function upsertTransientPreset(input: Omit<CustomPreset, "id">): string {
   return nextPreset.id;
 }
 
-/**
- * Persist an API key + slot binding.
- *
- * For built-in providers we bind the slot to the exact provider/model pair.
- * Existing presets are reused; arbitrary model IDs synthesize a local preset.
- * For custom providers we register a local custom preset and point the
- * slot at that. Returns the resolved preset ID, or undefined if no match
- * could be found (e.g. built-in provider with no server-side preset yet).
- */
+/** Persist the model chosen for an onboarding slot. Managed FrostFox models
+ * already carry their trusted provider definition and credential server-side,
+ * so only the model reference is stored. Local providers keep the existing
+ * key + preset path below. */
 export async function persistSlot(
   form: ProviderFormState,
   slotName: SlotName,
   presetCatalog: PresetSummary[],
 ): Promise<string | undefined> {
+  if (form.modelSource === "managed") {
+    const modelRef = form.managedModelRef.trim();
+    if (!modelRef) return undefined;
+    const slots = getSlotConfig();
+    setSlotConfig({ ...slots, [slotName]: { modelRef } });
+    return modelRef;
+  }
+
   const key = form.apiKey.trim();
   if (!key) return undefined;
 
@@ -134,8 +138,10 @@ export async function persistSlot(
 
 export function bindPluginSlotToStory(): void {
   const slots = getSlotConfig();
-  if (!slots.plugin && slots.story) {
-    setSlotConfig({ ...slots, plugin: slots.story });
+  const storyBinding = slotBindingId(slots.story);
+  const pluginBinding = slotBindingId(slots.plugin);
+  if (storyBinding && pluginBinding !== storyBinding) {
+    setSlotConfig({ ...slots, plugin: slots.story! });
   }
 }
 

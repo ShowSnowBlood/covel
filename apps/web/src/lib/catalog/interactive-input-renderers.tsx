@@ -6,7 +6,7 @@ import { useFormInputBinding } from "./use-form-input-binding.js";
 
 // Shared base class for all text-input shells.
 export const inputBase =
-  "ui-input-shell w-full bg-background border border-border px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground";
+  "ui-input-shell w-full rounded-xl border border-border/80 bg-background/80 px-3 py-2 text-xs outline-none transition-all duration-150 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 text-foreground placeholder:text-muted-foreground shadow-xs backdrop-blur-xs";
 
 /** Shared presentational label for form inputs. */
 function FormInputLabel({ label }: { label: string }) {

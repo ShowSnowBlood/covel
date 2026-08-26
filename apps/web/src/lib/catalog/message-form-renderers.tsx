@@ -105,7 +105,7 @@ export const FormField: ComponentRenderer = ({ element, bindings }) => {
   const bindPath = bindings?.value;
 
   const fieldCls =
-    "ui-input-shell w-full bg-background border border-border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 text-foreground placeholder:text-muted-foreground";
+    "ui-input-shell w-full rounded-xl border border-border/80 bg-background/80 px-3.5 py-2.5 text-sm outline-none transition-all duration-150 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 disabled:opacity-50 text-foreground placeholder:text-muted-foreground shadow-xs backdrop-blur-xs";
 
   return (
     <div className="space-y-1.5">
@@ -156,10 +156,10 @@ export const SubmitButton: ComponentRenderer = ({ element, emit }) => {
       onClick={() => emit("click")}
       disabled={disabled}
       className={clsx(
-        "w-full py-3 text-sm font-medium rounded-[var(--radius-control)] transition-colors tracking-[0.04em]",
+        "w-full py-3 text-sm font-semibold rounded-xl transition-all duration-200 shadow-xs hover:shadow-md hover:scale-[1.01] active:scale-[0.99] tracking-wide",
         disabled
           ? "bg-muted text-muted-foreground cursor-not-allowed"
-          : "bg-foreground text-[var(--surface-page)] hover:opacity-90",
+          : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_12px_rgba(var(--primary),0.2)]",
       )}
     >
       {label}

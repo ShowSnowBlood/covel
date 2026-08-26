@@ -4,6 +4,7 @@ import {
   type FrostFoxAccountStatus,
   type FrostFoxModelCatalog,
 } from "./frostfox.js";
+import type { PresetSummary } from "./types.js";
 import type { CustomPreset } from "./model-settings.js";
 
 const FROSTFOX_MODEL_REF_PREFIX = "frostfox:";
@@ -47,17 +48,38 @@ export function getManagedFrostFoxPresets(): CustomPreset[] {
   );
 }
 
+export function isManagedFrostFoxModelRef(value: string): boolean {
+  return value.startsWith(FROSTFOX_MODEL_REF_PREFIX);
+}
+
+export function getManagedFrostFoxPresetSummaries(): PresetSummary[] {
+  return getManagedFrostFoxPresets().map((preset) => ({
+    id: preset.id,
+    name: preset.name,
+    provider: preset.provider,
+    model: preset.model,
+    enabled: true,
+    isDefault: false,
+    scope: "frostfox",
+    baseUrl: preset.baseUrl,
+    protocol: preset.protocol,
+    capability: preset.capability,
+  }));
+}
+
 export async function hydrateManagedFrostFoxModels(
   accountStatus?: FrostFoxAccountStatus,
-): Promise<void> {
+): Promise<FrostFoxModelCatalog | null> {
   try {
     const account = accountStatus ?? (await fetchFrostFoxAccount(true));
     if (!account.enabled || !account.authenticated) {
       managedCatalog = null;
-      return;
+      return null;
     }
     managedCatalog = await fetchFrostFoxModels(true);
+    return managedCatalog;
   } catch {
     managedCatalog = null;
+    return null;
   }
 }

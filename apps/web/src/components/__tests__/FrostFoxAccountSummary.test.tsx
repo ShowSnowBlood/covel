@@ -16,6 +16,7 @@ vi.mock("@/services/api.js", () => ({
   fetchFrostFoxAccount: api.fetchAccount,
   hydrateManagedFrostFoxModels: api.hydrateManagedFrostFoxModels,
   signOutFrostFox: api.signOutFrostFox,
+  getManagedFrostFoxCatalog: vi.fn().mockReturnValue(null),
   setManagedFrostFoxCatalog: vi.fn(),
 }));
 

@@ -24,9 +24,12 @@ export * from "./api/media.js";
 export * from "./api/actions.js";
 export * from "./api/frostfox.js";
 export {
+  frostFoxModelRef,
   getManagedFrostFoxCatalog,
+  getManagedFrostFoxPresetSummaries,
   getManagedFrostFoxPresets,
   hydrateManagedFrostFoxModels,
+  isManagedFrostFoxModelRef,
   setManagedFrostFoxCatalog,
 } from "./api/frostfox-models.js";
 export {
