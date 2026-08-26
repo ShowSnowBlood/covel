@@ -2,9 +2,9 @@
  * Per-session owner-token store.
  *
  * `POST /api/sessions` mints an owner token and returns it exactly once. On
- * hosted tiers (demo/commercial) the server requires it on every session-scoped
- * call (`X-Session-Token` / `Authorization: Bearer` / `?session_token=`); on
- * self/desktop/dev it is ignored. So we persist it keyed by sessionId and replay
+ * hosted tiers (demo/commercial), session-scoped calls use this token unless
+ * the server can authorize the matching FrostFox account cookie; on
+ * self/desktop/dev it is ignored. We persist it keyed by sessionId and replay
  * it unconditionally — a stray token on a self tier is harmless, and one code
  * path beats branching on the deployment tier the client can't reliably know.
  *

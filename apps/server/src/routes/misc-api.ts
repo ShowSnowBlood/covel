@@ -114,10 +114,11 @@ export function createMiscApiRoutes(
     const sessionId = c.req.query("sessionId");
     // Owner guard: a session-scoped request both reads that
     // session's active-plugin set and synchronously (re)writes its
-    // plugin_data UI-spec rows, so hosted tiers require the owner token
-    // BEFORE buildUiSpecsResponse touches the store. No-op on self.
-    // misc-api routes mount on the root app (no bootstrap middleware), so
-    // the closure `store` is passed explicitly.
+    // plugin_data UI-spec rows, so hosted tiers require the owner token, the
+    // operator token, or the matching FrostFox account cookie BEFORE
+    // buildUiSpecsResponse touches the store. No-op on self.
+    // misc-api routes mount on the root app (no bootstrap middleware), so the
+    // closure `store` is passed explicitly.
     if (sessionId) {
       const denied = await checkSessionOwnerById(c, store, sessionId);
       if (denied) return denied;

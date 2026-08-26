@@ -26,9 +26,10 @@
  *   - `self` (default) / desktop / dev: NOT enforced. Single-user local play
  *     must keep working token-free; the network boundary for these tiers is
  *     the loopback bind in `index.ts` (COVEL_BIND_HOST=127.0.0.1 default).
- *   - `demo` / `commercial`: hard-required on every session-scoped route that
- *     goes through this guard. Sessions without a stored hash fail closed.
- *     The operator token (COVEL_DESKTOP_REST_TOKEN) acts as a master key.
+ *   - `demo` / `commercial`: session-scoped routes require either the owner
+ *     token, the operator master token, or (for a commercial FrostFox SaaS
+ *     session) the matching authenticated account cookie. Sessions without a
+ *     stored hash or account binding fail closed.
  *
  * CORS remains a browser policy only — it is never relied on for authz.
  */
@@ -36,6 +37,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Context } from "hono";
 import type { DataStore, SessionRecord } from "@covel/store";
 import { readRuntimeEnv } from "@covel/shared";
+import type { FrostFoxPrincipal } from "../../../frostfox/service.js";
 import { errorBody } from "../../../api-error.js";
 
 export const SESSION_NOT_FOUND_CODE = "session_not_found";
@@ -44,6 +46,9 @@ export const OPERATOR_TOKEN_REQUIRED_CODE = "operator_token_required";
 
 /** Metadata key holding the SHA-256 hex hash of the session owner token. */
 export const SESSION_OWNER_TOKEN_HASH_KEY = "ownerTokenHash";
+
+/** Metadata key binding a session to its authenticated FrostFox account. */
+export const FROSTFOX_LOCAL_USER_ID_KEY = "frostFoxLocalUserId";
 
 type ResolveResult =
   | { readonly ok: true; readonly session: SessionRecord }
@@ -120,11 +125,12 @@ export function checkHostedOperator(c: Context): Response | undefined {
 }
 
 /**
- * Authorize the request against the session's owner token.
+ * Authorize the request against the session's owner token or its bound
+ * FrostFox account.
  *
  * Returns `undefined` when access is allowed, or a ready-to-return 401
- * response when a hosted tier requires a token the caller did not present.
- * Non-hosted tiers (`self`, unset) always allow — see module doc.
+ * response when a hosted tier requires a credential the caller did not
+ * present. Non-hosted tiers (`self`, unset) always allow — see module doc.
  */
 export function checkSessionOwner(
   c: Context,
@@ -132,6 +138,24 @@ export function checkSessionOwner(
 ): Response | undefined {
   const env = readRuntimeEnv();
   if (!isOwnerAuthEnforced(env.deploymentTier)) return undefined;
+
+  // A first-party account is the durable identity for hosted Web sessions.
+  // The browser's HttpOnly FrostFox cookie survives across devices, unlike
+  // the one-time owner token kept in localStorage. Only an exact metadata
+  // binding grants this path; it cannot authorize unbound or other-account
+  // sessions.
+  const principal = c.get("frostFoxPrincipal") as
+    | FrostFoxPrincipal
+    | null
+    | undefined;
+  if (
+    env.deploymentTier === "commercial" &&
+    env.frostFoxSaasEnabled &&
+    principal &&
+    session.metadata?.[FROSTFOX_LOCAL_USER_ID_KEY] === principal.localUserId
+  ) {
+    return undefined;
+  }
 
   const provided = extractSessionOwnerToken(c);
   if (provided) {
@@ -148,8 +172,9 @@ export function checkSessionOwner(
     }
   }
 
-  // Fail closed: sessions without a stored hash predate this guard; on hosted
-  // tiers they are only reachable with the operator token.
+  // Fail closed: sessions without a stored hash or account binding predate
+  // this guard; on hosted tiers they are only reachable with the operator
+  // token.
   return c.json(
     errorBody("Session owner token missing or invalid", {
       code: SESSION_OWNER_REQUIRED_CODE,
@@ -191,9 +216,12 @@ export async function checkSessionOwnerById(
 
 /**
  * Look up the session named by the `:id` (or `:sessionId`) route param and
- * enforce owner-token authorization on hosted tiers. On miss, the returned
- * `response` is a ready-to-return 404 (unknown session) or 401 (owner token
- * required) with the unified error envelope.
+ * enforce hosted session authorization (owner token, operator token, or the
+ * matching FrostFox account) on hosted tiers. On miss, the returned
+ * `response` is a ready-to-return 404 (unknown session) or 401 (missing
+ * credential) with the unified error envelope.
+ * Returns `undefined` when access is allowed, else a ready-to-return 404
+ * (unknown session) or 401 (missing/invalid credential) response.
  */
 export async function resolveSessionParam(
   c: Context,

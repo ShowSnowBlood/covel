@@ -56,13 +56,15 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 | `DEPLOYMENT_TIER`     | 行为                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `self`（默认）/ 桌面  | **不强制**。单机本地游玩零 token 可用；网络边界由默认回环监听保障（`COVEL_BIND_HOST=127.0.0.1`，见 env-registry）。带 token 也不校验。                                                                                                                                                                                                                                                                                                                                    |
-| `demo` / `commercial` | **硬性强制**。所有会话作用域端点仍要求每会话 owner token（未知会话返回 404、缺失或错误 token 返回 `401 session_owner_required`）。`demo` 以及未启用 FrostFox 的 `commercial` 部署中，`GET /api/sessions` 和 `POST /api/sessions` 只接受运维 token。启用 `COVEL_FROSTFOX_SAAS_ENABLED=1` 的 `commercial` 部署中，已连接 FrostFox 账号可创建会话并只列出绑定到自身本地账号的会话；服务端在内部 metadata 记录账号归属，响应会剥离该字段。运维 token 仍可查看和管理全部会话。 |
+| `demo` / `commercial` | **硬性强制**。会话作用域端点要求 owner token 或运维 token；启用 `COVEL_FROSTFOX_SAAS_ENABLED=1` 的 `commercial` 部署中，绑定到当前 FrostFox 账号的会话也接受匹配的 HttpOnly 账号 Cookie，因此可跨设备继续历史会话。未知会话返回 404，缺失或错误凭据返回 `401 session_owner_required`。`demo` 以及未启用 FrostFox 的 `commercial` 中，`GET /api/sessions` 和 `POST /api/sessions` 只接受运维 token；启用 FrostFox 后，已连接账号可创建并只列出自己的会话。服务端在内部 metadata 记录账号归属，响应会剥离该字段；运维 token 仍可查看和管理全部会话。 |
 
-**Token 提交方式**（三选一）：
+**Owner token 提交方式**（三选一；绑定 FrostFox 账号的 Web 会话也可使用匹配的账号 Cookie）：
 
 1. `Authorization: Bearer <ownerToken>`
 2. `X-Session-Token: <ownerToken>`
 3. `?session_token=<ownerToken>` query 参数（供无法设置 header 的 EventSource / SSE 客户端使用）
+
+**FrostFox 账号会话**：账号 Cookie 只授权 metadata 中绑定到同一 `localUserId` 的会话；未绑定账号的历史会话仍只能使用其 owner token 或运维 token。这样 owner token 丢失时，已登录账号仍可在另一设备恢复自己的历史会话，同时不会跨账号放开会话。
 
 **运维 master token**：设置了 `COVEL_DESKTOP_REST_TOKEN` 时，以该值作为 Bearer token 可通过任意会话的 owner 校验，并且是 hosted 层级的全局管理凭据。启用 FrostFox 的 `commercial` 部署允许已连接账号创建并列出自己的会话；世界写入/维度导入、模型探测/刷新、provider key 可用性查询和 community server-code 激活仍要求 operator token。`DEPLOYMENT_TIER=demo|commercial` 启动时若未配置该 token，`validateSecurityPosture` 仍会拒绝启动。
 

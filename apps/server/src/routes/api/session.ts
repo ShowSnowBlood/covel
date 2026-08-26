@@ -58,6 +58,7 @@ import {
   isOwnerAuthEnforced,
   mintSessionOwnerToken,
   resolveSessionParam,
+  FROSTFOX_LOCAL_USER_ID_KEY,
   SESSION_NOT_FOUND_CODE,
   SESSION_OWNER_TOKEN_HASH_KEY,
 } from "./session/session-guard.js";
@@ -90,7 +91,6 @@ type Env = {
 };
 
 export const sessionRoutes = new Hono<Env>();
-const FROSTFOX_LOCAL_USER_ID_KEY = "frostFoxLocalUserId";
 
 /**
  * Whether any plugin in the set declares a setup-stage runtime. Discovered by
@@ -424,7 +424,8 @@ sessionRoutes.post("/", async (c) => {
   }
 
   // `ownerToken` is returned exactly once — it is never readable again
-  // (only its hash is stored). Clients on hosted tiers must persist it.
+  // (only its hash is stored). Hosted FrostFox Web clients can authorize via
+  // their account cookie; other hosted clients must persist this token.
   return c.json({
     ...sanitizeSessionForResponse(session),
     ownerToken: owner.token,

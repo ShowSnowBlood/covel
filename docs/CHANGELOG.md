@@ -34,6 +34,7 @@ This release rebuilds provider and model configuration around explicit connectio
 - **会话面包屑返回会正确离开当前会话。** 从游戏中返回配置或世界选择时清除 URL 中的旧 `sid`，避免会话状态被自动恢复。
 - **舞台世界 UI 恢复了正确的视觉与行动契约。** 透明 `sprite` 才会进入前景合成，带背景的 `avatar` 不再变成立绘矩形；传统世界切入舞台时保留场景背景与 `action-guide` 建议而不显示头像，消息数据在会话恢复后也会水合到舞台所用的 store。
 - **SaaS 模型目录改为登录周期加载。** 账号余额和登录状态可以继续刷新，但同一账号不会重复拉取 `modellist`；客户端共享登录时目录，服务端按账号凭据世代与 client-config 版本缓存，并合并并发请求。
+- **FrostFox 账号可以跨设备继续自己的历史会话。** Hosted 会话鉴权现在接受匹配账号的 HttpOnly Cookie 作为 owner 身份；未绑定账号的会话仍严格要求 owner token 或运维 token，避免跨账号访问。
 
 ## [0.0.25] - 2026-08-11
 

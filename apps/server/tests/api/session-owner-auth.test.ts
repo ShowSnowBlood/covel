@@ -4,8 +4,9 @@
  * Tiered model:
  *   - self (default): owner tokens are minted but NOT enforced — local play
  *     stays token-free (the network boundary is the loopback bind).
- *   - demo / commercial: every session-scoped route behind
- *     `resolveSessionParam` / `checkSessionOwner` hard-requires the token;
+ *   - `demo` / `commercial`: every session-scoped route behind
+ *     `resolveSessionParam` / `checkSessionOwner` requires an owner token,
+ *     operator token, or the matching FrostFox account cookie;
  *     COVEL_DESKTOP_REST_TOKEN acts as an operator master key.
  *
  * Mounts the REAL route modules, mirroring bootstrap.ts wiring.
@@ -118,7 +119,7 @@ describe("self tier (default) — no enforcement, no breakage", () => {
   });
 });
 
-describe("commercial tier — owner token hard-required", () => {
+describe("commercial tier — owner authorization", () => {
   let created: CreatedSession;
 
   beforeEach(async () => {
@@ -293,7 +294,7 @@ describe("commercial tier — owner token hard-required", () => {
 });
 
 describe("commercial tier — FrostFox account sessions", () => {
-  it("creates sessions without the operator token and filters the listing by account", async () => {
+  it("authorizes the account owner without a token and filters the listing by account", async () => {
     process.env.DEPLOYMENT_TIER = "commercial";
     process.env.COVEL_DESKTOP_REST_TOKEN = "operator-secret";
     process.env.COVEL_FROSTFOX_SAAS_ENABLED = "1";
@@ -316,6 +317,12 @@ describe("commercial tier — FrostFox account sessions", () => {
     const appB = createTestApp(store, registry, accountB);
 
     const created = await createSession(appA);
+    expect(
+      (await appA.request(`/api/sessions/${created.id}`)).status,
+    ).toBe(200);
+    expect(
+      (await appB.request(`/api/sessions/${created.id}`)).status,
+    ).toBe(401);
     expect(created.metadata).not.toHaveProperty("frostFoxLocalUserId");
     expect(await (await appA.request("/api/sessions")).json()).toMatchObject({
       items: [{ id: created.id }],

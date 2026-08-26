@@ -20,12 +20,12 @@ type RuntimeEnv = ReturnType<typeof readRuntimeEnv>;
  *   failing at boot surfaces the misconfiguration immediately).
  * - `commercial` and `demo`: the operator bearer token
  *   (`COVEL_DESKTOP_REST_TOKEN`). Session-scoped routes are authorized by
- *   per-session owner tokens (minted at session creation and hard-enforced
- *   on `demo`/`commercial` — see `routes/api/session/session-guard.ts`),
- *   but session CREATION and cross-session admin surfaces (session
- *   listing, config/install) require the operator token; without it a
- *   hosted deployment could never mint a session at all — fail loudly at
- *   boot instead of shipping a silently bricked (or unauthenticated) host.
+ *   the per-session owner token, the operator token, or (for a commercial
+ *   FrostFox SaaS session) the matching authenticated account cookie — see
+ *   `routes/api/session/session-guard.ts`. Session CREATION and cross-session
+ *   admin surfaces (session listing, config/install) require the operator
+ *   token; without it a hosted deployment could never mint a session at all —
+ *   fail loudly at boot instead of shipping a silently bricked host.
  * - `commercial` only: an explicit `CORS_ORIGIN` allowlist.
  */
 export function validateSecurityPosture(env: RuntimeEnv): void {
