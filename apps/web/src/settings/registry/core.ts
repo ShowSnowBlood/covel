@@ -53,4 +53,16 @@ export function registerCoreSettings(store: SettingsStoreApi): void {
     widget: "number",
     label: { "zh-CN": "Onboarding 版本", "en-US": "Onboarding version" },
   });
+
+  // Internal marker used to replay the model-selection wizard when a different
+  // FrostFox account signs in on the same device. It is hidden from the generic
+  // settings navigation; the wizard owns this value.
+  store.register({
+    key: "ui.onboardedAccountId",
+    schema: z.string(),
+    default: "",
+    group: "general",
+    widget: "custom",
+    label: { "zh-CN": "引导账号", "en-US": "Onboarding account" },
+  });
 }

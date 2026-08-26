@@ -45,6 +45,7 @@ interface PingButtonProps {
 // model row + settings pane), so caching at this level avoids hitting the
 // provider once per component.
 const resultCache = new Map<string, { result: PingResult; at: number }>();
+const invalidationListeners = new Set<(requestId: string) => void>();
 
 function requestIdFor(target: PingTarget): string {
   return target.kind === "preset" ? target.presetId : `slot-${target.slotId}`;
@@ -114,6 +115,19 @@ export function PingButton({
     }
   }, [requestId, cacheTtlMs]);
 
+  // External form edits invalidate the shared cache. Clear the rendered
+  // result too; otherwise a green probe from the previous key/model remains
+  // visible until the next click.
+  useEffect(() => {
+    const listener = (invalidatedRequestId: string) => {
+      if (invalidatedRequestId === requestId) setResult(null);
+    };
+    invalidationListeners.add(listener);
+    return () => {
+      invalidationListeners.delete(listener);
+    };
+  }, [requestId]);
+
   const handleClick = useCallback(async () => {
     const cached = resultCache.get(requestId);
     if (cached && Date.now() - cached.at < cacheTtlMs) {
@@ -124,17 +138,17 @@ export function PingButton({
     try {
       // Run pre-ping side effects (e.g. persist keys in onboarding). A
       // thrown error or explicit `false` short-circuits and surfaces via
-      // the error display; we deliberately don't cache these results
-      // because the environment wasn't fully set up.
+      // the error display. These setup failures are never cached: the next
+      // click must be able to retry persistence after the user fixes it.
       if (onBeforePing) {
         const ok = await onBeforePing();
-        if (ok === false) {
-          setTesting(false);
-          return;
-        }
+        if (ok === false) return;
       }
       const res = await pingPreset(requestId);
-      resultCache.set(requestId, { result: res, at: Date.now() });
+      // Keep only successful probes in the TTL cache. A failed provider probe
+      // is transient by definition and must be retried on the next click.
+      if (res.ok) resultCache.set(requestId, { result: res, at: Date.now() });
+      else resultCache.delete(requestId);
       setResult(res);
       onResult?.(res);
     } catch (err) {
@@ -143,13 +157,13 @@ export function PingButton({
         latencyMs: 0,
         error: err instanceof Error ? err.message : t("toast.networkError"),
       };
-      resultCache.set(requestId, { result: fallback, at: Date.now() });
+      resultCache.delete(requestId);
       setResult(fallback);
       onResult?.(fallback);
     } finally {
       setTesting(false);
     }
-  }, [requestId, cacheTtlMs, onResult, onBeforePing]);
+  }, [requestId, cacheTtlMs, onResult, onBeforePing, t]);
 
   const buttonHeight =
     size === "xs" ? "h-6 text-[10px] px-1.5" : "h-7 text-[11px] px-2.5";
@@ -277,5 +291,7 @@ export function PingButton({
 
 /** Invalidate the cached ping result for one target (e.g. after key edit). */
 export function invalidatePingResult(target: PingTarget): void {
-  resultCache.delete(requestIdFor(target));
+  const requestId = requestIdFor(target);
+  resultCache.delete(requestId);
+  for (const listener of invalidationListeners) listener(requestId);
 }

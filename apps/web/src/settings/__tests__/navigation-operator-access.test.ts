@@ -36,4 +36,31 @@ describe("operator access settings navigation", () => {
       expect.objectContaining({ id: OPERATOR_ACCESS_NODE_ID }),
     ]);
   });
+
+  it("hides onboarding bookkeeping from player settings", () => {
+    const store = {
+      listEntries: () => [
+        {
+          key: "ui.onboardedVersion",
+          group: "general",
+          label: "Onboarding version",
+        },
+        {
+          key: "ui.onboardedAccountId",
+          group: "general",
+          label: "Onboarding account",
+        },
+        {
+          key: "ui.locale",
+          group: "general",
+          label: "Language",
+        },
+      ],
+    } as unknown as SettingsStoreApi;
+
+    const nodes = buildNavTree(store, { locale: "en-US" });
+    expect(nodes.flatMap((node) => node.children)).toEqual([
+      expect.objectContaining({ key: "ui.locale" }),
+    ]);
+  });
 });

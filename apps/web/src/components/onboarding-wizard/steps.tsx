@@ -96,6 +96,7 @@ interface StoryStepProps {
   managedOnly?: boolean;
   storyContinueDisabled: boolean;
   onBeforePingStory: () => Promise<void>;
+  onRefreshManagedModels?: () => Promise<void>;
   onContinue: () => void | Promise<void>;
   onSkip: () => void;
 }
@@ -109,6 +110,7 @@ export function StoryStep({
   managedOnly = false,
   storyContinueDisabled,
   onBeforePingStory,
+  onRefreshManagedModels,
   onContinue,
   onSkip,
 }: StoryStepProps) {
@@ -120,6 +122,7 @@ export function StoryStep({
         state={storyForm}
         onChange={setStoryForm}
         onBeforePing={onBeforePingStory}
+        onRefreshManagedModels={onRefreshManagedModels}
         presets={availablePresets}
         managedCatalog={managedCatalog}
         managedModelsLoading={managedModelsLoading}
@@ -128,27 +131,34 @@ export function StoryStep({
       />
 
       {storyContinueDisabled && (
-        <p className="text-[11px] text-amber-500/80 leading-relaxed">
-          {t(
-            "onboarding.disabledHint",
-            "Fill in API Key and Model ID to continue, or skip below to configure later.",
-          )}
+        <p className="text-[11px] leading-relaxed text-amber-500/80">
+          {managedOnly
+            ? t(
+                "onboarding.managedDisabledHint",
+                "Select an available account model to continue.",
+              )
+            : t(
+                "onboarding.disabledHint",
+                "Fill in API Key and Model ID to continue, or skip below to configure later.",
+              )}
         </p>
       )}
 
       <div className="flex items-center gap-2 pt-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-none text-xs text-muted-foreground"
-          onClick={onSkip}
-          title={t(
-            "onboarding.skipTitle",
-            "You can configure this later in Settings.",
-          )}
-        >
-          {t("onboarding.skip", "Skip for now")}
-        </Button>
+        {!managedOnly && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-none text-xs text-muted-foreground"
+            onClick={onSkip}
+            title={t(
+              "onboarding.skipTitle",
+              "You can configure this later in Settings.",
+            )}
+          >
+            {t("onboarding.skip", "Skip for now")}
+          </Button>
+        )}
         <div className="flex-1" />
         <Button
           onClick={onContinue}
@@ -175,6 +185,7 @@ interface PluginStepProps {
   managedOnly?: boolean;
   pluginContinueDisabled: boolean;
   onBeforePingPlugin: () => Promise<void>;
+  onRefreshManagedModels?: () => Promise<void>;
   onBack: () => void;
   onContinue: () => void | Promise<void>;
 }
@@ -191,6 +202,7 @@ export function PluginStep({
   managedOnly = false,
   pluginContinueDisabled,
   onBeforePingPlugin,
+  onRefreshManagedModels,
   onBack,
   onContinue,
 }: PluginStepProps) {
@@ -275,6 +287,7 @@ export function PluginStep({
           state={pluginForm}
           onChange={setPluginForm}
           onBeforePing={onBeforePingPlugin}
+          onRefreshManagedModels={onRefreshManagedModels}
           presets={availablePresets}
           managedCatalog={managedCatalog}
           managedModelsLoading={managedModelsLoading}
@@ -284,11 +297,16 @@ export function PluginStep({
       )}
 
       {pluginContinueDisabled && (
-        <p className="text-[11px] text-amber-500/80 leading-relaxed">
-          {t(
-            "onboarding.disabledHint",
-            "Fill in API Key and Model ID to continue, or skip below to configure later.",
-          )}
+        <p className="text-[11px] leading-relaxed text-amber-500/80">
+          {managedOnly
+            ? t(
+                "onboarding.managedDisabledHint",
+                "Select an available account model to continue.",
+              )
+            : t(
+                "onboarding.disabledHint",
+                "Fill in API Key and Model ID to continue, or skip below to configure later.",
+              )}
         </p>
       )}
 
@@ -314,7 +332,6 @@ export function PluginStep({
     </div>
   );
 }
-
 interface ReadyStepProps {
   onDismiss: () => void;
 }

@@ -17,6 +17,10 @@ This release rebuilds provider and model configuration around explicit connectio
 - **LLM settings now separate connections, models, slots, and advanced request options.** Provider catalogs normalize ids consistently, slot bindings clear stale reasoning overrides when their model changes, numeric fields can be cleared, and base URLs commit once on blur or Enter.
 - **Project documentation is organized by audience and lifetime.** Stable user and developer guides live under `docs/`; audits, implementation plans, temporary analysis, and handoff notes live under `devs/docs/`. Desktop packaging and world-media generation now have indexed guides, and the architecture section carries the maintained technical-debt ledger.
 
+- **FrostFox 新账号引导现在使用账号模型目录。** 登录后的叙事模型从当前账号可用的文本模型中选择，插件模型默认复用该绑定，也可以单独选择另一模型；托管绑定只保存模型引用，不要求浏览器填写 provider key。
+
+- **托管模型连通性探测复用正式请求的覆盖清洗边界。** `/api/ai/ping` 现在解析并清洗浏览器传入的 slot/preset 覆盖，拒绝伪造 FrostFox 渠道或让托管凭据指向外部 endpoint；provider 返回仅 reasoning 或无内容时分别给出可判定的成功/失败结果，失败探测不会污染前端重试缓存。
+
 ### Fixed
 
 - **Thinking models no longer emit incompatible tool-call payloads.** DeepSeek V4 thinking requests omit `tool_choice`, tool-call assistant messages retain non-null content, and streaming and non-streaming paths share the same compatibility rules.

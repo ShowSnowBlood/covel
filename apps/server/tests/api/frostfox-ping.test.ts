@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { createMemoryStore } from "@covel/store";
-import type {
-  FrostFoxService,
-  FrostFoxPrincipal,
+import {
+  FrostFoxServiceError,
+  type FrostFoxPrincipal,
+  type FrostFoxService,
 } from "../../src/frostfox/service.js";
 import { createMiscApiRoutes } from "../../src/routes/misc-api.js";
 
@@ -19,7 +20,15 @@ const principal: FrostFoxPrincipal = {
   lastVerifiedAt: "2026-08-25T00:00:00.000Z",
 };
 
-function makeHarness() {
+function makeHarness(
+  streamEvents: readonly Record<string, unknown>[] = [
+    { type: "text-delta", textDelta: "hello" },
+  ],
+): {
+  app: Hono;
+  frostFox: FrostFoxService;
+  streamCalls: Array<{ input: unknown; options: unknown }>;
+} {
   const streamCalls: Array<{ input: unknown; options: unknown }> = [];
   const managedPreset = {
     id: "managed-story",
@@ -78,11 +87,15 @@ function makeHarness() {
       streamText: (input: unknown, options: unknown) =>
         (async function* () {
           streamCalls.push({ input, options });
-          yield { type: "text-delta", textDelta: "hello" };
+          for (const event of streamEvents) yield event;
         })(),
     },
   };
   const frostFox = {
+    sanitizeSlotOverrides: vi.fn(
+      (overrides: Parameters<FrostFoxService["sanitizeSlotOverrides"]>[0]) =>
+        overrides,
+    ),
     prepareAiContext: vi.fn(async () => ({
       principal,
       apiKeys: { "frostfox-channel-1": "derived-gateway-key" },
@@ -173,5 +186,74 @@ describe("FrostFox account model ping", () => {
       model: "gpt-5",
     });
     expect(streamCalls).toHaveLength(1);
+  });
+
+  it("counts reasoning output as proof of provider connectivity", async () => {
+    const { app } = makeHarness([
+      { type: "reasoning-delta", reasoningDelta: "thinking" },
+      { type: "done", usage: { inputTokens: 1, outputTokens: 1 } },
+    ]);
+    const response = await app.request("/api/ai/ping", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ presetId: "slot-story" }),
+    });
+    const body = (await response.json()) as { ok: boolean; ttfbMs?: number };
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.ttfbMs).toEqual(expect.any(Number));
+  });
+
+  it("reports a deliberate no-content response instead of throwing", async () => {
+    const { app } = makeHarness([{ type: "done", usage: null }]);
+    const response = await app.request("/api/ai/ping", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ presetId: "slot-story" }),
+    });
+    const body = (await response.json()) as { ok: boolean; error?: string };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: false,
+      error: "Provider returned no content",
+    });
+  });
+  it("rejects an invalid browser model binding before registering an overlay", async () => {
+    const { app, frostFox } = makeHarness();
+    vi.mocked(frostFox.sanitizeSlotOverrides).mockImplementationOnce(() => {
+      throw new FrostFoxServiceError("frostfox_model_binding_invalid", 400);
+    });
+    const slotConfig = Buffer.from(
+      JSON.stringify({
+        slotPresetOverrides: { story: "browser-model" },
+        customPresets: [
+          {
+            id: "browser-model",
+            name: "Browser model",
+            provider: "frostfox-channel-1",
+            model: "remote-model",
+          },
+        ],
+      }),
+    ).toString("base64");
+
+    const response = await app.request("/api/ai/ping", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-slot-config": slotConfig,
+      },
+      body: JSON.stringify({ presetId: "slot-story" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(frostFox.sanitizeSlotOverrides).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slotPresetOverrides: { story: "browser-model" },
+      }),
+      true,
+    );
   });
 });

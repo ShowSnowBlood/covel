@@ -41,7 +41,8 @@ const {
   getCustomPresets,
   getProviderPriceMultiplier,
   getSlotConfig,
-  reconcileManagedFrostFoxImageSlot,
+  clearManagedFrostFoxSlots,
+  reconcileManagedFrostFoxSlots,
   removeCustomPreset,
   setCustomPresets,
   setManagedFrostFoxCatalog,
@@ -104,7 +105,7 @@ describe("custom preset secret channel", () => {
     });
     setSlotConfig({ image: { presetId: "slot-image" } });
 
-    reconcileManagedFrostFoxImageSlot("gpt-image-2-2k");
+    reconcileManagedFrostFoxSlots("gpt-image-2-2k");
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(getSlotConfig()).toEqual({
@@ -114,6 +115,250 @@ describe("custom preset secret channel", () => {
     });
   });
 
+  it("migrates a legacy hashed image binding to the current catalog model", async () => {
+    setManagedFrostFoxCatalog({
+      configurationVersion: "2",
+      channels: [
+        {
+          channelKey: "image",
+          providerId: "frostfox-696d616765",
+          displayName: "Images",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [
+            {
+              id: "gpt-image-2-2k",
+              name: "GPT Image",
+              capability: { input: ["text", "image"], output: ["image"] },
+            },
+          ],
+        },
+      ],
+    });
+    setSlotConfig({
+      image: { modelRef: "frostfox-managed-legacy-image" },
+    });
+
+    reconcileManagedFrostFoxSlots();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      image: { modelRef: "frostfox:image:gpt-image-2-2k" },
+    });
+  });
+
+  it("preserves a player-owned image binding", async () => {
+    setManagedFrostFoxCatalog({
+      configurationVersion: "1",
+      channels: [
+        {
+          channelKey: "image",
+          providerId: "frostfox-696d616765",
+          displayName: "Images",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [
+            {
+              id: "managed-image",
+              name: "Managed Image",
+              capability: { input: ["text", "image"], output: ["image"] },
+            },
+          ],
+        },
+      ],
+    });
+    setCustomPresets([
+      {
+        id: "custom-image",
+        name: "My Image Model",
+        provider: "openai",
+        baseUrl: "https://openai.example/v1",
+        model: "gpt-image-1",
+        capability: { input: ["text", "image"], output: ["image"] },
+      },
+    ]);
+    setSlotConfig({ image: { presetId: "custom-image" } });
+
+    reconcileManagedFrostFoxSlots();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      image: { modelRef: "custom-image" },
+    });
+  });
+
+  it("removes account-scoped slot references missing from the current catalog", async () => {
+    setManagedFrostFoxCatalog({
+      configurationVersion: "account-a",
+      channels: [
+        {
+          channelKey: "text",
+          providerId: "frostfox-74657874",
+          displayName: "Text",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [
+            {
+              id: "model-b",
+              name: "Model B",
+              capability: { input: ["text"], output: ["text"] },
+            },
+          ],
+        },
+      ],
+    });
+    setSlotConfig({
+      story: { modelRef: "frostfox:text:model-a" },
+      plugin: { modelRef: "frostfox:text:model-a" },
+      local: { modelRef: "custom_local" },
+    });
+
+    reconcileManagedFrostFoxSlots();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      local: { modelRef: "custom_local" },
+    });
+  });
+
+  it("keeps managed bindings during a temporary empty catalog", async () => {
+    setSlotConfig({ story: { modelRef: "frostfox:text:model-a" } });
+    setManagedFrostFoxCatalog(null);
+
+    reconcileManagedFrostFoxSlots();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      story: { modelRef: "frostfox:text:model-a" },
+    });
+  });
+
+  it("keeps bindings from a channel that failed a partial refresh", async () => {
+    setManagedFrostFoxCatalog({
+      configurationVersion: "partial",
+      channels: [
+        {
+          channelKey: "healthy",
+          providerId: "frostfox-healthy",
+          displayName: "Healthy",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [
+            {
+              id: "new-model",
+              name: "New Model",
+              capability: { input: ["text"], output: ["text"] },
+            },
+          ],
+        },
+        {
+          channelKey: "temporarily-unavailable",
+          providerId: "frostfox-unavailable",
+          displayName: "Unavailable",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [],
+          error: "upstream_timeout",
+        },
+      ],
+    });
+    setSlotConfig({
+      story: { modelRef: "frostfox:temporarily-unavailable:old-model" },
+    });
+
+    reconcileManagedFrostFoxSlots();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      story: { modelRef: "frostfox:temporarily-unavailable:old-model" },
+    });
+  });
+
+  it("clears only managed bindings on explicit account removal", async () => {
+    setSlotConfig({
+      story: { modelRef: "frostfox:text:model-a" },
+      plugin: { presetId: "frostfox:text:model-b" },
+      local: { modelRef: "custom_local" },
+    });
+
+    clearManagedFrostFoxSlots();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSlotConfig()).toEqual({
+      local: { modelRef: "custom_local" },
+    });
+  });
+
+  it("does not persist account-managed presets as local provider profiles", async () => {
+    setManagedFrostFoxCatalog({
+      configurationVersion: "account-a",
+      channels: [
+        {
+          channelKey: "text",
+          providerId: "frostfox-74657874",
+          displayName: "Text",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://market.example/v1",
+          models: [
+            {
+              id: "model-a",
+              name: "Model A",
+              capability: { input: ["text"], output: ["text"] },
+            },
+          ],
+        },
+      ],
+    });
+
+    setCustomPresets(getCustomPresets());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(JSON.stringify(readSettingsBlob())).not.toContain("frostfox:");
+  });
+
+  it("filters stale managed references even after the catalog is cleared", async () => {
+    setManagedFrostFoxCatalog(null);
+    setCustomPresets([
+      {
+        id: "frostfox:old-channel:old-model",
+        name: "Old managed model",
+        provider: "frostfox-old",
+        baseUrl: "https://market.example/v1",
+        model: "old-model",
+      },
+      {
+        id: "frostfox-managed-0123456789abcdef",
+        name: "Legacy managed model",
+        provider: "frostfox-old",
+        baseUrl: "https://market.example/v1",
+        model: "legacy-model",
+      },
+      {
+        id: "custom_keep",
+        name: "Local model",
+        provider: "openai",
+        baseUrl: "https://openai.example/v1",
+        model: "gpt-5",
+      },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getCustomPresets().map((preset) => preset.id)).toEqual([
+      "custom_keep",
+    ]);
+
+    const persisted = readSettingsBlob() as {
+      entries?: { "llm.providers"?: Array<Record<string, unknown>> };
+    };
+    const serialized = JSON.stringify(persisted);
+    expect(serialized).not.toContain("old managed model");
+    expect(serialized).toContain("Local model");
+  });
   it("uses a 1x default and persists positive decimal provider multipliers", async () => {
     expect(getProviderPriceMultiplier("openai")).toBe(1);
 

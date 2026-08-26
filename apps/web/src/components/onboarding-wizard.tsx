@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Dispatch, SetStateAction } from "react";
 import type { FrostFoxModelCatalog, PresetSummary } from "@/services/api.js";
 import {
@@ -6,6 +7,7 @@ import {
   managedCatalogToPresetSummaries,
 } from "@/services/api.js";
 import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { emitToast } from "@/lib/toast-channel.js";
 import { useLocalePreference } from "@/hooks/useLocalePreference";
 import { TOTAL_STEPS } from "./onboarding-wizard/constants.js";
 import {
@@ -23,7 +25,6 @@ import {
 import {
   defaultModelForProvider,
   defaultManagedFormState,
-  managedModelOptions,
   emptyFormState,
 } from "./onboarding-wizard/provider-state.js";
 import {
@@ -90,25 +91,27 @@ function useDefaultModelSelection(
 ): void {
   useEffect(() => {
     if (managedOnly) {
-      const managedOption = managedModelOptions(managedCatalog, slotName)[0];
-      if (!managedOption) return;
+      if (form.modelSource !== "managed") {
+        setForm({ ...form, modelSource: "managed" });
+        return;
+      }
+      const next = defaultManagedFormState(form, managedCatalog, slotName);
+      if (next !== form) setForm(next);
+      return;
+    }
+
+    // A sign-out can happen while the wizard is mounted. Do not leave the
+    // form in a managed-only state that has no selectable catalog behind it.
+    if (form.modelSource === "managed") {
       setForm((current) =>
-        current.modelSource === "managed" && current.managedModelRef
-          ? current
-          : defaultManagedFormState(
-              { ...current, modelSource: "managed" },
-              managedCatalog,
-              slotName,
-            ),
+        current.modelSource === "managed"
+          ? { ...current, modelSource: "local", managedModelRef: "" }
+          : current,
       );
       return;
     }
 
-    if (
-      form.modelSource === "managed" ||
-      form.selected === "__custom__" ||
-      form.builtInModel.trim()
-    ) {
+    if (form.selected === "__custom__" || form.builtInModel.trim()) {
       return;
     }
 
@@ -122,26 +125,26 @@ function useDefaultModelSelection(
         ? current
         : { ...current, builtInModel: nextModel },
     );
-  }, [
-    availablePresets,
-    form.builtInModel,
-    form.managedModelRef,
-    form.modelSource,
-    form.selected,
-    managedCatalog,
-    managedOnly,
-    setForm,
-    slotName,
-  ]);
+  }, [availablePresets, form, managedCatalog, managedOnly, setForm, slotName]);
 }
 
 export function OnboardingWizard() {
   const [visible, setVisible] = useState(() => !isOnboarded());
+  const { t } = useTranslation();
   const { locale, setLocale } = useLocalePreference();
-  const { status, catalog: managedCatalog, loading: managedLoading } =
-    useFrostFoxAccount();
-  const managedOnly = Boolean(status?.enabled && status.authenticated);
+  const {
+    status,
+    catalog: managedCatalog,
+    loading: managedLoading,
+    refresh: refreshManagedModels,
+  } = useFrostFoxAccount();
+  const accountId =
+    status?.authenticated && status.account ? status.account.id : undefined;
+  const managedOnly = Boolean(
+    status?.enabled && status.authenticated && status.account,
+  );
   const managedModelsLoading = managedOnly && managedLoading;
+  const dismissing = useRef(false);
   const [step, setStep] = useState<OnboardingStep>(0);
   const availablePresets = useAvailablePresets(managedCatalog);
 
@@ -153,6 +156,14 @@ export function OnboardingWizard() {
     emptyFormState(),
   );
 
+  // Completion is device-local for self-hosted users but account-scoped for
+  // FrostFox users. A second account on the same device must get its own model
+  // selection instead of inheriting the first account's completion marker.
+  useEffect(() => {
+    if (managedLoading || !accountId || isOnboarded(accountId)) return;
+    setStep(0);
+    setVisible(true);
+  }, [accountId, managedLoading]);
   useDefaultModelSelection(
     storyForm,
     setStoryForm,
@@ -169,18 +180,32 @@ export function OnboardingWizard() {
     managedOnly,
     "plugin",
   );
-
-  const dismiss = useCallback(() => {
-    markOnboarded();
-    setVisible(false);
-  }, []);
+  const dismiss = useCallback(async () => {
+    if (dismissing.current) return;
+    dismissing.current = true;
+    try {
+      await markOnboarded(accountId);
+      setVisible(false);
+    } catch (error) {
+      emitToast(
+        "error",
+        t(
+          "onboarding.saveFailed",
+          "Could not save onboarding completion. Please try again.",
+        ),
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      dismissing.current = false;
+    }
+  }, [accountId, t]);
 
   const handleNext = useCallback(() => {
     if (step < TOTAL_STEPS - 1) {
       setStep((current) => nextStep(current));
       return;
     }
-    dismiss();
+    void dismiss();
   }, [step, dismiss]);
 
   const handleBack = useCallback(() => {
@@ -213,7 +238,7 @@ export function OnboardingWizard() {
     setStep((current) => nextStep(current));
   }, [pluginForm, pluginMode, availablePresets]);
 
-  if (!visible) return null;
+  if (!visible || managedLoading) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm">
@@ -245,6 +270,7 @@ export function OnboardingWizard() {
                 managedCatalog,
               )}
               onBeforePingStory={handleBeforePingStory}
+              onRefreshManagedModels={refreshManagedModels}
               onContinue={handleContinueFromStory}
               onSkip={handleNext}
             />
@@ -267,6 +293,7 @@ export function OnboardingWizard() {
                 managedCatalog,
               )}
               onBeforePingPlugin={handleBeforePingPlugin}
+              onRefreshManagedModels={refreshManagedModels}
               onBack={handleBack}
               onContinue={handleContinueFromPlugin}
             />

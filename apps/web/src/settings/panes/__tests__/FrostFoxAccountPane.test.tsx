@@ -3,18 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n";
 
 const api = vi.hoisted(() => ({
+  clearManagedFrostFoxSlots: vi.fn(),
   fetchAccount: vi.fn(),
   fetchModels: vi.fn(),
   setCatalog: vi.fn(),
+  reconcileSlots: vi.fn(),
   signOut: vi.fn(),
   disconnect: vi.fn(),
   refreshSharedAccount: vi.fn(),
 }));
 
 vi.mock("@/services/api.js", () => ({
+  clearManagedFrostFoxSlots: api.clearManagedFrostFoxSlots,
   fetchFrostFoxAccount: api.fetchAccount,
   fetchFrostFoxModels: api.fetchModels,
   setManagedFrostFoxCatalog: api.setCatalog,
+  reconcileManagedFrostFoxSlots: api.reconcileSlots,
   signOutFrostFox: api.signOut,
   disconnectFrostFox: api.disconnect,
 }));

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check,
@@ -18,9 +18,11 @@ import {
 import { Badge } from "@/components/ui/badge.js";
 import { Button } from "@/components/ui/button.js";
 import {
+  clearManagedFrostFoxSlots,
   disconnectFrostFox,
   fetchFrostFoxAccount,
   fetchFrostFoxModels,
+  reconcileManagedFrostFoxSlots,
   setManagedFrostFoxCatalog,
   signOutFrostFox,
   type FrostFoxAccountStatus,
@@ -39,19 +41,37 @@ export function FrostFoxAccountPane() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(false);
   const [modelsError, setModelsError] = useState(false);
+  const refreshVersion = useRef(0);
+  const activeAccountId = useRef<string | null | undefined>(undefined);
   const refresh = async () => {
+    const requestVersion = ++refreshVersion.current;
     setLoading(true);
     setError(false);
     setModelsError(false);
     try {
       const next = await fetchFrostFoxAccount(true);
+      if (requestVersion !== refreshVersion.current) return;
+      const nextAccountId =
+        next.authenticated && next.account ? next.account.id : null;
+      if (
+        activeAccountId.current !== undefined &&
+        activeAccountId.current !== nextAccountId
+      ) {
+        setManagedFrostFoxCatalog(null);
+        clearManagedFrostFoxSlots();
+        setCatalog(null);
+      }
+      activeAccountId.current = nextAccountId;
       setStatus(next);
-      if (next.authenticated) {
+      if (next.enabled && next.authenticated && next.account) {
         try {
           const nextCatalog = await fetchFrostFoxModels(true);
+          if (requestVersion !== refreshVersion.current) return;
           setCatalog(nextCatalog);
           setManagedFrostFoxCatalog(nextCatalog);
+          reconcileManagedFrostFoxSlots();
         } catch {
+          if (requestVersion !== refreshVersion.current) return;
           setCatalog(null);
           setManagedFrostFoxCatalog(null);
           setModelsError(true);
@@ -59,11 +79,14 @@ export function FrostFoxAccountPane() {
       } else {
         setCatalog(null);
         setManagedFrostFoxCatalog(null);
+        clearManagedFrostFoxSlots();
       }
     } catch {
+      if (requestVersion !== refreshVersion.current) return;
+      setManagedFrostFoxCatalog(null);
       setError(true);
     } finally {
-      setLoading(false);
+      if (requestVersion === refreshVersion.current) setLoading(false);
     }
   };
 
@@ -72,11 +95,14 @@ export function FrostFoxAccountPane() {
   }, []);
 
   const signOut = async () => {
+    refreshVersion.current += 1;
     setAction("signout");
     try {
       await signOutFrostFox();
       setManagedFrostFoxCatalog(null);
+      clearManagedFrostFoxSlots();
       setCatalog(null);
+      activeAccountId.current = null;
       setModelsError(false);
       setStatus((current) =>
         current
@@ -90,11 +116,14 @@ export function FrostFoxAccountPane() {
   };
 
   const disconnect = async () => {
+    refreshVersion.current += 1;
     setAction("disconnect");
     try {
       await disconnectFrostFox();
       setManagedFrostFoxCatalog(null);
       setCatalog(null);
+      clearManagedFrostFoxSlots();
+      activeAccountId.current = null;
       setModelsError(false);
       setStatus((current) =>
         current

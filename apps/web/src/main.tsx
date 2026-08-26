@@ -14,7 +14,7 @@ import {
   fetchServerHealth,
   hydrateManagedFrostFoxModels,
   loadProviderKeysFromStorage,
-  reconcileManagedFrostFoxImageSlot,
+  reconcileManagedFrostFoxSlots,
 } from "@/services/api";
 import { probeDesktopMode } from "@/lib/desktop-bridge";
 import { emitToast } from "@/lib/toast-channel.js";
@@ -178,7 +178,7 @@ probeDesktopMode()
       hydrateManagedFrostFoxModels(),
       fetchLlmConfig(),
     ]);
-    reconcileManagedFrostFoxImageSlot(llmConfig.slots.image?.model);
+    reconcileManagedFrostFoxSlots(llmConfig.slots.image?.model);
   })
   // Nothing in the bootstrap is allowed to stop the app from mounting. Every
   // step above is a preference/hydration concern; a rejection here used to

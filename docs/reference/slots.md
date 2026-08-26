@@ -103,6 +103,8 @@ providerRequestMetadata = { speechWire = "mimo-tts/mimo" }
 
 托管模型只在当前 FrostFox 账号会话中解析；退出或解绑后清除前端目录，未连接账号的 AI 执行请求 fail-closed。桌面端和 self-hosted 配置路径不变。
 
+首次登录 FrostFox 账号时，商业 Web 的引导会直接读取该账号当前同步的文本模型目录：叙事槽位必须选择一个可用的托管文本模型，插件槽位默认复制叙事槽位，也可在同一目录中另选模型。此路径只把 `frostfox:<channel>:<model>` 引用写入前端槽位设置，不要求或保存 provider API key；账号退出、解绑或切换后，旧账号的托管引用会清除，新的账号目录重新决定可选项。
+
 ## API Key 流转
 
 Key 永远不进 `llm.toml`：dev 放 `.env.llm`，桌面端放 `~/.covel/keys.env`（mode 600），纯 web 放 localStorage（`covel:keys`）。每次 AI 请求经 `X-Provider-Keys` header（base64 JSON `{provider: key}`）到达服务端，按目标 slot 的 `provider` 名分发绑定 —— wire 拿到的 `config.apiKey` 已是该 slot provider 的 key，客户端 key 覆盖 env key。

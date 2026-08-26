@@ -24,9 +24,11 @@ import {
 import { useTranslation } from "react-i18next";
 import { FrostFoxConnectDialog } from "@/components/frostfox-connect-dialog.js";
 import {
+  clearManagedFrostFoxSlots,
   fetchFrostFoxAccount,
   getManagedFrostFoxCatalog,
   hydrateManagedFrostFoxModels,
+  reconcileManagedFrostFoxSlots,
   setManagedFrostFoxCatalog,
   signOutFrostFox,
   type FrostFoxAccountStatus,
@@ -55,22 +57,46 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const mounted = useRef(true);
+  const refreshVersion = useRef(0);
+  const activeAccountId = useRef<string | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
+    const requestVersion = ++refreshVersion.current;
     setLoading(true);
     setError(false);
     try {
       const next = await fetchFrostFoxAccount(true);
-      if (mounted.current) setStatus(next);
-      await hydrateManagedFrostFoxModels(next);
-      if (mounted.current) setCatalog(getManagedFrostFoxCatalog());
+      if (!mounted.current || requestVersion !== refreshVersion.current) return;
+      const nextAccountId =
+        next.authenticated && next.account ? next.account.id : null;
+      if (
+        activeAccountId.current !== undefined &&
+        activeAccountId.current !== nextAccountId
+      ) {
+        setManagedFrostFoxCatalog(null);
+        clearManagedFrostFoxSlots();
+        setCatalog(null);
+      }
+      activeAccountId.current = nextAccountId;
+      setStatus(next);
+      const hydratedCatalog = await hydrateManagedFrostFoxModels(next);
+      if (!mounted.current || requestVersion !== refreshVersion.current) return;
+      if (!next.enabled || !next.authenticated || !next.account) {
+        clearManagedFrostFoxSlots();
+      } else {
+        reconcileManagedFrostFoxSlots();
+      }
+      setCatalog(hydratedCatalog ?? getManagedFrostFoxCatalog());
     } catch {
-      if (mounted.current) {
+      if (mounted.current && requestVersion === refreshVersion.current) {
+        setManagedFrostFoxCatalog(null);
         setCatalog(null);
         setError(true);
       }
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && requestVersion === refreshVersion.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -171,7 +197,11 @@ export function FrostFoxAccountSummary({
     try {
       await signOutFrostFox();
       setManagedFrostFoxCatalog(null);
+      clearManagedFrostFoxSlots();
       setPopoverOpen(false);
+      // Refresh after logout. Besides publishing the unauthenticated state,
+      // refresh() advances the provider generation and invalidates any
+      // periodic request that was still in flight when logout began.
       await refresh();
     } finally {
       setSigningOut(false);
@@ -199,7 +229,10 @@ export function FrostFoxAccountSummary({
               : "bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white dark:border-white/20 shadow-xs"
           }`}
         >
-          <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-80 group-hover:scale-110 transition-transform" aria-hidden="true" />
+          <Sparkles
+            className="h-3.5 w-3.5 shrink-0 opacity-80 group-hover:scale-110 transition-transform"
+            aria-hidden="true"
+          />
           <span>{t("nav.frostfoxConnect", "Connect Account")}</span>
         </button>
 
@@ -246,9 +279,7 @@ export function FrostFoxAccountSummary({
             className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ${
               overlay ? "ring-zinc-900" : "ring-card"
             } ${
-              recoveryRequired
-                ? "bg-amber-500 animate-pulse"
-                : "bg-emerald-500"
+              recoveryRequired ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
             }`}
             aria-hidden="true"
           />
@@ -417,9 +448,7 @@ export function FrostFoxAccountSummary({
                 </p>
                 <button
                   type="button"
-                  onClick={() =>
-                    window.location.assign("/auth/frostfox/start")
-                  }
+                  onClick={() => window.location.assign("/auth/frostfox/start")}
                   className="text-xs font-semibold underline hover:no-underline text-amber-800 dark:text-amber-200 cursor-pointer"
                 >
                   {t("account.reconnect", "Reconnect")}

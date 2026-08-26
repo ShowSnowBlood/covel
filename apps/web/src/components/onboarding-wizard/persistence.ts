@@ -16,18 +16,60 @@ import { CUSTOM_PROVIDER_ID, ONBOARDING_VERSION } from "./constants.js";
 import { providerOptionLabel } from "./provider-state.js";
 import type { ProviderFormState, SlotName } from "./types.js";
 
-export function isOnboarded(): boolean {
+const ONBOARDING_ACCOUNT_KEY = "ui.onboardedAccountId";
+
+export function isOnboarded(accountId?: string | null): boolean {
   const stored = getSettings().get<number>("ui.onboardedVersion");
-  return typeof stored === "number" && stored >= ONBOARDING_VERSION;
+  if (typeof stored !== "number" || stored < ONBOARDING_VERSION) return false;
+  if (!accountId) return true;
+  return getSettings().get<string>(ONBOARDING_ACCOUNT_KEY) === accountId;
 }
 
-export function markOnboarded(): void {
-  void getSettings().set("ui.onboardedVersion", ONBOARDING_VERSION);
+export async function markOnboarded(accountId?: string | null): Promise<void> {
+  const store = getSettings();
+  const previousVersion = store.get<number>("ui.onboardedVersion");
+  const previousAccount = store.get<string>(ONBOARDING_ACCOUNT_KEY);
+  try {
+    // Persist the version first. If the account marker write fails, the old
+    // marker still prevents the new account from being treated as complete.
+    await store.set("ui.onboardedVersion", ONBOARDING_VERSION);
+    if (accountId) {
+      await store.set(ONBOARDING_ACCOUNT_KEY, accountId);
+    } else {
+      await store.clear(ONBOARDING_ACCOUNT_KEY);
+    }
+  } catch (error) {
+    // Settings writes are separate adapter operations. Restore both values so
+    // a partial desktop/localStorage write cannot leave a false completion.
+    try {
+      if (typeof previousVersion === "number") {
+        await store.set("ui.onboardedVersion", previousVersion);
+      } else {
+        await store.clear("ui.onboardedVersion");
+      }
+    } catch {
+      // Preserve the original failure; the next mount will remain fail-closed
+      // unless the adapter happened to persist the first write.
+    }
+    try {
+      if (typeof previousAccount === "string" && previousAccount.length > 0) {
+        await store.set(ONBOARDING_ACCOUNT_KEY, previousAccount);
+      } else {
+        await store.clear(ONBOARDING_ACCOUNT_KEY);
+      }
+    } catch {
+      // Preserve the original failure.
+    }
+    throw error;
+  }
 }
 
 /** Force the onboarding wizard to appear again on next mount. Used by Settings "re-run tutorial". */
 export function resetOnboarding(): void {
-  void getSettings().clear("ui.onboardedVersion");
+  const store = getSettings();
+  void store
+    .clear("ui.onboardedVersion")
+    .then(() => store.clear(ONBOARDING_ACCOUNT_KEY));
 }
 
 /**
@@ -75,11 +117,13 @@ export async function persistSlot(
     const modelRef = form.managedModelRef.trim();
     const isKnownManagedModel = presetCatalog.some(
       (preset) =>
-        preset.id === modelRef &&
-        preset.enabled &&
-        preset.scope === "frostfox",
+        preset.id === modelRef && preset.enabled && preset.scope === "frostfox",
     );
-    if (!modelRef || !isManagedFrostFoxModelRef(modelRef) || !isKnownManagedModel) {
+    if (
+      !modelRef ||
+      !isManagedFrostFoxModelRef(modelRef) ||
+      !isKnownManagedModel
+    ) {
       return undefined;
     }
     const slots = getSlotConfig();

@@ -43,6 +43,11 @@ const APPEARANCE_KEYS = new Set([
   "ui.scheme",
   "ui.themeManager",
 ]);
+
+const INTERNAL_SETTING_KEYS = new Set([
+  "ui.onboardedVersion",
+  "ui.onboardedAccountId",
+]);
 const OPERATOR_ACCESS_NODE_ID = "operator-access";
 const OPERATOR_ACCESS_LABEL = {
   "zh-CN": "运维访问",
@@ -94,7 +99,9 @@ export function buildNavTree(
   opts: BuildNavOptions = {},
 ): NavNode[] {
   const locale = opts.locale ?? "zh-CN";
-  const all = store.listEntries();
+  const all = store
+    .listEntries()
+    .filter((entry) => !INTERNAL_SETTING_KEYS.has(entry.key));
   const byGroup = new Map<SettingGroup, SettingEntry[]>();
   for (const e of all) {
     const bucket = byGroup.get(e.group) ?? [];

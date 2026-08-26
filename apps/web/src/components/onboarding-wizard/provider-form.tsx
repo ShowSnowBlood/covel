@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Cloud, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Cloud, Eye, EyeOff, KeyRound, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { Label } from "@/components/ui/label.js";
 import { getProviderKeys } from "@/services/api.js";
@@ -27,6 +27,7 @@ export function ProviderForm({
   state,
   onChange,
   onBeforePing,
+  onRefreshManagedModels,
   presets,
   managedCatalog = null,
   managedModelsLoading = false,
@@ -39,7 +40,9 @@ export function ProviderForm({
     PROVIDERS.find((p) => p.id === state.selected) ?? PROVIDERS[0];
   const modelOptions = modelOptionsForProvider(presets, state.selected);
   const managedOptions = managedModelOptions(managedCatalog, slotName);
-  const effectiveSource: ModelSource = managedOnly ? "managed" : state.modelSource;
+  const effectiveSource: ModelSource = managedOnly
+    ? "managed"
+    : state.modelSource;
   const managedReady = managedFormIsReady(
     { ...state, modelSource: effectiveSource },
     managedCatalog,
@@ -148,17 +151,31 @@ export function ProviderForm({
               aria-hidden="true"
             />
           )}
-          <span>
-            {managedModelsLoading
-              ? t(
-                  "onboarding.loadingManagedModels",
-                  "Loading account models…",
-                )
-              : t(
-                  "onboarding.noManagedModels",
-                  "No usable account models are available yet. Refresh your FrostFox account and try again.",
-                )}
-          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <span className="block">
+              {managedModelsLoading
+                ? t(
+                    "onboarding.loadingManagedModels",
+                    "Loading account models…",
+                  )
+                : t(
+                    "onboarding.noManagedModels",
+                    "No usable account models are available yet. Refresh your FrostFox account and try again.",
+                  )}
+            </span>
+            {!managedModelsLoading && onRefreshManagedModels && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 text-[11px]"
+                onClick={() => void onRefreshManagedModels()}
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("onboarding.refreshManagedModels", "Refresh models")}
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

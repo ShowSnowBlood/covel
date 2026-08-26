@@ -238,7 +238,7 @@ export function mergeManagedSlotDefaults(
   };
 }
 
-function parseProviderKeys(
+export function parseProviderKeys(
   header: string | undefined,
 ): Record<string, string> | null {
   if (!header || header.length > MAX_HEADER_BYTES) return null;
@@ -252,7 +252,7 @@ function parseProviderKeys(
   return result;
 }
 
-function parseSlotOverrides(
+export function parseSlotOverrides(
   header: string | undefined,
 ): SlotOverridesInput | null {
   if (!header || header.length > MAX_HEADER_BYTES) return null;

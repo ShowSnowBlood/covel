@@ -1,13 +1,22 @@
-import { useState, useMemo, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   getSlotConfig,
   getCustomPresets,
+  getManagedFrostFoxCatalogRevision,
   slotBindingId,
+  subscribeManagedFrostFoxCatalog,
   type SlotConfigEntry,
   type CustomPreset,
   type PresetSummary,
   type LlmConfigResponse,
 } from "@/services/api.js";
+import { getSettings } from "@/settings/store";
 
 export interface ResolvedSlot {
   slotId: string;
@@ -59,14 +68,33 @@ export function useSlotConfig(
   llmConfig?: LlmConfigResponse | null,
 ) {
   const [version, setVersion] = useState(0);
+  const managedCatalogRevision = useSyncExternalStore(
+    subscribeManagedFrostFoxCatalog,
+    getManagedFrostFoxCatalogRevision,
+    getManagedFrostFoxCatalogRevision,
+  );
+
+  useEffect(() => {
+    const store = getSettings();
+    return store.subscribeAll(() => setVersion((current) => current + 1));
+  }, []);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- version in deps triggers recalc on refresh()
-  const slotConfig = useMemo(() => getSlotConfig(), [version]);
+  // Both local settings and the account catalog can change independently.
+  // Re-read them on either revision so active model rows do not retain a
+  // previous account's managed preset after login, refresh, or sign-out.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- revisions in deps trigger recalc
+  const slotConfig = useMemo(
+    () => getSlotConfig(),
+    [version, managedCatalogRevision],
+  );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- version in deps triggers recalc on refresh()
-  const customPresets = useMemo(() => getCustomPresets(), [version]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- revisions in deps trigger recalc
+  const customPresets = useMemo(
+    () => getCustomPresets(),
+    [version, managedCatalogRevision],
+  );
 
   const allPresets = useMemo(() => {
     const customs: PresetSummary[] = customPresets.map((p) => ({

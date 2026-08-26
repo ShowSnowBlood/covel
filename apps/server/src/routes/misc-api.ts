@@ -29,8 +29,11 @@ import {
   checkSessionOwnerById,
   hasOperatorToken,
 } from "./api/session/session-guard.js";
-import { mergeManagedSlotDefaults } from "../middleware/per-request-llm.js";
-import { decodeBase64Json } from "../lib/base64-json.js";
+import {
+  mergeManagedSlotDefaults,
+  parseProviderKeys,
+  parseSlotOverrides,
+} from "../middleware/per-request-llm.js";
 
 export function createMiscApiRoutes(
   ai: AiStack,
@@ -276,11 +279,8 @@ export function createMiscApiRoutes(
     // Decode per-request API keys (base64 JSON). Keys are never persisted
     // server-side. Malformed header → undefined; let the gateway raise a
     // clearer error later if the key is actually needed.
-    let apiKeys: Record<string, string> | undefined;
-    const keysParsed = decodeBase64Json(c.req.header("X-Provider-Keys"));
-    if (keysParsed && typeof keysParsed === "object") {
-      apiKeys = keysParsed as Record<string, string>;
-    }
+    let apiKeys: Record<string, string> | undefined =
+      parseProviderKeys(c.req.header("X-Provider-Keys")) ?? undefined;
     if (frostFoxContext) {
       // The derived managed key wins over any browser-supplied value for the
       // reserved FrostFox provider ids.
@@ -293,15 +293,28 @@ export function createMiscApiRoutes(
     // middleware runs (same request, but the resolution we do here happens
     // against the already-mutated registries).
     // Malformed header → behave as if no overrides were supplied.
-    let browserSlotConfig: SlotOverridesInput | null = {};
-    const slotParsed = decodeBase64Json(c.req.header("X-Slot-Config"));
-    if (slotParsed && typeof slotParsed === "object") {
-      browserSlotConfig = slotParsed as SlotOverridesInput;
+    const browserSlotConfig = parseSlotOverrides(c.req.header("X-Slot-Config"));
+    let sanitizedSlotConfig: SlotOverridesInput | null;
+    try {
+      sanitizedSlotConfig = frostFox
+        ? frostFox.sanitizeSlotOverrides(
+            browserSlotConfig,
+            frostFoxContext !== null,
+          )
+        : browserSlotConfig;
+    } catch (error) {
+      if (error instanceof FrostFoxServiceError) {
+        return c.json(
+          errorBody(error.code, { code: error.code }),
+          error.status === 400 ? 400 : 401,
+        );
+      }
+      throw error;
     }
     const slotConfig =
       mergeManagedSlotDefaults(
         frostFoxContext?.managedSlotDefaults,
-        browserSlotConfig,
+        sanitizedSlotConfig,
       ) ?? {};
 
     // Register client-declared custom presets via the shared overlay helper

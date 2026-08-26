@@ -1,7 +1,4 @@
-import type {
-  FrostFoxModelCatalog,
-  PresetSummary,
-} from "@/services/api.js";
+import type { FrostFoxModelCatalog, PresetSummary } from "@/services/api.js";
 import { frostFoxModelRef } from "@/services/api.js";
 import { PROVIDERS } from "./constants.js";
 import type { ProviderFormState, SlotName } from "./types.js";
@@ -110,11 +107,13 @@ export function defaultManagedFormState(
   catalog: FrostFoxModelCatalog | null,
   slotName: SlotName,
 ): ProviderFormState {
-  if (form.modelSource !== "managed" || form.managedModelRef.trim()) {
-    return form;
-  }
-  const option = managedModelOptions(catalog, slotName)[0];
-  return option
-    ? { ...form, managedModelRef: option.ref, apiKey: "" }
-    : form;
+  if (form.modelSource !== "managed") return form;
+  const options = managedModelOptions(catalog, slotName);
+  if (options.length === 0) return form;
+  const selected = options.find(
+    (option) => option.ref === form.managedModelRef,
+  );
+  const option = selected ?? options[0]!;
+  if (selected && !form.apiKey) return form;
+  return { ...form, managedModelRef: option.ref, apiKey: "" };
 }

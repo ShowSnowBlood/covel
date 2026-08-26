@@ -18,6 +18,23 @@ export async function parseJson(
   }
 }
 
+function parseSseFrame(frame: string): Record<string, unknown> | null {
+  const data = frame
+    .split(/\r\n|\n|\r/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n")
+    .trim();
+  if (!data || data === "[DONE]") return null;
+  try {
+    return JSON.parse(data) as Record<string, unknown>;
+  } catch {
+    throw new Error(
+      `Provider returned malformed SSE payload: ${data.slice(0, ERROR_PREVIEW_MAX_CHARS)}`,
+    );
+  }
+}
+
 export async function* iterateSsePayloads(
   response: Response,
 ): AsyncIterable<Record<string, unknown>> {
@@ -34,30 +51,19 @@ export async function* iterateSsePayloads(
 
       buffer += decoder.decode(value, { stream: true });
 
-      while (buffer.includes("\n\n")) {
-        const boundary = buffer.indexOf("\n\n");
-        const frame = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-
-        const dataLine = frame
-          .split("\n")
-          .find((line) => line.startsWith("data: "));
-        if (!dataLine) continue;
-
-        const data = dataLine.slice(6).trim();
-        if (data === "[DONE]") continue;
-
-        let parsed: Record<string, unknown>;
-        try {
-          parsed = JSON.parse(data) as Record<string, unknown>;
-        } catch {
-          throw new Error(
-            `Provider returned malformed SSE payload: ${data.slice(0, ERROR_PREVIEW_MAX_CHARS)}`,
-          );
-        }
-        yield parsed;
+      while (true) {
+        const boundary = /\r?\n\r?\n|\r\r/.exec(buffer);
+        if (!boundary || boundary.index === undefined) break;
+        const frame = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary[0].length);
+        const payload = parseSseFrame(frame);
+        if (payload) yield payload;
       }
     }
+
+    buffer += decoder.decode();
+    const payload = parseSseFrame(buffer);
+    if (payload) yield payload;
   } finally {
     reader.releaseLock();
   }

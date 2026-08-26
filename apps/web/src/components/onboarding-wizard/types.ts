@@ -34,6 +34,7 @@ export interface ProviderFormProps {
   state: ProviderFormState;
   onChange: (next: ProviderFormState) => void;
   onBeforePing: () => Promise<void>;
+  onRefreshManagedModels?: () => Promise<void>;
   presets: PresetSummary[];
   managedCatalog?: FrostFoxModelCatalog | null;
   managedModelsLoading?: boolean;

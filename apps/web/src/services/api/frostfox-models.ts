@@ -8,12 +8,36 @@ import type { PresetSummary } from "./types.js";
 import type { CustomPreset } from "./model-settings.js";
 
 const FROSTFOX_MODEL_REF_PREFIX = "frostfox:";
+const LEGACY_MANAGED_MODEL_REF_PREFIX = "frostfox-managed-";
 let managedCatalog: FrostFoxModelCatalog | null = null;
+let managedHydrationVersion = 0;
+let managedCatalogRevision = 0;
+const managedCatalogListeners = new Set<() => void>();
+
+function publishManagedFrostFoxCatalog(
+  catalog: FrostFoxModelCatalog | null,
+): void {
+  managedCatalog = catalog;
+  managedCatalogRevision += 1;
+  for (const listener of managedCatalogListeners) listener();
+}
+
+export function subscribeManagedFrostFoxCatalog(
+  listener: () => void,
+): () => void {
+  managedCatalogListeners.add(listener);
+  return () => managedCatalogListeners.delete(listener);
+}
+
+export function getManagedFrostFoxCatalogRevision(): number {
+  return managedCatalogRevision;
+}
 
 export function setManagedFrostFoxCatalog(
   catalog: FrostFoxModelCatalog | null,
 ): void {
-  managedCatalog = catalog;
+  managedHydrationVersion += 1;
+  publishManagedFrostFoxCatalog(catalog);
 }
 
 export function getManagedFrostFoxCatalog(): FrostFoxModelCatalog | null {
@@ -49,7 +73,10 @@ export function getManagedFrostFoxPresets(): CustomPreset[] {
 }
 
 export function isManagedFrostFoxModelRef(value: string): boolean {
-  return value.startsWith(FROSTFOX_MODEL_REF_PREFIX);
+  return (
+    value.startsWith(FROSTFOX_MODEL_REF_PREFIX) ||
+    value.startsWith(LEGACY_MANAGED_MODEL_REF_PREFIX)
+  );
 }
 
 export function managedCatalogToPresetSummaries(
@@ -81,16 +108,21 @@ export function getManagedFrostFoxPresetSummaries(): PresetSummary[] {
 export async function hydrateManagedFrostFoxModels(
   accountStatus?: FrostFoxAccountStatus,
 ): Promise<FrostFoxModelCatalog | null> {
+  const hydrationVersion = ++managedHydrationVersion;
   try {
     const account = accountStatus ?? (await fetchFrostFoxAccount(true));
+    if (hydrationVersion !== managedHydrationVersion) return null;
     if (!account.enabled || !account.authenticated) {
-      managedCatalog = null;
+      publishManagedFrostFoxCatalog(null);
       return null;
     }
-    managedCatalog = await fetchFrostFoxModels(true);
-    return managedCatalog;
+    const catalog = await fetchFrostFoxModels(true);
+    if (hydrationVersion !== managedHydrationVersion) return null;
+    publishManagedFrostFoxCatalog(catalog);
+    return catalog;
   } catch {
-    managedCatalog = null;
+    if (hydrationVersion === managedHydrationVersion)
+      publishManagedFrostFoxCatalog(null);
     return null;
   }
 }

@@ -138,4 +138,38 @@ describe("onboarding provider state helpers", () => {
     expect(form.managedModelRef).toBe(options[0]!.ref);
     expect(managedFormIsReady(form, catalog, "story")).toBe(true);
   });
+
+  it("replaces a model reference that belongs to a previous account", () => {
+    const catalog: FrostFoxModelCatalog = {
+      configurationVersion: "2",
+      channels: [
+        {
+          channelKey: "new-account",
+          providerId: "frostfox-new",
+          displayName: "New Account",
+          enabled: true,
+          protocol: "openai-chat-v1",
+          baseUrl: "https://router.example/v1",
+          models: [
+            {
+              id: "new-model",
+              name: "New Model",
+              capability: { input: ["text"], output: ["text"] },
+            },
+          ],
+        },
+      ],
+    };
+    const stale = {
+      ...emptyFormState(),
+      modelSource: "managed" as const,
+      managedModelRef: "frostfox:old-account:old-model",
+      apiKey: "stale-key",
+    };
+
+    const next = defaultManagedFormState(stale, catalog, "story");
+    expect(next.managedModelRef).toBe("frostfox:new-account:new-model");
+    expect(next.apiKey).toBe("");
+    expect(managedFormIsReady(next, catalog, "story")).toBe(true);
+  });
 });

@@ -1,11 +1,35 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   frostFoxModelRef,
+  getManagedFrostFoxCatalog,
   getManagedFrostFoxPresets,
+  hydrateManagedFrostFoxModels,
   setManagedFrostFoxCatalog,
+  subscribeManagedFrostFoxCatalog,
 } from "../frostfox-models.js";
 
-afterEach(() => setManagedFrostFoxCatalog(null));
+const api = vi.hoisted(() => ({
+  fetchFrostFoxAccount: vi.fn(),
+  fetchFrostFoxModels: vi.fn(),
+}));
+
+vi.mock("../frostfox.js", () => ({
+  fetchFrostFoxAccount: api.fetchFrostFoxAccount,
+  fetchFrostFoxModels: api.fetchFrostFoxModels,
+}));
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
+afterEach(() => {
+  setManagedFrostFoxCatalog(null);
+  vi.clearAllMocks();
+});
 
 describe("FrostFox managed model projection", () => {
   it("projects only enabled, healthy channel models into request presets", () => {
@@ -67,5 +91,42 @@ describe("FrostFox managed model projection", () => {
         capability: { input: ["text"], output: ["text"] },
       },
     ]);
+  });
+});
+
+describe("managed catalog hydration ordering", () => {
+  it("does not let a stale request overwrite a newer catalog", async () => {
+    const first = deferred<{ configurationVersion: string; channels: [] }>();
+    const second = deferred<{ configurationVersion: string; channels: [] }>();
+    api.fetchFrostFoxModels
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const account = { enabled: true, authenticated: true };
+
+    const firstRun = hydrateManagedFrostFoxModels(account);
+    const secondRun = hydrateManagedFrostFoxModels(account);
+    const latestCatalog = {
+      configurationVersion: "latest",
+      channels: [] as [],
+    };
+    const staleCatalog = { configurationVersion: "stale", channels: [] as [] };
+
+    second.resolve(latestCatalog);
+    expect(await secondRun).toBe(latestCatalog);
+    first.resolve(staleCatalog);
+    expect(await firstRun).toBeNull();
+    expect(getManagedFrostFoxCatalog()).toBe(latestCatalog);
+  });
+
+  it("notifies subscribers when the catalog is replaced or cleared", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeManagedFrostFoxCatalog(listener);
+
+    setManagedFrostFoxCatalog({ configurationVersion: "1", channels: [] });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    setManagedFrostFoxCatalog(null);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });

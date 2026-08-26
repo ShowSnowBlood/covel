@@ -5,7 +5,11 @@ import {
   profilesFromLegacyPresets,
   type ProviderModelProfile,
 } from "./provider-model-profiles.js";
-import { getManagedFrostFoxPresets } from "./frostfox-models.js";
+import {
+  getManagedFrostFoxCatalog,
+  getManagedFrostFoxPresets,
+  isManagedFrostFoxModelRef,
+} from "./frostfox-models.js";
 import type { ModelCapabilityInfo } from "./llm.js";
 
 /** Routes that need the provider API keys header. */
@@ -317,36 +321,86 @@ export function setSlotConfig(config: Record<string, SlotConfigEntry>): void {
 }
 
 /**
- * Keep hosted accounts on a managed image model instead of exposing a
- * deployment-only image provider as the effective browser override. Existing
- * managed or player-authored model references win; a server preset binding is
- * replaced because hosted requests cannot supply that provider's credential.
+ * A current `frostfox:` or legacy hashed reference is only valid while its
+ * channel/model is present in the current account catalog; keeping an old
+ * account's reference would make the active-model UI show an empty row and
+ * could route a later request to an unintended fallback. Player-owned
+ * references (for example `custom_*`) are left untouched.
  */
-export function reconcileManagedFrostFoxImageSlot(
-  preferredModel?: string,
+export function reconcileManagedFrostFoxSlots(
+  preferredImageModel?: string,
 ): void {
+  const catalog = getManagedFrostFoxCatalog();
+  // A null catalog or a catalog with a failed channel is not a complete
+  // account projection. Preserve existing bindings until a complete refresh;
+  // explicit sign-out/disconnect uses clearManagedFrostFoxSlots().
+  if (!catalog || catalog.channels.some((channel) => channel.error)) return;
   const managedPresets = getManagedFrostFoxPresets();
+  if (managedPresets.length === 0) return;
+  const managedIds = new Set(managedPresets.map((preset) => preset.id));
+  const localPresetIds = new Set(
+    getCustomPresets()
+      .filter((preset) => !managedIds.has(preset.id))
+      .map((preset) => preset.id),
+  );
+  const config = getSlotConfig();
+  const next: Record<string, SlotConfigEntry> = {};
+  let changed = false;
+
+  for (const [slotId, entry] of Object.entries(config)) {
+    const binding = slotBindingId(entry);
+    if (
+      binding &&
+      isManagedFrostFoxModelRef(binding) &&
+      !managedIds.has(binding)
+    ) {
+      changed = true;
+      continue;
+    }
+    next[slotId] = entry;
+  }
+
   const imagePresets = managedPresets.filter((preset) =>
     preset.capability?.output.includes("image"),
   );
-  if (imagePresets.length === 0) return;
+  if (imagePresets.length > 0) {
+    const current = next.image;
+    const currentBinding = slotBindingId(current);
+    const currentManaged = currentBinding
+      ? managedPresets.find((preset) => preset.id === currentBinding)
+      : undefined;
+    const playerOwnedReference =
+      (typeof current?.modelRef === "string" &&
+        !isManagedFrostFoxModelRef(current.modelRef)) ||
+      (typeof current?.presetId === "string" &&
+        localPresetIds.has(current.presetId));
+    if (
+      !currentManaged?.capability?.output.includes("image") &&
+      !playerOwnedReference
+    ) {
+      const selected =
+        imagePresets.find((preset) => preset.model === preferredImageModel) ??
+        imagePresets[0]!;
+      next.image = { modelRef: selected.id };
+      changed = true;
+    }
+  }
 
+  if (changed) setSlotConfig(next);
+}
+
+/** Remove account-owned model bindings after an explicit sign-out/disconnect. */
+export function clearManagedFrostFoxSlots(): void {
   const config = getSlotConfig();
-  const current = config.image;
-  const currentId = slotBindingId(current);
-  const currentManaged = currentId
-    ? managedPresets.find((preset) => preset.id === currentId)
-    : undefined;
-  if (currentManaged?.capability?.output.includes("image")) return;
-  if (current?.modelRef && !currentManaged) return;
-
-  const selected =
-    imagePresets.find((preset) => preset.model === preferredModel) ??
-    imagePresets[0]!;
-  setSlotConfig({
-    ...config,
-    image: { modelRef: selected.id },
-  });
+  const next = Object.fromEntries(
+    Object.entries(config).filter(([, entry]) => {
+      const binding = slotBindingId(entry);
+      return !binding || !isManagedFrostFoxModelRef(binding);
+    }),
+  );
+  if (Object.keys(next).length !== Object.keys(config).length) {
+    setSlotConfig(next);
+  }
 }
 
 /**
@@ -557,11 +611,27 @@ export function getCustomPresets(): CustomPreset[] {
 
   const managed = getManagedFrostFoxPresets();
   const managedIds = new Set(managed.map((preset) => preset.id));
-  return [...merged.filter((preset) => !managedIds.has(preset.id)), ...managed];
+  return [
+    ...merged.filter(
+      (preset) =>
+        !managedIds.has(preset.id) && !isManagedFrostFoxModelRef(preset.id),
+    ),
+    ...managed,
+  ];
 }
 
 export function setCustomPresets(presets: CustomPreset[]): void {
+  // Managed FrostFox presets are a read-only projection of the current
+  // account catalog. They may be passed back by legacy callers such as
+  // add/remove, but must never be written into local provider profiles.
+  const managedIds = new Set(
+    getManagedFrostFoxPresets().map((preset) => preset.id),
+  );
   const normalized = presets
+    .filter(
+      (preset) =>
+        !isManagedFrostFoxModelRef(preset.id) && !managedIds.has(preset.id),
+    )
     .map((preset) => ({
       ...preset,
       provider: providerKeyToId(preset.provider) ?? preset.provider.trim(),

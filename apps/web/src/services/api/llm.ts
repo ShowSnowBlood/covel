@@ -296,7 +296,8 @@ export interface PingResult {
 
 /**
  * Send a minimal "hi" to a specific preset to test connectivity and latency.
- * Requires API keys in localStorage.
+ * Local providers use the browser's key store; managed FrostFox providers use
+ * the authenticated account context on the server.
  */
 export async function pingPreset(presetId: string): Promise<PingResult> {
   const res = await fetch("/api/ai/ping", {

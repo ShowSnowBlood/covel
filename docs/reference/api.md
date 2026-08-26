@@ -536,6 +536,10 @@ Fork 不继承 community server-code grant；child 中对应插件保持未激�
 | POST | `/api/ai/ping`           | 测试 LLM 提供商连通性                   |
 | POST | `/api/ai/generate-world` | AI 生成世界包；hosted 需 operator token |
 
+`POST /api/ai/ping` 接受 `{ "presetId": "<id>" }`，也接受 `{ "slot": "<slot>" }`（客户端会将其解析为 `slot-<slot>`）。浏览器可通过 `X-Provider-Keys` 与 `X-Slot-Config` 传递本次请求的本地 provider key、槽位绑定和临时 preset；服务端会先按正式 LLM 请求相同的解析/清洗规则处理这些 header，再发起最小流式探测。商业 FrostFox 请求使用当前账号派生凭据，浏览器不能把托管 provider 改指向其他 origin 或伪造渠道。
+
+探测在收到首个非空 `text-delta` 或 `reasoning-delta` 后即可成功并返回 `ttfbMs`；provider 正常结束但没有任何内容时返回 HTTP 200、`{ "ok": false, "error": "Provider returned no content" }`，不会把该失败结果当作成功缓存。
+
 ### 模型数据库（Model DB）
 
 | 方法 | 路径                                                       | 描述                                     |

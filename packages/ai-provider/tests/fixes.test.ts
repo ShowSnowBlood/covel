@@ -17,6 +17,7 @@ import { parseLlmConfig } from "../src/config/llm-loader.js";
 import { createGateway } from "../src/gateway.js";
 import { createPresetRegistry } from "../src/preset-registry.js";
 import { createProviderRegistry } from "../src/provider-registry.js";
+import { iterateSsePayloads } from "../src/adapters/http/response.js";
 import type { ModelProviderAdapter } from "../src/adapters/adapter.js";
 import type { ModelProfile, PresetConfig } from "../src/types.js";
 
@@ -598,5 +599,29 @@ protocol = "openai-chat-v1"
     // First slot is the default
     expect(result.aiConfig.presets[0].isDefault).toBe(true);
     expect(result.aiConfig.presets[1].isDefault).toBe(false);
+  });
+});
+
+describe("SSE response framing", () => {
+  it("accepts CRLF frames and a final frame without a blank-line terminator", async () => {
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              'data: {"choices":[{"delta":{"content":"ok"}}]}\r\n\r\n' +
+                "data: [DONE]",
+            ),
+          );
+          controller.close();
+        },
+      }),
+    );
+    const payloads: Record<string, unknown>[] = [];
+    for await (const payload of iterateSsePayloads(response)) {
+      payloads.push(payload);
+    }
+
+    expect(payloads).toEqual([{ choices: [{ delta: { content: "ok" } }] }]);
   });
 });
