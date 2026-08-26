@@ -11,7 +11,7 @@ readonly LLM_CONFIG="${APP_ROOT}/config/llm.toml"
 readonly LLM_ENV="${APP_ROOT}/config/.env.llm"
 readonly BACKUP_DIR="${APP_ROOT}/backups"
 readonly LOCK_FILE="/run/lock/covel-game-deploy.lock"
-readonly COMPOSE_PROJECT="docker"
+readonly COMPOSE_PROJECT="covel-game"
 readonly HEALTH_URL="http://127.0.0.1:3301/api/health"
 readonly ACCOUNT_URL="http://127.0.0.1:3301/api/frostfox/account"
 
