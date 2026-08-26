@@ -22,6 +22,12 @@ pipeline {
     )
   }
 
+  environment {
+    DEPLOY_HOST = '67.159.52.100'
+    DEPLOY_USER = 'elissias'
+    DEPLOY_KEY = '/var/lib/jenkins/.ssh/id_ed25519'
+  }
+
   stages {
     stage('Checkout main') {
       steps {
@@ -56,7 +62,13 @@ pipeline {
       steps {
         sh '''
           set -eu
-          sudo -n /usr/local/sbin/deploy-covel-game-main "$WORKSPACE" "$DEPLOY_SHA"
+          ssh -i "$DEPLOY_KEY" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=/var/lib/jenkins/.ssh/known_hosts \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo -n /usr/local/sbin/deploy-covel-game-main-remote $DEPLOY_SHA"
         '''
       }
     }
