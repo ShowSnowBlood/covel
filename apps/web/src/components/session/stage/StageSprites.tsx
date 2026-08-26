@@ -102,6 +102,7 @@ export function StageSprites({
                 fit="contain"
                 rounded="none"
                 maxHeight="100%"
+                className="opacity-60"
               />
             ) : (
               // No authored stage sprite yet — a name-initial standee keeps
