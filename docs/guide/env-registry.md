@@ -25,16 +25,17 @@ Covel 的环境变量清单由 `packages/shared/src/env/registry.ts` 维护。�
 
 启用 `COVEL_FROSTFOX_SAAS_ENABLED=1` 后，Covel 作为受信 Web SaaS 后端接入 Router 的第一方协议。该开关只允许在 `DEPLOYMENT_TIER=commercial` 且 `STORE_BACKEND=sqlite|pg` 时启用；`memory` 不提供可持久化的账户绑定。
 
-| 变量                             | 必需 | 说明                                                                                               |
-| -------------------------------- | ---- | -------------------------------------------------------------------------------------------------- |
-| `COVEL_FROSTFOX_SAAS_ENABLED`    | 是   | 第一方账号和托管模型入口总闸，严格值 `1` 开启                                                      |
-| `COVEL_FROSTFOX_ROUTER_BASE_URL` | 是   | 规范 HTTPS Router origin，例如 `https://market.dstopology.com`                                     |
-| `COVEL_FROSTFOX_CLIENT_ID`       | 是   | Router Root 登记的稳定小写 Client ID                                                               |
-| `COVEL_FROSTFOX_CLIENT_SECRET`   | 是   | Router 一次性交付的服务凭据，只在服务端环境中保存                                                  |
+| 变量                             | 必需 | 说明                                                                                            |
+| -------------------------------- | ---- | ----------------------------------------------------------------------------------------------- |
+| `COVEL_FROSTFOX_SAAS_ENABLED`    | 是   | 第一方账号和托管模型入口总闸，严格值 `1` 开启                                                   |
+| `COVEL_FROSTFOX_ROUTER_BASE_URL` | 是   | 规范 HTTPS Router origin，例如 `https://market.frostfox.ai`                                     |
+| `COVEL_FROSTFOX_CLIENT_ID`       | 是   | Router Root 登记的稳定小写 Client ID                                                            |
+| `COVEL_FROSTFOX_CLIENT_SECRET`   | 是   | Router 一次性交付的服务凭据，只在服务端环境中保存                                               |
 | `COVEL_FROSTFOX_CALLBACK_URL`    | 是   | 与 Router 登记完全一致的 HTTPS callback，例如 `https://game.frostfox.ai/auth/frostfox/callback` |
-| `COVEL_FROSTFOX_CREDENTIAL_KEY`  | 是   | 32 字节随机数的无填充 Base64Url，用于服务端信封加密账户 Key                                        |
+| `COVEL_FROSTFOX_CREDENTIAL_KEY`  | 是   | 32 字节随机数的无填充 Base64Url，用于服务端信封加密账户 Key                                     |
 
 部署时不要把 `clientSecret` 或 `credentialKey` 写进 `llm.toml`、前端变量、浏览器存储、URL 或日志。服务端通过 Basic 同步 `client-config`，按整个配置快照替换渠道映射；模型调用使用按账户和 client 派生的 Gateway Key。
+生产 Router 当前地址是 `https://market.frostfox.ai`。旧的 `https://market.dstopology.com` 只作为迁移兼容输入：服务启动时会将其规范化为新地址，因此授权登录不会再跳回旧站；部署配置仍应同步更新为新地址。
 
 ## 状态
 

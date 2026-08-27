@@ -8,7 +8,6 @@
  */
 import {
   useEffect,
-  useRef,
   useState,
   type KeyboardEvent,
   type ReactElement,
@@ -25,6 +24,8 @@ export interface StageDialogProps {
   readonly speakerName?: string;
   readonly autoPlay: boolean;
   readonly reducedMotion?: boolean;
+  /** Skip replaying persisted paragraphs when stage is entered mid-session. */
+  readonly revealImmediately?: boolean;
   readonly inputMode: boolean;
   readonly onInputModeChange: (inputMode: boolean) => void;
   /** Fires once when the current turn's text has been fully revealed. */
@@ -42,6 +43,7 @@ export function StageDialog({
   speakerName,
   autoPlay,
   reducedMotion = false,
+  revealImmediately = false,
   inputMode,
   onInputModeChange,
   onAllRead,
@@ -51,15 +53,15 @@ export function StageDialog({
   const { visible, status, advance, skip } = useTypewriter(
     storyText,
     streamEnded,
-    { turnId, reducedMotion },
+    { turnId, reducedMotion, revealImmediately },
   );
   const [draft, setDraft] = useState("");
 
-  const prevStatusRef = useRef(status);
   useEffect(() => {
-    const justFinished = status === "done" && prevStatusRef.current !== "done";
-    prevStatusRef.current = status;
-    if (justFinished) onAllRead();
+    // A hydrated turn may already be `done` on the first committed render.
+    // Notify the parent for that state too; only reacting to the transition
+    // loses the choice overlay when the parent resets its read flag on mount.
+    if (status === "done") onAllRead();
   }, [status, onAllRead]);
 
   useEffect(() => {

@@ -383,6 +383,40 @@ describe("FrostFox first-party SaaS", () => {
     expect(await service!.resolvePrincipal(connected.sessionToken)).toBeNull();
   });
 
+  it("rewrites the retired Router origin before SaaS authorization", async () => {
+    const fetchImpl = vi.fn(async () =>
+      json({
+        protocolVersion: "2.0",
+        clientId: "covel",
+        displayName: "Covel",
+        callbackUrl: SOURCE.COVEL_FROSTFOX_CALLBACK_URL,
+        channelSelectorHeader: "X-FrostFox-Channel-Id",
+        configurationVersion: "1",
+        channelMappings: [],
+      }),
+    );
+    const service = await FrostFoxService.create({
+      env: HOST_ENV,
+      ai: createAiStack(),
+      source: {
+        ...SOURCE,
+        COVEL_FROSTFOX_ROUTER_BASE_URL: "https://market.dstopology.com",
+      },
+      fetchImpl: fetchImpl as typeof fetch,
+      credentialStore: createMemoryCredentialStore(),
+    });
+    expect(service).not.toBeNull();
+    services.push(service!);
+
+    expect(service!.runtimeConfig.routerBaseUrl).toBe(
+      "https://market.frostfox.ai",
+    );
+    const start = await service!.startAuthorization();
+    expect(new URL(start.redirectUrl).origin).toBe(
+      "https://market.frostfox.ai",
+    );
+  });
+
   it("rejects a client-config snapshot for another callback", async () => {
     const fetchImpl = vi.fn(async () =>
       json({

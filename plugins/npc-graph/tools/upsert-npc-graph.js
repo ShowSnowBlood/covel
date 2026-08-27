@@ -71,7 +71,11 @@ export default function ({ tool, z, shortIdBatch, store }) {
       .string()
       .min(1)
       .max(48)
-      .regex(/^[\p{Letter}][\p{Letter}\p{Number}_\-\s]*$/u)
+      // OpenAI-compatible JSON-schema validators reject Unicode property
+      // escapes (`\\p{Letter}`) even though JavaScript accepts them. Relation
+      // identifiers are deliberately UPPER_SNAKE_CASE, so ASCII is the exact
+      // contract and keeps the tool advertisable to every configured provider.
+      .regex(/^[A-Za-z][A-Za-z0-9_\-\s]*$/)
       .describe(
         "Relation type; accepts a structured English identifier or a natural-language relation label (e.g. TRUSTS, ALLIED_WITH, RIVALS)",
       ),

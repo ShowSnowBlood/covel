@@ -42,10 +42,17 @@ sources:
     indexTo: plugin:character-presence/assets
     key: filename
     after: cast
+  sprites:
+    kind: media
+    path: media/sprites
+    to: media
+    indexTo: plugin:character-presence/assets
+    key: filename
+    after: portraits
   presence:
     kind: json
     path: media/presence.json
     schema: plugin://character-presence/presence
     to: plugin:character-presence/presence
     key: characterId
-    after: portraits
+    after: sprites

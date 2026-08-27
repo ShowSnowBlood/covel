@@ -29,24 +29,48 @@ const manifest = JSON.parse(
 const records = [];
 const missing = [];
 for (const c of manifest.characters) {
-  let bytes;
+  let portraitBytes;
   try {
-    bytes = await readFile(path.join(mediaDir, "portraits", c.filename));
+    portraitBytes = await readFile(
+      path.join(mediaDir, "portraits", c.filename),
+    );
   } catch {
     missing.push(c.filename);
     continue;
   }
-  const ref = {
-    id: createHash("sha256").update(bytes).digest("hex"),
+
+  const avatar = {
+    id: createHash("sha256").update(portraitBytes).digest("hex"),
     mime: "image/png",
-    size: bytes.length,
+    size: portraitBytes.length,
   };
+  let sprite = avatar;
+  // Stage-ready worlds may keep a transparent composition asset alongside the
+  // scene-backed portrait. Prefer the explicit `sprite-` convention, while
+  // accepting the original filename for hand-authored packages.
+  for (const filename of [`sprite-${c.filename}`, c.filename]) {
+    try {
+      const spriteBytes = await readFile(
+        path.join(mediaDir, "sprites", filename),
+      );
+      sprite = {
+        id: createHash("sha256").update(spriteBytes).digest("hex"),
+        mime: "image/png",
+        size: spriteBytes.length,
+        meta: { role: "stage-sprite" },
+      };
+      break;
+    } catch {
+      // No separate sprite under this candidate; keep looking.
+    }
+  }
+
   records.push({
     schemaVersion: 1,
     characterId: c.characterId,
     displayName: c.name,
-    avatar: ref,
-    sprite: ref,
+    avatar,
+    sprite,
   });
 }
 

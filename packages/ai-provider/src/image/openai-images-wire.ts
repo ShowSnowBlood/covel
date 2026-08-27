@@ -17,11 +17,6 @@ import {
   sleepWithAbort,
 } from "../adapters/http.js";
 
-/** DashScope-style "1024*1024" → OpenAI "1024x1024". */
-function normalizeSize(size: string): string {
-  return size.trim().replace("*", "x").toLowerCase();
-}
-
 type FixedResolutionTier = 1 | 2 | 4;
 
 const DEFAULT_ASYNC_POLL_MS = 3_000;
@@ -35,6 +30,17 @@ function fixedResolutionTier(model: string): FixedResolutionTier | null {
   return null;
 }
 
+function normalizeSize(size: string): string {
+  return size.trim().replace(/[×*]/g, "x").toLowerCase();
+}
+
+/**
+ * Fixed-tier GPT Image models are strict about their accepted dimensions.
+ * July's OpenAI-compatible endpoint reports the same contract in its 400
+ * response; map the requested aspect ratio to the model's native dimensions
+ * before sending the request. The suffix is authoritative, including ids such
+ * as `openai/gpt-image-2-2k`.
+ */
 function sizeForFixedTier(
   requestedSize: string | undefined,
   tier: FixedResolutionTier,
@@ -63,7 +69,6 @@ function sizeForFixedTier(
   if (orientation === "portrait") return "2160x3840";
   return "2880x2880";
 }
-
 function pollInterval(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? Math.min(MAX_ASYNC_POLL_MS, Math.floor(value))

@@ -524,10 +524,12 @@ export async function runAgentToolLoop({
       }
 
       // Runtime-done early exit. If any tool call in this round was the
-      // builtin `runtime-done` tool, the LLM has declared completion —
-      // break immediately instead of burning another round-trip for a
-      // terminator message. Business tool outputs from this round are
-      // already in collectedToolCalls and become the runtime's output.
+      // builtin `runtime-done` tool, the LLM has declared completion. A
+      // requireToolUse runtime is the one exception: a bare terminator does
+      // not prove that its declared business tool ran, so give the model the
+      // same single corrective retry as a prose-only finish before releasing.
+      // Business tool outputs from a valid round are already in
+      // collectedToolCalls and become the runtime's output.
       // See packages/tools/src/builtin/runtime-done.ts for the sentinel
       // and buildFrameworkPreamble for the prompt contract.
       const doneCall = executedToolCalls.find((c) =>
@@ -542,14 +544,32 @@ export async function runAgentToolLoop({
         );
         collectedToolCalls.length = 0;
         collectedToolCalls.push(...businessCalls);
-        // A `requireToolUse` runtime can reach here having called nothing but
-        // the terminator — a nudged model will do exactly that to satisfy
-        // "call the declared tools". This exit runs before the gate below, so
-        // record the unmet contract here or the runtime finishes as an empty
-        // success.
-        if (requireToolUse && businessCalls.length === 0) {
+
+        const didBusinessToolWork =
+          seededBusinessWork ||
+          executedToolCalls.some(
+            (c) => c.success && !isRuntimeDoneSentinel(c.result),
+          );
+        if (requireToolUse && !didBusinessToolWork) {
+          if (noToolCallCorrections === 0) {
+            noToolCallCorrections++;
+            console.warn(
+              `[covel:warn] [runtime-retry] ${manifest.name} attempt=${noToolCallCorrections} reason=no-tool-call cause=finished with runtime-done without a business tool call`,
+            );
+            messages.push({
+              role: "system",
+              content: input.locale?.toLowerCase().startsWith("zh")
+                ? "你调用了结束工具，但还没有完成业务工具调用。必须先调用声明的工具完成任务，再收尾。"
+                : "You called the completion tool without doing the declared business work. Call the declared tools first, then wrap up.",
+            });
+            // runtime-done is terminal by design; clear that response-local
+            // latch so the corrective retry can actually make one more call.
+            terminatedByTool = false;
+            continue;
+          }
           requiredToolUseUnmet = true;
         }
+
         // Preserve streamed / captured prose from earlier steps or this
         // step's response.content. Without this guard a story runtime that
         // interleaves narrative prose + tool calls + runtime-done would lose

@@ -157,13 +157,13 @@ export function PluginPackageRow({
   return (
     <div
       data-testid={`plugin-row-${pkg.name}`}
-      className={`rounded-2xl border p-3 sm:p-4 transition-all duration-200 ${
+      className={`min-w-0 rounded-2xl border p-3 transition-all duration-200 sm:p-4 ${
         isSelected
           ? "border-primary/40 bg-card/85 shadow-xs"
-          : "border-border/60 bg-muted/20 opacity-75 hover:opacity-100 hover:bg-muted/35"
+          : "border-border/60 bg-muted/20 opacity-75 hover:bg-muted/35 hover:opacity-100"
       }`}
     >
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2">
         {/* Toggle Switch */}
         <button
           type="button"
@@ -184,21 +184,21 @@ export function PluginPackageRow({
         </button>
 
         {/* Plugin Name */}
-        <span className="text-xs sm:text-sm font-semibold text-foreground truncate min-w-0">
+        <span className="min-w-0 max-w-full truncate text-xs font-semibold text-foreground sm:text-sm">
           {displayName}
         </span>
 
         {/* Core Lock Badge */}
         {isLocked && (
           <span
-            className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md shrink-0 font-mono"
+            className="flex shrink-0 items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
             title={
               isCore
                 ? t("plugin.locked", "Core plugin — cannot be disabled")
                 : t("session.world", "World")
             }
           >
-            <Lock className="w-2.5 h-2.5" />
+            <Lock className="h-2.5 w-2.5" />
             <span>
               {isCore ? t("plugin.core", "Core") : t("session.world", "World")}
             </span>
@@ -207,18 +207,18 @@ export function PluginPackageRow({
 
         {/* Stage / Runtime Badges */}
         {runtimes[0]?.stage && (
-          <Badge variant="outline" className="text-[9px] shrink-0 font-mono">
+          <Badge variant="outline" className="shrink-0 font-mono text-[9px]">
             {stageLabel(runtimes[0].stage, t)}
           </Badge>
         )}
         {runtimes[0]?.kind && (
-          <Badge variant="secondary" className="text-[9px] shrink-0 font-mono">
+          <Badge variant="secondary" className="shrink-0 font-mono text-[9px]">
             {runtimes[0].kind === "agent" ? "LLM" : "Fn"}
           </Badge>
         )}
         {tools.length > 0 && (
-          <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground shrink-0 font-mono">
-            <Wrench className="w-2.5 h-2.5" />
+          <span className="flex shrink-0 items-center gap-0.5 font-mono text-[9px] text-muted-foreground">
+            <Wrench className="h-2.5 w-2.5" />
             {tools.length}
           </span>
         )}
@@ -238,7 +238,7 @@ export function PluginPackageRow({
                   event.target.value,
                 )
               }
-              className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
+              className="order-last min-w-0 basis-full rounded-xl border border-border/80 bg-background/80 px-2.5 py-1 text-[11px] outline-none sm:order-none sm:ml-auto sm:w-auto sm:basis-auto sm:max-w-[240px]"
               aria-label={t(
                 "plugin.modelBindingAria",
                 "Which model slot this plugin's runtime will use.",

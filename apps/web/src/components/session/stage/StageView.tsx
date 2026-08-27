@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog.js";
 import { Button } from "@/components/ui/button.js";
 import { useMediaQuery } from "@/hooks/use-media-query.js";
+import { isMediaRef } from "@/lib/media-ref-utils.js";
 import { requestConfirm } from "@/lib/confirm-channel.js";
 import { usePluginNamespace } from "@/stores/plugin-data-store.js";
 import { useStreamingText } from "@/stores/streaming-text-store.js";
@@ -170,11 +171,21 @@ export function StageView(props: StageViewProps): ReactElement {
       ? liveStoryText
       : storyMsg.content
     : "";
-  // Only worlds that opt into the authored visual-novel stage may synthesize
-  // or consume character sprites. Traditional worlds can still use the stage
-  // presentation for their backdrop and action guide, but an old/explicit
-  // scene-cast payload must not turn portrait cards into foreground scenery.
-  const stageArtAllowed = world?.metadata?.defaultViewMode === "stage";
+  // A sprite is a composition asset only when the world explicitly marks it
+  // as such. Older presence records reused opaque avatar portraits in the
+  // `sprite` field; keeping those gated prevents the portrait rectangle from
+  // swallowing the scene. Authored stage worlds retain their existing path.
+  const hasTransparentStageSprites = useMemo(
+    () =>
+      Object.values(presence).some(
+        (record) =>
+          isMediaRef(record?.sprite) &&
+          record.sprite.meta?.role === "stage-sprite",
+      ),
+    [presence],
+  );
+  const stageArtAllowed =
+    world?.metadata?.defaultViewMode === "stage" || hasTransparentStageSprites;
   const fallbackSpeakers = useMemo(
     () =>
       stageArtAllowed
@@ -295,6 +306,7 @@ export function StageView(props: StageViewProps): ReactElement {
         speakerName={speakers[0]?.name}
         autoPlay={autoPlay}
         reducedMotion={reducedMotion}
+        revealImmediately={!isStreaming && !executing}
         inputMode={inputMode}
         onInputModeChange={setInputMode}
         onAllRead={() => setAllRead(true)}

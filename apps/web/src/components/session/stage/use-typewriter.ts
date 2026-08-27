@@ -37,6 +37,8 @@ export type TypewriterEvent =
   | { readonly type: "advance" }
   | { readonly type: "skip" }
   | { readonly type: "streamEnd" }
+  /** Settle a hydrated, already-complete turn on its final paragraph. */
+  | { readonly type: "complete"; readonly text: string }
   | {
       readonly type: "reset";
       readonly turnId?: string;
@@ -76,6 +78,8 @@ export function typewriterReduce(
       return applySkip(state);
     case "streamEnd":
       return applyStreamEnd(state);
+    case "complete":
+      return applyComplete(state, event.text);
     case "reset":
       return {
         ...typewriterInit(event.reducedMotion ?? state.reducedMotion),
@@ -84,6 +88,22 @@ export function typewriterReduce(
     default:
       return state;
   }
+}
+
+function applyComplete(state: TypewriterState, text: string): TypewriterState {
+  const buffer = text;
+  const segments = splitSegments(buffer);
+  const segmentIndex = Math.max(segments.length - 1, 0);
+  const visible = segments[segmentIndex] ?? "";
+  return {
+    ...state,
+    status: text.trim().length > 0 ? "done" : "idle",
+    buffer,
+    segmentIndex,
+    shownLen: visible.length,
+    visible,
+    streamEnded: true,
+  };
 }
 
 function applyFeed(state: TypewriterState, text: string): TypewriterState {
@@ -167,6 +187,8 @@ const TICK_INTERVAL_MS = 1000 / CHARS_PER_SECOND;
 export interface UseTypewriterOptions {
   readonly turnId?: string;
   readonly reducedMotion?: boolean;
+  /** Settle persisted text on its final paragraph instead of replaying it. */
+  readonly revealImmediately?: boolean;
 }
 
 export interface UseTypewriterResult {
@@ -239,6 +261,15 @@ export function useTypewriter(
   useEffect(() => {
     if (streamEnded) dispatch({ type: "streamEnd" });
   }, [streamEnded, opts.turnId]);
+
+  // Stage mode can be entered after a turn already completed in parsed view.
+  // Do not make the player click through every persisted paragraph again just
+  // to reach the next action. This is opt-in; live turns keep the typewriter.
+  useEffect(() => {
+    if (!opts.revealImmediately || !streamEnded || !streamText.trim()) return;
+    fedTextRef.current = streamText;
+    dispatch({ type: "complete", text: streamText });
+  }, [opts.revealImmediately, streamEnded, streamText, opts.turnId]);
 
   useEffect(() => {
     if (reducedMotion || state.status !== "typing") return;

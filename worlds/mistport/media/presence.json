@@ -9,9 +9,12 @@
       "size": 2169966
     },
     "sprite": {
-      "id": "2d5975625090ac74cb1edca4f97ceb68ff197494279c26760c7e9df142d35deb",
+      "id": "0edb1fdfd0a90393c7a4e57bdb87b7cf47822bf65650d48a69ecf1be771e28d7",
       "mime": "image/png",
-      "size": 2169966
+      "size": 1659951,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   },
   {
@@ -24,9 +27,12 @@
       "size": 2110678
     },
     "sprite": {
-      "id": "579848e3d93ce4d42c83bce33c50599cfe5467d0d0f6587f403eb4175e422ffd",
+      "id": "09c5533f7e996e2b4f41622c738078dbe4adee6b0bc45b31d6893e6754f665c6",
       "mime": "image/png",
-      "size": 2110678
+      "size": 1698097,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   },
   {
@@ -39,9 +45,12 @@
       "size": 1980086
     },
     "sprite": {
-      "id": "29da2c847d24983dce6b9c4098070b1a01d014e49912762a5f9ebec25304172c",
+      "id": "1b2eff13c6a2ec22b27f61143758ae89e1dd01bb8e5d75cde2b2fea84f784b92",
       "mime": "image/png",
-      "size": 1980086
+      "size": 1512357,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   },
   {
@@ -54,9 +63,12 @@
       "size": 2449589
     },
     "sprite": {
-      "id": "a459d41dce1c9e86489b129b1b6c2c1f3f97269a5d1ae23e1a3b715799897147",
+      "id": "f6352323ba516dbe7d283b8c3bbd3d588fa1cfa583b2d3ab97fd589aed67ddc4",
       "mime": "image/png",
-      "size": 2449589
+      "size": 1814096,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   },
   {
@@ -69,9 +81,12 @@
       "size": 2385974
     },
     "sprite": {
-      "id": "b4263dbbb034ebb17cccbd8efe22a7b26726b1dd5fd0628d08ece06924411746",
+      "id": "11e7b35257bc72eae9ef219fe40ab540d2cc1da7112e083fb548dba0e534737b",
       "mime": "image/png",
-      "size": 2385974
+      "size": 1798712,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   },
   {
@@ -84,9 +99,12 @@
       "size": 1799922
     },
     "sprite": {
-      "id": "c716e0a100465548a7b571c355474a2f91fbfb8c460e37f0edb9b84cb7eb24da",
+      "id": "3e44e19293be2bccbcb188baf210ea5964d72eca2cd7945de40092e5fd98790e",
       "mime": "image/png",
-      "size": 1799922
+      "size": 1396484,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   },
   {
@@ -99,9 +117,12 @@
       "size": 2421663
     },
     "sprite": {
-      "id": "49d1a2b1ecc987e5420281662f2d852bb723c30ba362313a624ba370c2837aa8",
+      "id": "48e98246f460d83dc3e66cc1bec8c2a98f7ef920c19acf68256809f81dce308c",
       "mime": "image/png",
-      "size": 2421663
+      "size": 1820925,
+      "meta": {
+        "role": "stage-sprite"
+      }
     }
   }
 ]

@@ -5,6 +5,11 @@ const CLIENT_ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
 const CHANNEL_KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// The production Router moved from the retired dstopology host. Normalize the
+// exact legacy origin at the config boundary so stale secret files cannot send
+// SaaS authorization traffic to the old login site.
+const FROSTFOX_ROUTER_ORIGIN = "https://market.frostfox.ai";
+const RETIRED_FROSTFOX_ROUTER_ORIGIN = "https://market.dstopology.com";
 const CONFIG_POLL_MS = 60_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -323,7 +328,10 @@ function canonicalHttpsOrigin(raw: string, name: string): string {
   ) {
     throw new Error(`${name} must be a canonical HTTPS origin`);
   }
-  return url.origin;
+  const origin = url.origin;
+  return origin === RETIRED_FROSTFOX_ROUTER_ORIGIN
+    ? FROSTFOX_ROUTER_ORIGIN
+    : origin;
 }
 
 function exactHttpsUrl(raw: string, name: string): string {

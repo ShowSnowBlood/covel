@@ -1468,9 +1468,10 @@ sources: {}
       "scene-stage",
     ];
 
-    // haruka media = 8 portraits + 10 scene backdrops (scenes source has indexTo).
+    // mistport ships 7 portraits + 7 transparent stage sprites; haruka ships
+    // 8 portraits + 10 scene backdrops (scenes source has indexTo).
     for (const [worldId, portraitCount, mediaCount] of [
-      ["mistport", 7, 7],
+      ["mistport", 7, 14],
       ["haruka-academy", 8, 18],
     ] as const) {
       const sessionId = `sess-portraits-${worldId}`;

@@ -145,6 +145,58 @@ class DoneOnlyLLM implements LLMAdapter {
     };
   }
 }
+/** A model that incorrectly terminates first, then performs its business tool. */
+class DoneThenToolLLM implements LLMAdapter {
+  step = 0;
+  seenMessages: { role: string; content: unknown }[][] = [];
+
+  async generate(params: {
+    messages: readonly { role: string; content: unknown }[];
+  }): Promise<LLMResponse> {
+    this.step++;
+    this.seenMessages.push([...params.messages]);
+    if (this.step === 1) {
+      return {
+        content: null,
+        toolCalls: [
+          {
+            id: "tc-done-first",
+            name: "runtime-done",
+            arguments: JSON.stringify({ reason: "premature" }),
+          },
+        ],
+        finishReason: "tool_calls",
+        usage: { inputTokens: 10, outputTokens: 5 },
+      };
+    }
+    if (this.step === 2) {
+      return {
+        content: null,
+        toolCalls: [
+          {
+            id: "tc-business",
+            name: "emit-event",
+            arguments: JSON.stringify({ topic: "test.ping", data: { x: 2 } }),
+          },
+        ],
+        finishReason: "tool_calls",
+        usage: { inputTokens: 10, outputTokens: 5 },
+      };
+    }
+    return {
+      content: null,
+      toolCalls: [
+        {
+          id: "tc-done-after",
+          name: "runtime-done",
+          arguments: JSON.stringify({ reason: "complete" }),
+        },
+      ],
+      finishReason: "tool_calls",
+      usage: { inputTokens: 10, outputTokens: 5 },
+    };
+  }
+}
 
 describe("requireToolUse gate", () => {
   it("injects one correction then succeeds when the retry calls the tool", async () => {
@@ -244,6 +296,42 @@ describe("requireToolUse gate", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it("retries a bare runtime-done before accepting business work", async () => {
+    const store = await mainLoopStore("sess-done-retry");
+    const llm = new DoneThenToolLLM();
+    const deps: TurnExecutorDeps = {
+      loadRuntime: async (m) => ({ manifest: m, promptTemplate: "prompt" }),
+      llm,
+      store,
+      toolExecutor: toolExecutor(store),
+    };
+
+    const result = await executeTurn(
+      makeTurnInput({ sessionId: "sess-done-retry" }),
+      [manifest({ requireToolUse: true })],
+      deps,
+      { maxSteps: 5 },
+    );
+
+    // The successful business call is enough to settle the runtime; the
+    // earlier bare terminator is no longer allowed to short-circuit it.
+    expect(llm.step).toBe(2);
+    expect(
+      llm.seenMessages[1]!.some(
+        (message) =>
+          message.role === "system" &&
+          String(message.content).includes("You called the completion tool"),
+      ),
+    ).toBe(true);
+    const res = result.runtimeResults.find(
+      (entry) => entry.runtimeId === "plug/gated",
+    );
+    expect(res?.status).toBe("success");
+    expect((res?.output as { events?: unknown[] })?.events).toEqual([
+      { topic: "test.ping", data: { x: 2 } },
+    ]);
   });
 
   it("a bare runtime-done does not satisfy the gate", async () => {
