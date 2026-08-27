@@ -16,7 +16,11 @@ import {
   reduceTurnResumed,
   reduceTurnSuspended,
 } from "./event-reducers.js";
-import { createExecutionStepUpdate } from "./execution-steps.js";
+import {
+  createExecutionStepFromTrace,
+  createExecutionStepUpdate,
+} from "./execution-steps.js";
+import { parseRuntimeJobStatus } from "./job-status.js";
 import { upsertGameStateCharacter } from "./game-state.js";
 import type {
   AssetProgressEvent,
@@ -651,12 +655,36 @@ export function createSseEventHandler(
         });
         break;
       }
-      // Known CovelEvents that the action-stream handler intentionally does
-      // NOT render: runtime-internal trace events forwarded onto this stream
-      // (consumed by the /debug timeline via the subscription channel) plus
-      // reserved lifecycle events handled elsewhere. Listed explicitly so the
-      // `assertNeverEvent` exhaustiveness guard below stays green — adding a
-      // new CovelEvent forces a conscious decision here (handle or ignore).
+      case "job-status.updated": {
+        const status = parseRuntimeJobStatus(payload, {
+          sessionId: envelope.sessionId,
+          turnId,
+          timestamp: envelope.timestamp,
+        });
+        if (status) {
+          deps.dispatch({ type: "UPSERT_JOB_STATUS", status });
+        }
+        break;
+      }
+      // Trace events are forwarded on the action stream during a live turn.
+      // Project only the transient LLM/tool boundaries here; terminal runtime
+      // events below remain authoritative for completion and failure.
+      case "tool.calling":
+      case "tool.completed":
+      case "tool.failed":
+      case "llm.calling":
+      case "llm.responded": {
+        const step = createExecutionStepFromTrace({
+          eventType,
+          payload,
+          turnId,
+        });
+        if (step) deps.dispatch({ type: "UPSERT_EXECUTION_STEP", step });
+        break;
+      }
+      // Remaining runtime-internal trace events are intentionally not rendered
+      // by the player action surface; the debug timeline consumes them from
+      // the subscription channel. LLM/tool boundaries are handled above.
       case "interaction.completed":
       case "ui.part.update":
       case "state.snapshot":
@@ -672,11 +700,6 @@ export function createSseEventHandler(
       // stays green (previously this fell through to `assertNeverEvent` and
       // warned on every commit).
       case "working_memory.changed":
-      case "tool.calling":
-      case "tool.completed":
-      case "tool.failed":
-      case "llm.calling":
-      case "llm.responded":
       case "message.completed":
       case "block.emitted":
       case "hook.fired":
@@ -702,10 +725,6 @@ export function createSseEventHandler(
       case "utils.fetch.failed":
       // Prompt-budget prune trace: /debug reads it from trace_events.
       case "context.pruned":
-      // Kernel job-status progress: forwarded live for future media-progress UI;
-      // the action renderer does not consume it yet (compat with plugin-data
-      // `_jobs`), so ignore for exhaustiveness like the other trace events.
-      case "job-status.updated":
         break;
       default:
         assertNeverEvent(eventType);

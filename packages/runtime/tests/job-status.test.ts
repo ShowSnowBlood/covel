@@ -37,6 +37,7 @@ function makeHarness(overrides?: Partial<ProgressReporterDeps>): Harness {
     store,
     eventBus,
     sessionId: SESSION,
+    turnId: "turn-1",
     progressScopeId: SCOPE,
     pluginId: PLUGIN,
     runtimeId: RUNTIME,
@@ -99,6 +100,7 @@ describe("createProgressReporter.report", () => {
       progressScopeId: SCOPE,
       sequence: 1,
     });
+    expect(ev.payload.turnId).toBe("turn-1");
   });
 
   it("silently drops a duplicate/older sequence without overwriting", async () => {
@@ -106,6 +108,9 @@ describe("createProgressReporter.report", () => {
     await reporter.report({ jobId: "job-a", state: "running", sequence: 1 });
     // Same (jobId, sequence) with a different state — must be rejected.
     await reporter.report({ jobId: "job-a", state: "failed", sequence: 1 });
+    // An older sequence is also rejected, even though the store's composite
+    // key would otherwise allow it as a distinct append.
+    await reporter.report({ jobId: "job-a", state: "queued", sequence: 0 });
 
     const rows = await h.store.listJobStatus(SESSION, { jobId: "job-a" });
     expect(rows).toHaveLength(1);
@@ -153,6 +158,25 @@ describe("createProgressReporter.report", () => {
         data: { pct: Number.NaN },
       }),
     ).rejects.toThrow(/non-finite/);
+  });
+  it.each([
+    ["empty job id", { jobId: "" }],
+    ["negative sequence", { sequence: -1 }],
+    ["fractional sequence", { sequence: 1.5 }],
+    ["out-of-range progress", { progress: 101 }],
+    ["unknown state", { state: "done" }],
+  ])("rejects %s before writing", async (_label, fields) => {
+    const reporter = createProgressReporter(h.deps);
+    await expect(
+      reporter.report({
+        jobId: "job-a",
+        state: "running",
+        sequence: 1,
+        ...fields,
+      } as never),
+    ).rejects.toThrow();
+    expect(await h.store.listJobStatus(SESSION)).toHaveLength(0);
+    expect(h.jobEvents).toHaveLength(0);
   });
 });
 

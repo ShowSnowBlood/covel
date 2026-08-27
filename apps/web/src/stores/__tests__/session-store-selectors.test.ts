@@ -33,6 +33,7 @@ function stateFor(
     executing: false,
     executionError: null,
     executionSteps: [],
+    jobStatuses: [],
     suspensions: [],
     statePatches: [],
     gameState: {},

@@ -19,6 +19,7 @@ import { ChatMessageRenderer } from "./chat-messages/chat-message-renderer.js";
 import { ChatBlockRenderer } from "./chat-messages/chat-block-renderer.js";
 import { useImageGeneration } from "./chat-messages/use-image-generation.js";
 import { useLoadOlderMessages } from "./chat-messages/use-load-older-messages.js";
+import { RuntimeJobProgress } from "./runtime-job-progress.js";
 import { useMessageGrouping } from "./chat-messages/use-message-grouping.js";
 import { isPreGameSession } from "@/stores/session-store/selectors.js";
 import type { PluginRpcConfirmRequest } from "./plugin-rpc-ui.js";
@@ -262,6 +263,7 @@ export function ChatMessages({
 
             {/* Render messages with per-turn execution timelines inline */}
             {renderedRows}
+            <RuntimeJobProgress />
 
             {executionError && (
               <div className="flex items-start gap-2 border border-destructive/50 bg-destructive/5 p-4 text-sm">

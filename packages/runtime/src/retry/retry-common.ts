@@ -32,6 +32,29 @@ export const DEFAULT_LOOP_THRESHOLD = 3;
 export const DEFAULT_CALL_TIMEOUT_CAP_MS = 60_000;
 export const MIN_CALL_TIMEOUT_MS = 5_000;
 
+/** Initial delay between transient retry attempts. */
+export const DEFAULT_RETRY_BACKOFF_MS = 250;
+/** Hard cap for retry backoff so a retry never sleeps indefinitely. */
+export const MAX_RETRY_BACKOFF_MS = 2_000;
+
+/** A fixed deadline or a provider that reads a deadline extended in-flight. */
+export type RetryDeadline = number | (() => number);
+
+export function resolveRetryDeadline(deadline: RetryDeadline): number {
+  const value = typeof deadline === "function" ? deadline() : deadline;
+  return Number.isFinite(value) ? value : Date.now();
+}
+
+/** Exponential, deterministic backoff for retry number 1..N. */
+export function computeRetryBackoff(attempt: number): number {
+  if (!Number.isFinite(attempt) || attempt <= 0) return 0;
+  const exponent = Math.min(Math.floor(attempt) - 1, 10);
+  return Math.min(
+    MAX_RETRY_BACKOFF_MS,
+    DEFAULT_RETRY_BACKOFF_MS * 2 ** exponent,
+  );
+}
+
 /** Minimum per-attempt budget floor (ms). */
 const MIN_ATTEMPT_BUDGET_MS = 1_000;
 

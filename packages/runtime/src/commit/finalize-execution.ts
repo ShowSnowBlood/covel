@@ -221,15 +221,25 @@ async function terminalizeExecutionJobs(
     const statusByRuntime = new Map(
       args.results.map((result) => [result.runtimeId, result.status]),
     );
+    const fallbackTurnId = args.turnIds[0];
+    const turnIdByRuntime = new Map(
+      args.results.map((result) => [result.runtimeId, result.turnId]),
+    );
     const groups = new Map<
       string,
-      { pluginId: string; runtimeId: string; jobIds: Set<string> }
+      {
+        pluginId: string;
+        runtimeId: string;
+        turnId: string | undefined;
+        jobIds: Set<string>;
+      }
     >();
     for (const record of reported) {
-      const key = `${record.pluginId} ${record.runtimeId}`;
+      const key = `${record.pluginId}|${record.runtimeId}`;
       const group = groups.get(key) ?? {
         pluginId: record.pluginId,
         runtimeId: record.runtimeId,
+        turnId: turnIdByRuntime.get(record.runtimeId) ?? fallbackTurnId,
         jobIds: new Set<string>(),
       };
       group.jobIds.add(record.jobId);
@@ -245,6 +255,7 @@ async function terminalizeExecutionJobs(
           store: args.store,
           ...(args.eventBus ? { eventBus: args.eventBus } : {}),
           sessionId: args.sessionId,
+          ...(group.turnId ? { turnId: group.turnId } : {}),
           progressScopeId: scopeId,
           pluginId: group.pluginId,
           runtimeId: group.runtimeId,

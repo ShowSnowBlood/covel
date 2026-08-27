@@ -111,7 +111,7 @@
 
 | 事件类型             | 方向 | 描述                     | 负载（完整 `JobStatusRecord`）                                                                                       |
 | -------------------- | ---- | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `job-status.updated` | S→C  | 长任务作业进度（追加式） | `{ sessionId, progressScopeId, pluginId, runtimeId, jobId, state, progress?, message?, data?, sequence, createdAt }` |
+| `job-status.updated` | S→C  | 长任务作业进度（追加式） | `{ sessionId, progressScopeId, pluginId, runtimeId, jobId, state, progress?, message?, data?, sequence, createdAt, turnId? }`（`turnId` 仅为实时线路关联字段） |
 
 长耗时的 function runtime（媒体生成等）在 finalizer 提交之前，通过 `ctx.progress.report({ jobId, state, progress?, message?, data?, sequence })` 实时上报进度。这是 effects 隔离的**唯一实时例外**：上报写入内核 job-status 存储（追加式、按 `(sessionId, progressScopeId, pluginId, runtimeId, jobId, sequence)` 幂等），成功后立即发出本事件并经 `/actions` SSE 转发；它不写游戏态、不满足 binding/gate、不随领域事务回滚。`state` 取值为 `queued | running | progress | waiting-input | succeeded | failed | cancelled`；身份字段全部由内核注入，插件只提供作业业务字段。
 

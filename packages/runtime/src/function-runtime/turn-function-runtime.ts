@@ -199,6 +199,7 @@ export async function executeFunctionRuntime({
         store: deps.store,
         eventBus: deps.eventBus,
         sessionId: input.sessionId,
+        turnId: input.turnId,
         progressScopeId: executionId ?? input.turnId,
         pluginId: manifest.pluginId,
         runtimeId: manifest.name,

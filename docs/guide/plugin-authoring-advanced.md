@@ -389,7 +389,7 @@ const narrative = ctx.inputs?.narrative?.value as string | undefined;
 
 **`ctx.execution` — 本次调度运行的身份。** `{ executionId, origin, logicalTurnId?, countPolicy }`。`origin` 区分 `player` / `continuation` / `manual` / `background` / `recursive` / `resume`;`countPolicy` 决定本次执行的 finalizer 是否在成功终止时结算玩家逻辑回合。用于日志关联与幂等判断,handler 一般只读。
 
-**`ctx.progress.report` — 长任务的唯一实时通道。** `report(effect)` 向内核 job-status 流追加一条事件并立即发出 SSE,让前端在回合 finalizer 跑完前就看到媒体生成等长任务的进度。它**不写游戏状态、不随领域事务回滚**;持久的领域产出仍走 handler 返回值 / proposal。`effect` 只带业务字段(`jobId` / `state` / `progress` / `message` / `data` / `sequence`),身份(session/scope/plugin/runtime)与时间戳由内核注入——handler 无法伪造别的插件或 runtime 的 job。按 `sequence` 幂等:重复或更旧的序号会被静默丢弃。进度是纯观测,上报失败绝不应拖垮已计费的工作,因此惯例是**判空 + 吞异常**:
+**`ctx.progress.report` — 长任务的唯一实时通道。** `report(effect)` 向内核 job-status 流追加一条事件并立即发出 SSE,让前端在回合 finalizer 跑完前就看到媒体生成等长任务的进度。它**不写游戏状态、不随领域事务回滚**;持久的领域产出仍走 handler 返回值 / proposal。`effect` 只带业务字段(`jobId` / `state` / `progress` / `message` / `data` / `sequence`),身份(session/scope/plugin/runtime)与时间戳由内核注入——handler 无法伪造别的插件或 runtime 的 job。内核会拒绝空 `jobId`、未知状态、非负安全整数以外的 `sequence` 以及不在 `0..100` 的 `progress`。按 `sequence` 幂等:重复或更旧的序号会被静默丢弃。进度是纯观测,上报失败绝不应拖垮已计费的工作,因此惯例是**判空 + 吞异常**:
 
 ```ts
 try {

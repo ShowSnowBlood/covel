@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import handler from "../runtimes/roller/handler.js";
 
 function makeCtx(overrides = {}) {
@@ -90,5 +90,35 @@ describe("dice-check roller handler", () => {
     expect(result.checkContext).toContain("critical success");
     expect(result.checkContext).toContain("check.resolved");
     expect(result.checkContext).not.toContain("大成功");
+  });
+});
+
+it("reports the dice pool lifecycle without changing the result", async () => {
+  const report = vi.fn().mockResolvedValue(undefined);
+
+  const result = await handler(makeCtx({ progress: { report } }));
+
+  expect(report).toHaveBeenCalledTimes(3);
+  expect(report.mock.calls.map(([effect]) => effect.state)).toEqual([
+    "running",
+    "progress",
+    "progress",
+  ]);
+  expect(report.mock.calls.map(([effect]) => effect.sequence)).toEqual([
+    0, 1, 2,
+  ]);
+  expect(
+    report.mock.calls.every(([effect]) => effect.jobId === "dice-pool"),
+  ).toBe(true);
+  expect(result.pluginData[0].value.dice).toHaveLength(3);
+});
+
+it("continues rolling when progress reporting fails", async () => {
+  const report = vi.fn().mockRejectedValue(new Error("progress unavailable"));
+
+  await expect(
+    handler(makeCtx({ progress: { report } })),
+  ).resolves.toMatchObject({
+    pluginData: [{ namespace: "rolls" }],
   });
 });

@@ -625,10 +625,12 @@ export type ProgressEffect = Omit<
  */
 export interface ProgressReporter {
   /**
-   * Append one progress event. Append-only + idempotent on `sequence`: a
-   * duplicate/older sequence for the same job is silently dropped. `data` is
-   * validated against the JSON wire boundary and rejected with a throw on
-   * non-serialisable values (undefined / function / circular / non-finite).
+   * Append one progress event. The kernel validates jobId/state/sequence and
+   * the optional 0–100 progress range before persistence. Append-only and
+   * idempotent on `sequence`: a duplicate/older sequence for the same job is
+   * silently dropped. `data` is validated against the JSON wire boundary and
+   * rejected with a throw on non-serialisable values (undefined / function /
+   * circular / non-finite).
    */
   report(effect: ProgressEffect): Promise<void>;
 }

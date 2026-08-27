@@ -4,6 +4,7 @@ import { ignoreError } from "@/lib/ignore-error.js";
 import { setActiveSession as setActivePluginDataSession } from "@/stores/plugin-data-store.js";
 import { clearAllStreamingText } from "@/stores/streaming-text-store.js";
 import type { SnapshotMessage, SnapshotTraceEvent } from "@covel/shared";
+import { isDurableExecutionStep } from "./execution-steps.js";
 import { enrichGameStateFromSnapshot } from "./game-state.js";
 import type { ExecutionStep, SessionDispatch, StreamMessage } from "./types.js";
 
@@ -68,7 +69,7 @@ function buildSnapshotExecutionSteps(
         event.type === "runtime.started" ? event.timestamp : prev?.startedAt,
     });
   }
-  return [...byKey.values()];
+  return [...byKey.values()].filter(isDurableExecutionStep);
 }
 
 async function restoreServerSnapshot(
@@ -174,8 +175,16 @@ function migrateExecutionStep(raw: Record<string, unknown>): ExecutionStep {
         ? "failed"
         : legacyType === "runtime.skipped"
           ? "skipped"
-          : ((raw.status as ExecutionStep["status"] | undefined) ??
-            "completed");
+          : legacyType === "runtime.started"
+            ? "running"
+            : legacyType === "llm.calling" || legacyType === "llm.responded"
+              ? "llm"
+              : legacyType === "tool.calling" ||
+                  legacyType === "tool.completed" ||
+                  legacyType === "tool.failed"
+                ? "tool"
+                : ((raw.status as ExecutionStep["status"] | undefined) ??
+                  "completed");
   return {
     runtimeId: (raw.runtimeId as string) ?? "unknown",
     pluginId: (raw.pluginId as string) ?? "",
@@ -199,7 +208,9 @@ async function restorePersistedExecutionSteps(
     const raw = (await ds.loadExecutionSteps(sessionId)) as Array<
       Record<string, unknown>
     >;
-    for (const step of raw.map(migrateExecutionStep)) {
+    for (const step of raw
+      .map(migrateExecutionStep)
+      .filter(isDurableExecutionStep)) {
       dispatch({ type: "UPSERT_EXECUTION_STEP", step });
     }
   } catch {

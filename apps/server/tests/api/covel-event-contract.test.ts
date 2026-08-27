@@ -131,5 +131,7 @@ describe("CovelEvent contract", () => {
     // Both must be valid SubscriptionTopics so /events/stream accepts them.
     expect(SUBSCRIPTION_TOPICS).toContain("trace");
     expect(SUBSCRIPTION_TOPICS).toContain("hooks");
+    // Kernel progress reports use the dedicated `job` topic.
+    expect(SUBSCRIPTION_TOPICS).toContain("job");
   });
 });

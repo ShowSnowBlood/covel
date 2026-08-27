@@ -113,6 +113,7 @@ async function run(opts: {
   manifest?: RuntimeManifest;
   deps?: Record<string, unknown>;
   maxSteps?: number;
+  timeoutMs?: number;
   messages?: { role: string; content: string }[];
 }) {
   return (await runAgentToolLoop({
@@ -121,7 +122,7 @@ async function run(opts: {
     loaded,
     deps: { llm: opts.llm, toolExecutor: makeExecutor(), ...opts.deps },
     maxSteps: opts.maxSteps ?? 5,
-    timeoutMs: 10_000,
+    timeoutMs: opts.timeoutMs ?? 10_000,
     messages: (opts.messages ?? [
       { role: "system", content: "sys" },
       { role: "user", content: "go" },
@@ -262,6 +263,30 @@ describe("runAgentToolLoop core", () => {
     expect(result.collectedToolCalls).toHaveLength(2);
     expect(result.effectiveMaxSteps).toBe(2);
     expect(result.stoppedWithResponse).toBe(false);
+  });
+
+  it("synthesizes successful tool output when the final LLM round misses deadline", async () => {
+    let now = 1_000_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    let calls = 0;
+    const llm: LLMAdapter = {
+      generate: async () => {
+        calls += 1;
+        now += 2;
+        return toolCall("mark", { note: "deadline" }, "tc-deadline");
+      },
+    };
+
+    try {
+      const result = await run({ llm, timeoutMs: 1 });
+
+      expect(calls).toBe(1);
+      expect(result.stoppedWithResponse).toBe(true);
+      expect(result.finalContent).toContain("deadline");
+      expect(result.collectedToolCalls).toHaveLength(1);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it("streams deltas for story runtimes with identity attached", async () => {

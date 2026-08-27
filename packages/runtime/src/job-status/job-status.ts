@@ -28,11 +28,51 @@ import {
 /** The out-of-band SSE event this channel emits (see COVEL_EVENT_META). */
 const JOB_STATUS_EVENT = "job-status.updated";
 const JOB_STATUS_TOPIC = "job";
+const JOB_STATUS_STATES: ReadonlySet<JobStatusState> = new Set([
+  "queued",
+  "running",
+  "progress",
+  "waiting-input",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+function validateProgressEffect(effect: ProgressEffect): void {
+  if (typeof effect.jobId !== "string" || effect.jobId.trim().length === 0) {
+    throw new Error("ctx.progress.report: jobId must be a non-empty string");
+  }
+  if (!JOB_STATUS_STATES.has(effect.state)) {
+    throw new Error(
+      `ctx.progress.report: unknown job state ${String(effect.state)}`,
+    );
+  }
+  if (!Number.isSafeInteger(effect.sequence) || effect.sequence < 0) {
+    throw new Error(
+      "ctx.progress.report: sequence must be a non-negative safe integer",
+    );
+  }
+  if (
+    effect.progress !== undefined &&
+    (!Number.isFinite(effect.progress) ||
+      effect.progress < 0 ||
+      effect.progress > 100)
+  ) {
+    throw new Error(
+      "ctx.progress.report: progress must be a number from 0 to 100",
+    );
+  }
+  if (effect.message !== undefined && typeof effect.message !== "string") {
+    throw new Error("ctx.progress.report: message must be a string");
+  }
+}
 
 export interface ProgressReporterDeps {
   readonly store: Pick<DataStore, "appendJobStatus" | "listJobStatus">;
   readonly eventBus?: EventBus;
   readonly sessionId: string;
+  /** Optional wire-only correlation for subscription consumers. */
+  readonly turnId?: string;
   /** Progress scope this reporter writes under. Defaults to the executionId at the call site. */
   readonly progressScopeId: string;
   readonly pluginId: string;
@@ -79,6 +119,7 @@ async function appendAndEmit(
     deps.sessionId,
     {
       ...record,
+      ...(deps.turnId ? { turnId: deps.turnId } : {}),
     },
   );
   return true;
@@ -87,33 +128,89 @@ async function appendAndEmit(
 export function createProgressReporter(
   deps: ProgressReporterDeps,
 ): ProgressReporter {
-  return {
-    async report(effect: ProgressEffect): Promise<void> {
-      let reportEffect = effect;
-      if (effect.data !== undefined) {
-        assertJsonValue(effect.data, "job data at data");
-        if (deps.mediaStore) {
-          const canon = await canonicalizeMediaRefs(effect.data as JsonValue, {
-            store: deps.mediaStore,
-            sessionId: deps.sessionId,
-          });
-          if (canon.rejections.length > 0) {
-            throw new Error(
-              `job data media rejected: ${canon.rejections
-                .map((r) => `${r.id}:${r.reason}`)
-                .join("; ")}`,
-            );
-          }
-          reportEffect = { ...effect, data: canon.value };
+  // A handler normally awaits each report, but serialise same-job calls too:
+  // untyped plugins can fire-and-forget, and an older report must not race a
+  // newer one into the append-only store. The store still owns idempotency;
+  // this high-water mark adds the documented monotonic guard at the API edge.
+  const latestSequence = new Map<string, number>();
+  const chains = new Map<string, Promise<void>>();
+
+  const reportOne = async (effect: ProgressEffect): Promise<void> => {
+    validateProgressEffect(effect);
+    if (effect.data !== undefined) {
+      assertJsonValue(effect.data, "job data at data");
+    }
+
+    let baseline = latestSequence.get(effect.jobId);
+    if (baseline === undefined) {
+      const existing = await deps.store.listJobStatus(deps.sessionId, {
+        progressScopeId: deps.progressScopeId,
+        jobId: effect.jobId,
+      });
+      for (const record of existing) {
+        if (
+          record.pluginId === deps.pluginId &&
+          record.runtimeId === deps.runtimeId &&
+          (baseline === undefined || record.sequence > baseline)
+        ) {
+          baseline = record.sequence;
         }
       }
-      const record = buildRecord(deps, reportEffect);
-      const inserted = await appendAndEmit(deps, record);
-      if (!inserted) {
-        console.debug(
-          `[job-status] dropped duplicate/older sequence ${effect.sequence} for job ${effect.jobId}`,
+      if (baseline !== undefined) latestSequence.set(effect.jobId, baseline);
+    }
+
+    if (baseline !== undefined && effect.sequence <= baseline) {
+      console.debug(
+        `[job-status] dropped duplicate/older sequence ${effect.sequence} for job ${effect.jobId}`,
+      );
+      return;
+    }
+
+    let reportEffect = effect;
+    if (effect.data !== undefined && deps.mediaStore) {
+      const canon = await canonicalizeMediaRefs(effect.data as JsonValue, {
+        store: deps.mediaStore,
+        sessionId: deps.sessionId,
+      });
+      if (canon.rejections.length > 0) {
+        throw new Error(
+          `job data media rejected: ${canon.rejections
+            .map((r) => `${r.id}:${r.reason}`)
+            .join("; ")}`,
         );
       }
+      reportEffect = { ...effect, data: canon.value };
+    }
+
+    const record = buildRecord(deps, reportEffect);
+    const inserted = await appendAndEmit(deps, record);
+    // A concurrent writer may have won the same sequence. Treat it as the
+    // high-water mark locally so a later stale report cannot be re-attempted.
+    if (inserted || baseline === undefined || effect.sequence > baseline) {
+      latestSequence.set(
+        effect.jobId,
+        Math.max(baseline ?? -1, effect.sequence),
+      );
+    }
+    if (!inserted) {
+      console.debug(
+        `[job-status] dropped duplicate/older sequence ${effect.sequence} for job ${effect.jobId}`,
+      );
+    }
+  };
+
+  return {
+    report(effect: ProgressEffect): Promise<void> {
+      const jobId =
+        typeof effect?.jobId === "string" ? effect.jobId : "__invalid__";
+      const previous = chains.get(jobId) ?? Promise.resolve();
+      const current = previous.then(() => reportOne(effect));
+      const settled = current.catch(() => {});
+      chains.set(jobId, settled);
+      void settled.then(() => {
+        if (chains.get(jobId) === settled) chains.delete(jobId);
+      });
+      return current;
     },
   };
 }
@@ -146,7 +243,8 @@ const TERMINAL_STATES: ReadonlySet<JobStatusState> = new Set([
  * itself completed is not overwritten.
  *
  * Kernel-facing: called with the raw (un-revoked) store, unlike the plugin's
- * `ctx.progress`. Only export-only for now — the finalizer wiring lands later.
+ * `ctx.progress`. `finalizeExecution` invokes it after the domain outcome is
+ * known so every reported job receives a terminal state.
  */
 export async function finalizeJobStatuses(
   deps: ProgressReporterDeps,

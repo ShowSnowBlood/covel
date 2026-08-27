@@ -38,11 +38,9 @@ function deriveStatuses(
   steps: ExecutionStep[],
   runtimeLabels: Record<string, string>,
 ): RuntimeStatus[] {
-  // ExecutionStep is now a status-aggregation row (one per runtime per turn),
-  // so derive is mostly a projection. The old event-stream logic (llm.calling
-  // / tool.calling transient states) is gone — the server doesn't emit those
-  // through /api/actions today, and if it ever does they'll arrive as
-  // separate UPSERT_EXECUTION_STEP patches carrying status:"llm"|"tool".
+  // ExecutionStep remains one status-aggregation row per runtime and turn.
+  // The action SSE handler now projects transient llm/tool boundaries onto
+  // that row; terminal runtime events still own the final status.
   // Label resolution. Multi-runtime plugins (e.g. `npc-graph/rag-retriever`
   // and `npc-graph/extractor`) must render distinct chips, so we show the
   // runtime suffix after the plugin display name when runtimeId !== pluginId.

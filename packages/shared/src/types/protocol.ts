@@ -312,9 +312,9 @@ export type CovelEvent =
       readonly payload: CovelEventPayload;
     }
   | { readonly type: "session.forked"; readonly payload: CovelEventPayload }
-  // Runtime-internal trace events. These are forwarded onto the action stream
-  // (see COVEL_EVENT_META) but the web action handler intentionally ignores
-  // them — they drive the /debug timeline via the subscription channel.
+  // Runtime-internal trace events. LLM/tool boundaries are forwarded onto the
+  // action stream for the player-facing execution preview; the remaining
+  // trace events stay subscription/debug-only.
   | { readonly type: "tool.calling"; readonly payload: CovelEventPayload }
   | { readonly type: "tool.completed"; readonly payload: CovelEventPayload }
   | { readonly type: "tool.failed"; readonly payload: CovelEventPayload }

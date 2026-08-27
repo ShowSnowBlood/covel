@@ -3,6 +3,7 @@ import * as api from "@/services/api";
 import type { DataService } from "@/services/data-service.js";
 import { ignoreError } from "@/lib/ignore-error.js";
 import { loadPluginData } from "@/stores/plugin-data-store.js";
+import { isDurableExecutionStep } from "./execution-steps.js";
 import type { SessionDispatch, SessionState } from "./types.js";
 
 export function useBootEffect(
@@ -16,15 +17,20 @@ export function useBootEffect(
     }
   }, [boot, enabled, state.booted, state.bootError]);
 }
-
+/**
+ * Persist only terminal runtime rows. Live LLM/tool projections are rendered
+ * from the action stream and must not turn every trace boundary into a storage
+ * write.
+ */
 export function usePersistExecutionStepsEffect(
   state: Pick<SessionState, "executionSteps" | "session">,
   ds: DataService,
 ): void {
   useEffect(() => {
     const sid = state.session?.id;
-    if (!sid || state.executionSteps.length === 0) return;
-    ds.saveExecutionSteps(sid, state.executionSteps).catch(
+    const durableSteps = state.executionSteps.filter(isDurableExecutionStep);
+    if (!sid || durableSteps.length === 0) return;
+    ds.saveExecutionSteps(sid, durableSteps).catch(
       ignoreError("save execution steps"),
     );
   }, [state.executionSteps, state.session?.id, ds]);

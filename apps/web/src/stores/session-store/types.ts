@@ -1,5 +1,6 @@
 import type {
   AssetGenerateView,
+  JobStatusRecord,
   SnapshotCharacter,
   TimeCursor,
 } from "@covel/shared";
@@ -55,6 +56,11 @@ export interface ExecutionStep {
   /** Wall-clock start time (for on-device duration fallback). */
   startedAt?: string;
 }
+
+/** A live job-status record with action-stream turn correlation attached. */
+export type RuntimeJobStatus = JobStatusRecord & {
+  readonly turnId?: string;
+};
 
 /**
  * Suspended runtime awaiting external input (suspend/resume web integration).
@@ -134,6 +140,8 @@ export interface SessionState {
   executionError: string | null;
   /** Real-time execution progress steps from kernel. */
   executionSteps: ExecutionStep[];
+  /** Latest append-only runtime job records received by live streams. */
+  jobStatuses: RuntimeJobStatus[];
 
   /**
    * Active suspensions awaiting external resume.
@@ -267,6 +275,7 @@ export type SessionAction =
   | { type: "UPSERT_EXECUTION_STEP"; step: ExecutionStep }
   | { type: "LOAD_EXECUTION_STEPS"; steps: ExecutionStep[] }
   | { type: "CLEAR_EXECUTION_STEPS" }
+  | { type: "UPSERT_JOB_STATUS"; status: RuntimeJobStatus }
   | { type: "FINALIZE_HANGING_RUNTIMES"; reason: string }
   | { type: "RESET_SESSION" }
   | { type: "SUBMIT_BLOCK"; blockId: string; values?: Record<string, unknown> }

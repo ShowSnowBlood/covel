@@ -26,6 +26,8 @@ import {
   emitLlmRespondedError,
   emitLlmRespondedSuccess,
 } from "../llm/llm-telemetry.js";
+import { resolveRetryDeadline } from "../retry/retry-common.js";
+import { acquireLLMSlot } from "../retry/llm-slots.js";
 import { shouldRetryMalformedToolArguments } from "../turn-executor/turn-output-helpers.js";
 import type { AgentLoopDeps } from "../turn-executor/turn-executor-types.js";
 import type {
@@ -72,6 +74,11 @@ export async function requestLLMResponse(
     onQueueWait,
   } = opts;
 
+  let requestDeadline = deadline;
+  const reportQueueWait = (waitedMs: number): void => {
+    requestDeadline += waitedMs;
+    onQueueWait?.(waitedMs);
+  };
   const callParams = {
     llm: deps.llm,
     model: effectiveModel,
@@ -79,8 +86,10 @@ export async function requestLLMResponse(
     tools: toolDefs,
     responseFormat,
     policy: retryPolicy,
-    deadline,
-    onQueueWait,
+    // This provider observes queue waits reported by this request, including
+    // waits before a stream-to-generate fallback.
+    deadline: () => requestDeadline,
+    onQueueWait: reportQueueWait,
     onRetry: reportRetry,
     emitter: deps.emitter,
     runtimeId: manifest.name,
@@ -102,7 +111,7 @@ async function requestStreaming(
   callParams: CallParams,
   onStreamDelta: (textDelta: string) => Promise<void>,
 ): Promise<LLMResponse> {
-  const { manifest, deadline, toolDefs } = opts;
+  const { manifest, toolDefs } = opts;
   let response: LLMResponse;
 
   // Streaming path: helper enforces per-attempt call-timeout + first-token
@@ -116,7 +125,10 @@ async function requestStreaming(
     });
     response = streamed.response;
   } catch (streamError) {
-    if (streamError instanceof LLMRetryError && Date.now() < deadline) {
+    if (
+      streamError instanceof LLMRetryError &&
+      Date.now() < resolveRetryDeadline(callParams.deadline)
+    ) {
       console.warn(
         `[stream-recovery] ${manifest.name} streaming exhausted (reason=${streamError.reason}); falling back to non-stream generate()`,
       );
@@ -151,7 +163,6 @@ async function requestNonStreaming(
     toolDefs,
     responseFormat,
     retryPolicy,
-    deadline,
   } = opts;
 
   // Non-streaming path: helper handles transient-error + call-timeout retry. A
@@ -172,7 +183,9 @@ async function requestNonStreaming(
       toolDefs,
       responseFormat,
       retryPolicy,
-      deadline,
+      deadline: callParams.deadline,
+      onQueueWait: callParams.onQueueWait,
+      abortSignal: callParams.abortSignal,
     });
   }
 }
@@ -185,7 +198,9 @@ async function malformedToolArgsFallback(args: {
   toolDefs: readonly LLMToolDefinition[];
   responseFormat: LLMResponseFormat | undefined;
   retryPolicy: RetryPolicy;
-  deadline: number;
+  deadline: CallParams["deadline"];
+  onQueueWait?: (waitedMs: number) => void;
+  abortSignal?: AbortSignal;
 }): Promise<LLMResponse> {
   const {
     manifest,
@@ -196,54 +211,74 @@ async function malformedToolArgsFallback(args: {
     responseFormat,
     retryPolicy,
     deadline,
+    onQueueWait,
+    abortSignal,
   } = args;
-  const fallbackCallStart = Date.now();
-  // Malformed-tool-arguments fallback bypasses the retry helper, so provider
-  // identity is not available here. Explicit `null` signals "provider unknown
-  // at this call site" and survives JSON serialisation (unlike `undefined`,
-  // which is dropped), keeping the payload schema uniform across emit sites.
-  await emitLlmCalling(deps.emitter, {
-    runtimeId: manifest.name,
-    pluginId: manifest.pluginId,
-    slot: effectiveModel,
-    model: effectiveModel,
-    provider: null,
-    messages,
-    tools: toolDefs,
-    attempt: 0,
-  });
-  let response: LLMResponse;
+  const slot = await acquireLLMSlot();
   try {
-    response = await deps.llm.generate({
-      model: effectiveModel,
-      messages,
-      tools: toolDefs,
-      responseFormat,
-      signal: AbortSignal.timeout(
-        Math.max(
-          1000,
-          Math.min(retryPolicy.callTimeoutMs, deadline - Date.now()),
+    if (slot.waitedMs > 0) onQueueWait?.(slot.waitedMs);
+    const fallbackCallStart = Date.now();
+    const remainingMs = resolveRetryDeadline(deadline) - Date.now();
+    if (remainingMs <= 0) {
+      throw new LLMRetryError({
+        reason: "call-timeout",
+        attempts: 0,
+        cause: new Error(
+          "runtime deadline reached before malformed-tool fallback",
         ),
-      ),
-    });
-  } catch (fallbackErr) {
-    // Pair every `llm.calling` with an `llm.responded` on the error path so
-    // trace-viewer pairing stays intact when this fallback generate throws.
-    await emitLlmRespondedError(deps.emitter, {
+        message: "Runtime deadline reached before malformed-tool fallback",
+      });
+    }
+    // Malformed-tool-arguments fallback bypasses the retry helper, so provider
+    // identity is not available here. Explicit `null` signals "provider
+    // unknown at this call site" and survives JSON serialisation (unlike
+    // `undefined`, which is dropped), keeping the payload schema uniform.
+    await emitLlmCalling(deps.emitter, {
       runtimeId: manifest.name,
       pluginId: manifest.pluginId,
-      error: fallbackErr,
+      slot: effectiveModel,
+      model: effectiveModel,
+      provider: null,
+      messages,
+      tools: toolDefs,
+      attempt: 0,
+    });
+    let response: LLMResponse;
+    const timeoutSignal = AbortSignal.timeout(
+      Math.max(1, Math.min(retryPolicy.callTimeoutMs, remainingMs)),
+    );
+    const signal = abortSignal
+      ? AbortSignal.any([timeoutSignal, abortSignal])
+      : timeoutSignal;
+    try {
+      response = await deps.llm.generate({
+        model: effectiveModel,
+        messages,
+        tools: toolDefs,
+        responseFormat,
+        signal,
+      });
+    } catch (fallbackErr) {
+      // Pair every `llm.calling` with an `llm.responded` on the error path so
+      // trace-viewer pairing stays intact when this fallback generate throws.
+      await emitLlmRespondedError(deps.emitter, {
+        runtimeId: manifest.name,
+        pluginId: manifest.pluginId,
+        error: fallbackErr,
+        durationMs: Date.now() - fallbackCallStart,
+        attempt: 0,
+      });
+      throw fallbackErr;
+    }
+    await emitLlmRespondedSuccess(deps.emitter, {
+      runtimeId: manifest.name,
+      pluginId: manifest.pluginId,
+      response,
       durationMs: Date.now() - fallbackCallStart,
       attempt: 0,
     });
-    throw fallbackErr;
+    return response;
+  } finally {
+    slot.release();
   }
-  await emitLlmRespondedSuccess(deps.emitter, {
-    runtimeId: manifest.name,
-    pluginId: manifest.pluginId,
-    response,
-    durationMs: Date.now() - fallbackCallStart,
-    attempt: 0,
-  });
-  return response;
 }

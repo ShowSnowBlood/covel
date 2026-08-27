@@ -6,7 +6,8 @@
  *
  * This is separate from the /actions SSE handler which handles
  * high-frequency turn-execution events (message.delta, message.completed, block.emitted).
- * The subscription handles lifecycle events: runtime.*, state.*, game.*, plugin.*, session.*, system.*.
+ * The subscription handles lifecycle events: runtime.*, state.*, game.*, plugin.*,
+ * session.*, system.*, and job-status progress.*.
  */
 
 import type { SubscriptionEvent, SubscriptionTopic } from "@covel/shared";
@@ -81,6 +82,7 @@ export function createSessionSubscription(
     "plugin",
     "session",
     "system",
+    "job",
   ];
   const onStateChange = options?.onStateChange;
 

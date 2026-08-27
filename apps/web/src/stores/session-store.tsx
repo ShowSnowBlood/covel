@@ -24,6 +24,7 @@ export type {
   AssetProgressEvent,
   ExecutionStep,
   PendingInteractionDraft,
+  RuntimeJobStatus,
   StreamMessage,
   SuspensionRecord,
 } from "./session-store/types.js";

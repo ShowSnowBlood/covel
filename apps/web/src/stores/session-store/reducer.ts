@@ -4,6 +4,7 @@ import {
   mergeGameStateForReplacement,
   rebuildGameStateFromPatches,
 } from "./game-state.js";
+import { runtimeJobStatusKey } from "./job-status.js";
 import { applyPluginMessageSurface } from "./plugin-message-surface.js";
 import type {
   AssetProgressEvent,
@@ -13,6 +14,8 @@ import type {
 } from "./types.js";
 
 const EXEC_STEPS_MAX = 500;
+
+const JOB_STATUS_MAX = 200;
 
 /** Streaming-placeholder id convention shared with the renderer. */
 const STREAM_ID_PREFIX = "stream_";
@@ -80,6 +83,7 @@ export const initialState: SessionState = {
   executing: false,
   executionError: null,
   executionSteps: [],
+  jobStatuses: [],
   statePatches: [],
   gameState: {},
   pluginData: {},
@@ -108,6 +112,7 @@ const SESSION_RESET: Partial<SessionState> = {
   executing: false,
   executionError: null,
   executionSteps: [],
+  jobStatuses: [],
   submittedBlockIds: new Set<string>(),
   submittedBlockValues: {},
   sessionPlugins: [],
@@ -169,6 +174,7 @@ export function reducer(
         assetProgressByTurn: sameSession
           ? state.assetProgressByTurn
           : new Map<string, readonly AssetProgressEvent[]>(),
+        jobStatuses: sameSession ? state.jobStatuses : [],
       };
     }
     case "SET_WORLD_SESSIONS":
@@ -388,6 +394,44 @@ export function reducer(
     case "CLEAR_EXECUTION_STEPS":
       // Only clear in-memory — localStorage is preserved for session history
       return { ...state, executionSteps: [] };
+    case "UPSERT_JOB_STATUS": {
+      const incoming = action.status;
+      const key = runtimeJobStatusKey(incoming);
+      const idx = state.jobStatuses.findIndex(
+        (status) => runtimeJobStatusKey(status) === key,
+      );
+      if (idx < 0) {
+        const next = [...state.jobStatuses, incoming];
+        return {
+          ...state,
+          jobStatuses:
+            next.length > JOB_STATUS_MAX
+              ? next.slice(next.length - JOB_STATUS_MAX)
+              : next,
+        };
+      }
+      const previous = state.jobStatuses[idx]!;
+      if (incoming.sequence < previous.sequence) return state;
+      // The same record can arrive through both /actions and /events/stream.
+      // Keep the action envelope's turn correlation when the subscription copy
+      // has no turnId, while accepting a richer equal-sequence duplicate.
+      if (
+        incoming.sequence === previous.sequence &&
+        (!incoming.turnId || previous.turnId)
+      ) {
+        return state;
+      }
+      const next = [...state.jobStatuses];
+      // A higher sequence is a complete append-only record, not a patch.
+      // Preserve only action-stream turn correlation when the subscription
+      // copy lacks it; absent progress/message/data must stay absent (terminal
+      // finalizer records intentionally omit them).
+      next[idx] =
+        incoming.turnId || !previous.turnId
+          ? incoming
+          : { ...incoming, turnId: previous.turnId };
+      return { ...state, jobStatuses: next };
+    }
     case "SET_SUSPENSIONS":
       return { ...state, suspensions: action.suspensions };
     case "ADD_SUSPENSION": {

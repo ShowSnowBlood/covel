@@ -697,6 +697,29 @@ export async function runAgentToolLoop({
     break;
   }
 
+  // If the deadline/max-step guard fires after at least one successful
+  // business tool, that tool result is already a deterministic output. Avoid
+  // converting useful work into the misleading empty-runtime failure merely
+  // because a final prose/terminator round had no budget left. Proposals stay
+  // attached to the returned result and are still committed by the finalizer.
+  if (
+    !stoppedWithResponse &&
+    !finalContent &&
+    failedToolCalls.length === 0 &&
+    Date.now() >= deadline &&
+    executedToolCalls.some(
+      (call) => call.success && !isRuntimeDoneSentinel(call.result),
+    )
+  ) {
+    finalContent = JSON.stringify({
+      toolCalls: collectedToolCalls.map((call) => ({
+        name: call.toolName,
+        output: call.output,
+      })),
+    });
+    stoppedWithResponse = true;
+  }
+
   return {
     finalContent,
     collectedToolCalls,

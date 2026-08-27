@@ -9,6 +9,19 @@ const CATEGORY_PRIORITY = {
   stats: 4,
 };
 
+const PROGRESS_JOB_ID = "player-init";
+
+async function reportSetupProgress(ctx, effect) {
+  try {
+    await ctx.progress?.report({
+      jobId: PROGRESS_JOB_ID,
+      ...effect,
+    });
+  } catch {
+    // Progress is observational; a reporting failure must not block setup.
+  }
+}
+
 /**
  * Deterministic two-phase player setup.
  *
@@ -22,8 +35,28 @@ const CATEGORY_PRIORITY = {
  */
 export default async function playerInitHandler(ctx) {
   const locale = ctx.locale;
-  const completed = await completePlayerSetup(ctx);
+  const report = (effect) => reportSetupProgress(ctx, effect);
+  await report({
+    state: "running",
+    progress: 0,
+    message: pick(locale, "正在读取角色资料", "Reading character data"),
+    sequence: 0,
+  });
+
+  const completed = await completePlayerSetup(ctx, report);
   if (completed) {
+    await report({
+      // The finalizer owns terminal succeeded/failed mapping so a rollback
+      // cannot leave a pre-commit success marker behind.
+      state: "progress",
+      progress: 95,
+      message: pick(
+        locale,
+        "角色已准备，正在提交",
+        "Character ready to commit",
+      ),
+      sequence: 4,
+    });
     return {
       outcome: "success",
       value: completed,
@@ -55,6 +88,13 @@ export default async function playerInitHandler(ctx) {
   ];
   const opening = textFromInput(ctx.inputs?.opening?.value);
   const narrativeTemplate = buildNarrativeTemplate(fields, opening, locale);
+
+  await report({
+    state: "waiting-input",
+    progress: 45,
+    message: pick(locale, "等待填写角色卡", "Waiting for character details"),
+    sequence: 2,
+  });
 
   return {
     outcome: "success",
@@ -216,16 +256,32 @@ function textFromInput(value) {
 const CHARACTER_PLUGIN_ID = "char-creator";
 const CHARACTER_FORM_ID = "char-creation";
 
-async function completePlayerSetup(ctx) {
+async function completePlayerSetup(ctx, report) {
   const store = ctx.store;
   if (!store) return null;
 
+  await report({
+    state: "progress",
+    progress: 20,
+    message: pick(
+      ctx.locale,
+      "正在读取现有角色",
+      "Checking existing character",
+    ),
+    sequence: 1,
+  });
   const characters = await store.listCharacters(ctx.sessionId);
   const player = Array.isArray(characters)
     ? characters.find((character) => character.type === "player")
     : null;
   if (player) {
     await mirrorPlayer(store, ctx.sessionId, player);
+    await report({
+      state: "progress",
+      progress: 85,
+      message: pick(ctx.locale, "正在同步角色资料", "Syncing character data"),
+      sequence: 3,
+    });
     return {
       narrativeOutput: "",
       preGameDone: true,
@@ -238,6 +294,16 @@ async function completePlayerSetup(ctx) {
   const submission = await latestCharacterSubmission(store, ctx.sessionId);
   if (!submission) return null;
 
+  await report({
+    state: "progress",
+    progress: 55,
+    message: pick(
+      ctx.locale,
+      "正在整理角色设定",
+      "Preparing character details",
+    ),
+    sequence: 2,
+  });
   const values =
     submission.values &&
     typeof submission.values === "object" &&
@@ -262,6 +328,12 @@ async function completePlayerSetup(ctx) {
     createdAt: now,
     updatedAt: now,
   };
+  await report({
+    state: "progress",
+    progress: 80,
+    message: pick(ctx.locale, "正在保存角色卡", "Saving character sheet"),
+    sequence: 3,
+  });
   await store.upsertCharacter(character);
   await mirrorPlayer(store, ctx.sessionId, character);
   await ctx.logger?.info?.("player-init created submitted player", {

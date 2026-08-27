@@ -17,6 +17,7 @@ import {
   reduceTurnResumed,
   reduceTurnSuspended,
 } from "./event-reducers.js";
+import { parseRuntimeJobStatus } from "./job-status.js";
 import { enrichGameStateFromSnapshot } from "./game-state.js";
 import type { SessionAction } from "./types.js";
 
@@ -80,6 +81,16 @@ function createSubscriptionEventHandler(
       }
       case "plugin-data.changed": {
         reducePluginDataChanged(options.dispatch, event.payload ?? {});
+        break;
+      }
+      case "job-status.updated": {
+        const status = parseRuntimeJobStatus(event.payload ?? {}, {
+          sessionId: event.sessionId,
+          timestamp: event.timestamp,
+        });
+        if (status) {
+          options.dispatch({ type: "UPSERT_JOB_STATUS", status });
+        }
         break;
       }
       case "turn.suspended": {
@@ -247,9 +258,10 @@ export function useSessionSubscription({
     };
 
     // plugin-data.changed arrives on topic="plugin" with
-    // _subType="plugin-data.changed". `game` carries turn.suspended/resumed.
+    // _subType="plugin-data.changed". `game` carries turn.suspended/resumed;
+    // `job` carries append-only ctx.progress reports.
     const sub = createSessionSubscription(sessionId, {
-      topics: ["plugin", "system", "game"],
+      topics: ["plugin", "system", "game", "job"],
       onStateChange: handleConnectionStateChange,
     });
     subscriptionRef.current = sub;

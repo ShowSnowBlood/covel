@@ -23,6 +23,9 @@ import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_LOOP_THRESHOLD,
   DEFAULT_FIRST_TOKEN_TIMEOUT_MS,
+  DEFAULT_RETRY_BACKOFF_MS,
+  MAX_RETRY_BACKOFF_MS,
+  computeRetryBackoff,
 } from "../src/retry/llm-retry.js";
 import { computeAttemptBudget } from "../src/retry/retry-common.js";
 import type {
@@ -275,6 +278,15 @@ describe("perturbMessages", () => {
   });
 });
 
+describe("retry backoff", () => {
+  it("uses bounded exponential delays", () => {
+    expect(computeRetryBackoff(0)).toBe(0);
+    expect(computeRetryBackoff(1)).toBe(DEFAULT_RETRY_BACKOFF_MS);
+    expect(computeRetryBackoff(2)).toBe(DEFAULT_RETRY_BACKOFF_MS * 2);
+    expect(computeRetryBackoff(99)).toBe(MAX_RETRY_BACKOFF_MS);
+  });
+});
+
 // ── callLLMWithRetry ────────────────────────────────────────────────
 
 describe("callLLMWithRetry", () => {
@@ -358,6 +370,48 @@ describe("callLLMWithRetry", () => {
     expect(retryMessages[retryMessages.length - 1]!.content).toContain(
       "[retry",
     );
+  });
+
+  it("does not start the next attempt until backoff elapses", async () => {
+    vi.useFakeTimers();
+    try {
+      const llm = createScriptedLLM([
+        { kind: "throw", error: new Error("rate limited") },
+        { kind: "ok", response: okResponse("after-wait") },
+      ]);
+      const promise = callLLMWithRetry({
+        llm,
+        messages: baseMessages,
+        policy: buildRetryPolicy({ runtimeTimeoutMs: 10_000, maxRetries: 1 }),
+        deadline: Date.now() + 10_000,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(llm.calls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(DEFAULT_RETRY_BACKOFF_MS - 1);
+      expect(llm.calls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(promise).resolves.toMatchObject({ content: "after-wait" });
+      expect(llm.calls).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fails fast when the deadline cannot cover backoff plus an attempt", async () => {
+    const llm = createScriptedLLM([
+      { kind: "throw", error: new Error("rate limited") },
+    ]);
+
+    await expect(
+      callLLMWithRetry({
+        llm,
+        messages: baseMessages,
+        policy: buildRetryPolicy({ runtimeTimeoutMs: 2_000, maxRetries: 1 }),
+        deadline: Date.now() + 1_100,
+      }),
+    ).rejects.toThrow(/no budget for retry backoff/i);
+    expect(llm.calls).toHaveLength(1);
   });
 
   it("throws LLMRetryError after exhausting retries", async () => {

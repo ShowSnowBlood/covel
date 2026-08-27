@@ -27,6 +27,7 @@ import { requestConfirm } from "@/lib/confirm-channel.js";
 import { usePluginNamespace } from "@/stores/plugin-data-store.js";
 import { useStreamingText } from "@/stores/streaming-text-store.js";
 import { AssetTurnSidebar } from "@/components/asset-render/index.js";
+import { RuntimeJobProgress } from "../runtime-job-progress.js";
 import { useImageGeneration } from "../chat-messages/use-image-generation.js";
 import type { StreamMessage, ExecutionStep } from "@/stores/session-store.js";
 import type {
@@ -333,6 +334,7 @@ export function StageView(props: StageViewProps): ReactElement {
         onSendMessage={onSendMessage}
         onFreeInput={() => setInputMode(true)}
       />
+      <RuntimeJobProgress className="pointer-events-auto absolute left-3 top-16 z-30 w-[min(22rem,calc(100%-1.5rem))] md:left-4 md:top-20" />
 
       {/* Thinking indicator — between choice submit and the first stream delta
           the dialog just holds the previous line with no cue that a turn is

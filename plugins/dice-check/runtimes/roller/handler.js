@@ -4,6 +4,24 @@ const DICE_COUNT = 3;
 const D20_SIDES = 20;
 const ROLLS_NAMESPACE = "rolls";
 
+function pick(locale, zh, en) {
+  return typeof locale === "string" && locale.toLowerCase().startsWith("en")
+    ? en
+    : zh;
+}
+
+const PROGRESS_JOB_ID = "dice-pool";
+
+async function reportDiceProgress(ctx, effect) {
+  try {
+    await ctx.progress?.report({
+      jobId: PROGRESS_JOB_ID,
+      ...effect,
+    });
+  } catch {
+    // Progress is observational; a reporting failure must not block a roll.
+  }
+}
 /**
  * Pre-roll this turn's dice pool. Runs every turn in the `pre-turn` stage so
  * the narrative engine receives the pool (via its `input.inject` of
@@ -13,13 +31,38 @@ const ROLLS_NAMESPACE = "rolls";
  * @param {import('@covel/plugin-loader').FunctionHandlerContext} ctx
  */
 export default async function handler(ctx) {
+  await reportDiceProgress(ctx, {
+    state: "running",
+    progress: 0,
+    message: pick(ctx.locale, "正在准备骰池", "Preparing dice pool"),
+    sequence: 0,
+  });
+
   // randomInt's upper bound is exclusive → 1..20 inclusive.
   const dice = Array.from({ length: DICE_COUNT }, () =>
     randomInt(1, D20_SIDES + 1),
   );
+  await reportDiceProgress(ctx, {
+    state: "progress",
+    progress: 70,
+    message: pick(ctx.locale, "骰池已掷出", "Dice rolled"),
+    sequence: 1,
+  });
+  const checkContext = buildCheckContext(dice, ctx.locale);
+  await reportDiceProgress(ctx, {
+    // The finalizer owns the terminal state after proposals commit.
+    state: "progress",
+    progress: 100,
+    message: pick(
+      ctx.locale,
+      "本回合骰池已就绪，正在提交",
+      "Dice pool ready to commit",
+    ),
+    sequence: 2,
+  });
 
   return {
-    checkContext: buildCheckContext(dice, ctx.locale),
+    checkContext,
     // Audit trail: the raw pool survives even when the narrative never uses it.
     pluginData: [
       { namespace: ROLLS_NAMESPACE, key: ctx.turnId, value: { dice } },
