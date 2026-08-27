@@ -21,21 +21,23 @@ import type {
 import type { ZodType } from "zod";
 import type {
   GatewayAdapterConfig,
+  ManagedModelPolicy,
   SlotOverridesInput,
 } from "../llm/gateway-llm-adapter.js";
 
 /**
- * Common request-shaping options accepted by the full ai-provider gateway.
- * Mirrors `GatewayOptions` (apiKeys / traceId / signal / slotOverrides) via
- * a structural type so `@covel/runtime` stays decoupled from ai-provider.
+ * Mirrors the common gateway request options via a structural type so
+ * `@covel/runtime` stays decoupled from `@covel/ai-provider`.
  */
 interface FullGatewayOptions {
+  managedModelPolicy?: ManagedModelPolicy;
   apiKeys?: Record<string, string>;
   /** Server-env keys — origin-gated by the gateway, unlike apiKeys. */
   envApiKeys?: Record<string, string>;
   traceId?: string;
   signal?: AbortSignal;
   slotOverrides?: SlotOverridesInput;
+  allowProviderFallbackOnClientError?: boolean;
 }
 
 /**
@@ -166,10 +168,16 @@ export function createPluginRuntimeGateway(
   config?: PluginRuntimeGatewayConfig,
 ): PluginRuntimeGateway {
   const commonOptions = () => ({
+    ...(config?.managedModelPolicy
+      ? { managedModelPolicy: config.managedModelPolicy }
+      : {}),
     ...(config?.apiKeys ? { apiKeys: config.apiKeys } : {}),
     ...(config?.envApiKeys ? { envApiKeys: config.envApiKeys } : {}),
     ...(config?.traceId ? { traceId: config.traceId } : {}),
     ...(config?.slotOverrides ? { slotOverrides: config.slotOverrides } : {}),
+    ...(config?.allowProviderFallbackOnClientError
+      ? { allowProviderFallbackOnClientError: true }
+      : {}),
   });
 
   const facade: PluginRuntimeGateway = {

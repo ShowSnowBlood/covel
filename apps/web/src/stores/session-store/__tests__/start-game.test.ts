@@ -92,6 +92,24 @@ describe("startGameSession bootstrap order", () => {
     ]);
     expect(api.markServerAck).toHaveBeenCalledOnce();
   });
+  it("skips prep model binding persistence when overrides are disallowed", async () => {
+    const dispatch = vi.fn();
+
+    await startGameSession({
+      ds: makeDataService([]),
+      dispatch,
+      sessionIdRef: { current: null },
+      world,
+      presets: [],
+      llmConfig: null,
+      plugins: ["pregame", "world-init"],
+      allowModelOverrides: false,
+    });
+
+    expect(api.updateSession).not.toHaveBeenCalled();
+    expect(api.clearPrepRuntimeBindings).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({ type: "SET_SESSION", session });
+  });
 
   it("keeps prep bindings when the server patch fails", async () => {
     api.updateSession.mockRejectedValue(new Error("patch failed"));

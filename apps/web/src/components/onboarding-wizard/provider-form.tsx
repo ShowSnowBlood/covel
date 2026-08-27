@@ -32,6 +32,7 @@ export function ProviderForm({
   managedCatalog = null,
   managedModelsLoading = false,
   managedOnly = false,
+  modelSelectionLocked = false,
   slotName,
 }: ProviderFormProps) {
   const { t } = useTranslation();
@@ -96,7 +97,39 @@ export function ProviderForm({
 
   return (
     <div className="space-y-4">
-      {managedOptions.length > 0 && !managedOnly && (
+      {modelSelectionLocked && managedOnly && (
+        <div className="flex items-start gap-2 rounded-[var(--radius-card)] border border-primary/25 bg-primary/5 p-3 text-xs text-muted-foreground">
+          <Cloud
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <div className="min-w-0 space-y-1">
+            <p className="font-medium text-foreground">
+              {t(
+                "onboarding.modelsManagedByAdmin",
+                "Models are managed by your administrator.",
+              )}
+            </p>
+            <p className="leading-relaxed">
+              {managedModelsLoading
+                ? t(
+                    "onboarding.loadingManagedModels",
+                    "Loading account models…",
+                  )
+                : managedOptions.length > 0
+                  ? t("onboarding.managedModelAssigned", {
+                      model: `${managedOptions.find((option) => option.ref === state.managedModelRef)?.channelName ?? managedOptions[0]!.channelName} · ${managedOptions.find((option) => option.ref === state.managedModelRef)?.name ?? managedOptions[0]!.name}`,
+                      defaultValue: "Active model: {{model}}",
+                    })
+                  : t(
+                      "onboarding.noManagedModels",
+                      "No usable account models are available yet. Refresh your FrostFox account and try again.",
+                    )}
+            </p>
+          </div>
+        </div>
+      )}
+      {managedOptions.length > 0 && !managedOnly && !modelSelectionLocked && (
         <div className="space-y-2">
           <Label className="ui-eyebrow text-[10px]">
             {t("onboarding.modelSource", "Model source")}
@@ -138,7 +171,7 @@ export function ProviderForm({
         </div>
       )}
 
-      {managedOnly && managedOptions.length === 0 && (
+      {managedOnly && !modelSelectionLocked && managedOptions.length === 0 && (
         <div className="flex items-start gap-2 rounded-[var(--radius-card)] border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
           {managedModelsLoading ? (
             <span
@@ -179,45 +212,47 @@ export function ProviderForm({
         </div>
       )}
 
-      {showManagedForm && managedOptions.length > 0 && (
-        <div className="space-y-1.5">
-          <Label
-            htmlFor={`onboarding-managed-model-${slotName}`}
-            className="ui-eyebrow text-[10px]"
-          >
-            {t("onboarding.accountModel", "Account model")}
-          </Label>
-          <select
-            id={`onboarding-managed-model-${slotName}`}
-            value={state.managedModelRef || managedOptions[0]!.ref}
-            onChange={(event) =>
-              updateField("managedModelRef", event.target.value)
-            }
-            className="ui-input-shell min-h-11 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-          >
-            {managedOptions.map((option) => (
-              <option key={option.ref} value={option.ref}>
-                {option.channelName} · {option.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            {t(
-              "onboarding.managedModelHint",
-              "Uses your FrostFox account balance. No provider key is required.",
+      {showManagedForm &&
+        !modelSelectionLocked &&
+        managedOptions.length > 0 && (
+          <div className="space-y-1.5">
+            <Label
+              htmlFor={`onboarding-managed-model-${slotName}`}
+              className="ui-eyebrow text-[10px]"
+            >
+              {t("onboarding.accountModel", "Account model")}
+            </Label>
+            <select
+              id={`onboarding-managed-model-${slotName}`}
+              value={state.managedModelRef || managedOptions[0]!.ref}
+              onChange={(event) =>
+                updateField("managedModelRef", event.target.value)
+              }
+              className="ui-input-shell min-h-11 w-full border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            >
+              {managedOptions.map((option) => (
+                <option key={option.ref} value={option.ref}>
+                  {option.channelName} · {option.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "onboarding.managedModelHint",
+                "Uses your FrostFox account balance. No provider key is required.",
+              )}
+            </p>
+            {managedReady && (
+              <div className="flex items-center gap-2">
+                <PingButton
+                  target={{ kind: "slot", slotId: slotName }}
+                  onBeforePing={onBeforePing}
+                />
+              </div>
             )}
-          </p>
-          {managedReady && (
-            <div className="flex items-center gap-2">
-              <PingButton
-                target={{ kind: "slot", slotId: slotName }}
-                onBeforePing={onBeforePing}
-              />
-            </div>
-          )}
-        </div>
-      )}
-      {showLocalForm && (
+          </div>
+        )}
+      {showLocalForm && !modelSelectionLocked && (
         <>
           <div className="space-y-2">
             <Label className="ui-eyebrow text-[10px]">

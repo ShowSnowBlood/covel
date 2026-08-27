@@ -195,6 +195,8 @@ export interface TurnExecutorDeps extends AgentLoopDeps {
         };
         currentBlocks: readonly CoreMemoryBlockView[];
         locale?: string;
+        /** Request-scoped adapter used for this extraction call. */
+        llm?: LLMAdapter;
       }): Promise<{
         updated: boolean;
         blocksChanged: readonly string[];

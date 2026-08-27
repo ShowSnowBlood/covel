@@ -39,13 +39,14 @@ import {
 } from "./llm-slots-model.js";
 import { ignoreError } from "@/lib/ignore-error.js";
 import { clearChangedSlotReasoningEfforts } from "./llm-reasoning-effort.js";
+import { FrostFoxModelScheduleCard } from "./FrostFoxModelScheduleCard.js";
 
 /**
  * Pane that surfaces the `[covel.<slot>]` sections from llm.toml and lets the
  * user override each slot's preset and capability metadata. Legacy (non-
  * configured) environments fall back to a fixed slot list.
  */
-export function LlmSlotsPane() {
+export function LlmSlotsPane({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useTranslation();
   const { state, boot } = useSession();
   const llm = state.llmConfig;
@@ -180,7 +181,7 @@ export function LlmSlotsPane() {
   };
 
   return (
-    <div className="space-y-3">
+    <fieldset disabled={readOnly} className="min-w-0 space-y-3">
       {/* Relationship summary — explains how slots fit into the bigger picture.
           O-4 audit finding: players were seeing "slot / preset / key" as three
           disconnected tabs without any indication that they form a chain. */}
@@ -205,6 +206,7 @@ export function LlmSlotsPane() {
           </span>
         </div>
       </div>
+      <FrostFoxModelScheduleCard />
       {/* Manual hot-reload: re-read llm.toml on the server and apply it to the
           live gateway without restarting. */}
       <div className="flex items-center justify-between gap-2 border border-border/60 bg-muted/20 px-3 py-2">
@@ -582,7 +584,7 @@ export function LlmSlotsPane() {
           )}
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }
 

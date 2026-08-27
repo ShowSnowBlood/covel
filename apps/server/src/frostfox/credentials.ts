@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
   router_account_id TEXT NOT NULL,
   account_name TEXT NOT NULL,
   balance REAL NOT NULL,
+  is_admin INTEGER NOT NULL DEFAULT 0,
   account_key_ciphertext TEXT NOT NULL,
   credential_state TEXT NOT NULL,
   credential_generation_updated_at TEXT NOT NULL,
@@ -37,6 +38,11 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS frostfox_account_bindings_subject_uq
   ON frostfox_account_bindings(issuer, router_account_id);
+CREATE TABLE IF NOT EXISTS frostfox_model_schedule (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  schedule_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS frostfox_account_progression (
   local_user_id TEXT PRIMARY KEY,
   completed_level INTEGER NOT NULL DEFAULT 0,
@@ -62,6 +68,7 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
   router_account_id TEXT NOT NULL,
   account_name TEXT NOT NULL,
   balance DOUBLE PRECISION NOT NULL,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   account_key_ciphertext TEXT NOT NULL,
   credential_state TEXT NOT NULL,
   credential_generation_updated_at TEXT NOT NULL,
@@ -69,6 +76,11 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (issuer, router_account_id)
+);
+CREATE TABLE IF NOT EXISTS frostfox_model_schedule (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  schedule_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS frostfox_account_progression (
   local_user_id TEXT PRIMARY KEY REFERENCES frostfox_account_bindings(local_user_id) ON DELETE CASCADE,
@@ -93,11 +105,22 @@ export interface FrostFoxBinding {
   readonly routerAccountId: string;
   readonly accountName: string;
   readonly balance: number;
+  readonly isAdmin: boolean;
   readonly accountKeyCiphertext: string;
   readonly credentialState: FrostFoxCredentialState;
   readonly credentialGenerationUpdatedAt: string;
   readonly lastVerifiedAt: string;
   readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface FrostFoxModelScheduleEntry {
+  readonly channelKey: string;
+  readonly modelId: string;
+}
+
+export interface FrostFoxModelSchedule {
+  readonly story: readonly FrostFoxModelScheduleEntry[];
   readonly updatedAt: string;
 }
 
@@ -120,6 +143,10 @@ export interface FrostFoxCredentialStore {
   ): Promise<FrostFoxBinding | null>;
   getBindingByLocalUserId(localUserId: string): Promise<FrostFoxBinding | null>;
   upsertBinding(record: FrostFoxBinding): Promise<FrostFoxBinding>;
+  getModelSchedule(): Promise<FrostFoxModelSchedule | null>;
+  setModelSchedule(
+    story: readonly FrostFoxModelScheduleEntry[],
+  ): Promise<FrostFoxModelSchedule>;
   getProgression(localUserId: string): Promise<FrostFoxProgression>;
   setCompletedLevel(
     localUserId: string,
@@ -242,6 +269,7 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
   const transactions = new Map<string, FrostFoxLoginTransaction>();
   const bindings = new Map<string, FrostFoxBinding>();
   const progressions = new Map<string, FrostFoxProgression>();
+  let modelSchedule: FrostFoxModelSchedule | null = null;
 
   return {
     async createLoginTransaction(record) {
@@ -282,6 +310,19 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
       bindings.set(next.localUserId, next);
       return next;
     },
+    async getModelSchedule() {
+      return modelSchedule;
+    },
+    async setModelSchedule(story) {
+      modelSchedule = {
+        story: story.map((entry) => ({
+          channelKey: entry.channelKey,
+          modelId: entry.modelId,
+        })),
+        updatedAt: new Date().toISOString(),
+      };
+      return modelSchedule;
+    },
     async getProgression(localUserId) {
       return (
         progressions.get(localUserId) ?? {
@@ -318,6 +359,7 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
       transactions.clear();
       bindings.clear();
       progressions.clear();
+      modelSchedule = null;
     },
   };
 }
@@ -332,6 +374,26 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
   db.pragma("foreign_keys = ON");
 
   db.exec(SQLITE_DDL);
+  const bindingColumns = db.pragma(
+    "table_info(frostfox_account_bindings)",
+  ) as Array<{ name?: unknown }>;
+  if (!bindingColumns.some((column) => column.name === "is_admin")) {
+    db.exec(
+      "ALTER TABLE frostfox_account_bindings ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+    );
+  }
+
+  const scheduleById = db.prepare(
+    "SELECT schedule_json, updated_at FROM frostfox_model_schedule WHERE id = 1",
+  );
+  const upsertSchedule = db.prepare(`
+    INSERT INTO frostfox_model_schedule (id, schedule_json, updated_at)
+    VALUES (1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      schedule_json = excluded.schedule_json,
+      updated_at = excluded.updated_at
+    RETURNING schedule_json, updated_at
+  `);
 
   const insertTransaction = db.prepare(`
     INSERT INTO frostfox_login_transactions
@@ -353,13 +415,14 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
   `);
   const upsertBinding = db.prepare(`
     INSERT INTO frostfox_account_bindings (
-      local_user_id, issuer, router_account_id, account_name, balance,
+      local_user_id, issuer, router_account_id, account_name, balance, is_admin,
       account_key_ciphertext, credential_state,
       credential_generation_updated_at, last_verified_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(issuer, router_account_id) DO UPDATE SET
       account_name = excluded.account_name,
       balance = excluded.balance,
+      is_admin = excluded.is_admin,
       account_key_ciphertext = excluded.account_key_ciphertext,
       credential_state = excluded.credential_state,
       credential_generation_updated_at = excluded.credential_generation_updated_at,
@@ -413,6 +476,18 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
       if (!row) throw new Error("failed to upsert FrostFox binding");
       return mapBindingRow(row);
     },
+    async getModelSchedule() {
+      const row = scheduleById.get();
+      return row ? mapScheduleRow(row) : null;
+    },
+    async setModelSchedule(story) {
+      const row = upsertSchedule.get(
+        JSON.stringify({ story }),
+        new Date().toISOString(),
+      );
+      if (!row) throw new Error("failed to upsert FrostFox model schedule");
+      return mapScheduleRow(row);
+    },
     async getProgression(localUserId) {
       const row = progressionByLocalUser.get(localUserId);
       return row
@@ -445,6 +520,9 @@ async function createPostgresCredentialStore(
 ): Promise<FrostFoxCredentialStore> {
   const sql = postgres(databaseUrl, { max: 2 });
   await sql.unsafe(POSTGRES_DDL);
+  await sql.unsafe(
+    "ALTER TABLE frostfox_account_bindings ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE",
+  );
 
   return {
     async createLoginTransaction(record) {
@@ -490,13 +568,14 @@ async function createPostgresCredentialStore(
     async upsertBinding(record) {
       const rows = await sql.unsafe(
         `INSERT INTO frostfox_account_bindings (
-           local_user_id, issuer, router_account_id, account_name, balance,
+           local_user_id, issuer, router_account_id, account_name, balance, is_admin,
            account_key_ciphertext, credential_state,
            credential_generation_updated_at, last_verified_at, created_at, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT(issuer, router_account_id) DO UPDATE SET
            account_name = excluded.account_name,
            balance = excluded.balance,
+           is_admin = excluded.is_admin,
            account_key_ciphertext = excluded.account_key_ciphertext,
            credential_state = excluded.credential_state,
            credential_generation_updated_at = excluded.credential_generation_updated_at,
@@ -507,6 +586,25 @@ async function createPostgresCredentialStore(
       );
       if (!rows[0]) throw new Error("failed to upsert FrostFox binding");
       return mapBindingRow(rows[0]);
+    },
+    async getModelSchedule() {
+      const rows = await sql.unsafe(
+        "SELECT schedule_json, updated_at FROM frostfox_model_schedule WHERE id = 1",
+      );
+      return rows[0] ? mapScheduleRow(rows[0]) : null;
+    },
+    async setModelSchedule(story) {
+      const rows = await sql.unsafe(
+        `INSERT INTO frostfox_model_schedule (id, schedule_json, updated_at)
+         VALUES (1, $1, $2)
+         ON CONFLICT(id) DO UPDATE SET
+           schedule_json = excluded.schedule_json,
+           updated_at = excluded.updated_at
+         RETURNING schedule_json, updated_at`,
+        [JSON.stringify({ story }), new Date().toISOString()],
+      );
+      if (!rows[0]) throw new Error("failed to upsert FrostFox model schedule");
+      return mapScheduleRow(rows[0]);
     },
     async getProgression(localUserId) {
       const rows = await sql.unsafe(
@@ -560,6 +658,7 @@ function bindingParams(record: FrostFoxBinding): Array<string | number> {
     record.routerAccountId,
     record.accountName,
     record.balance,
+    record.isAdmin ? 1 : 0,
     record.accountKeyCiphertext,
     record.credentialState,
     record.credentialGenerationUpdatedAt,
@@ -592,6 +691,7 @@ function mapBindingRow(row: unknown): FrostFoxBinding {
     routerAccountId: String(value.router_account_id),
     accountName: String(value.account_name),
     balance: Number(value.balance),
+    isAdmin: readBoolean(value.is_admin),
     accountKeyCiphertext: String(value.account_key_ciphertext),
     credentialState: state,
     credentialGenerationUpdatedAt: String(
@@ -601,6 +701,44 @@ function mapBindingRow(row: unknown): FrostFoxBinding {
     createdAt: String(value.created_at),
     updatedAt: String(value.updated_at),
   };
+}
+
+function mapScheduleRow(row: unknown): FrostFoxModelSchedule {
+  const value = asRow(row);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(value.schedule_json));
+  } catch {
+    parsed = null;
+  }
+  const story =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as { story?: unknown }).story
+      : undefined;
+  return {
+    story: Array.isArray(story)
+      ? story.filter(isScheduleEntry).map((entry) => ({
+          channelKey: entry.channelKey,
+          modelId: entry.modelId,
+        }))
+      : [],
+    updatedAt: String(value.updated_at),
+  };
+}
+
+function isScheduleEntry(value: unknown): value is FrostFoxModelScheduleEntry {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.channelKey === "string" &&
+    typeof entry.modelId === "string" &&
+    entry.channelKey.length > 0 &&
+    entry.modelId.length > 0
+  );
+}
+
+function readBoolean(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
 }
 function mapProgressionRow(row: unknown): FrostFoxProgression {
   const value = asRow(row);

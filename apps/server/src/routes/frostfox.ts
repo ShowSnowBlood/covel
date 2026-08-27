@@ -1,6 +1,6 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import { errorBody } from "../api-error.js";
+import { errorBody, type ApiErrorResponse } from "../api-error.js";
 import { FrostFoxService, FrostFoxServiceError } from "../frostfox/service.js";
 
 export const FROSTFOX_SESSION_COOKIE = "covel_frostfox_session";
@@ -57,6 +57,7 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
               id: principal.routerAccountId,
               name: principal.accountName,
               balance: principal.balance,
+              isAdmin: principal.isAdmin === true,
               credentialState: principal.credentialState,
               lastVerifiedAt: principal.lastVerifiedAt,
             },
@@ -113,7 +114,6 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
         code: codeValues[0]!,
         state: stateValues[0]!,
         transactionToken,
-        currentSessionToken: getCookie(c, FROSTFOX_SESSION_COOKIE),
       });
       setCookie(c, FROSTFOX_SESSION_COOKIE, result.sessionToken, {
         ...SESSION_COOKIE_OPTIONS,
@@ -150,6 +150,82 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
     }
     try {
       return c.json(await service.listModels(principal));
+    } catch (error) {
+      return serviceError(c, error);
+    }
+  });
+
+  app.get("/api/frostfox/model-schedule", async (c) => {
+    noStore(c);
+    if (!service) {
+      return c.json(
+        errorBody("FrostFox account connection is not enabled", {
+          code: "frostfox_saas_disabled",
+        }),
+        404,
+      );
+    }
+    const principal = c.get("frostFoxPrincipal");
+    if (!principal) {
+      return c.json(
+        errorBody("FrostFox account connection required", {
+          code: "frostfox_account_required",
+        }),
+        401,
+      );
+    }
+    try {
+      const schedule = await service.getModelSchedule(principal);
+      return c.json({
+        story: schedule?.story ?? [],
+        updatedAt: schedule?.updatedAt ?? null,
+        canEdit: principal.isAdmin === true,
+      });
+    } catch (error) {
+      return serviceError(c, error);
+    }
+  });
+
+  app.put("/api/frostfox/model-schedule", async (c) => {
+    noStore(c);
+    if (!service) {
+      return c.json(
+        errorBody("FrostFox account connection is not enabled", {
+          code: "frostfox_saas_disabled",
+        }),
+        404,
+      );
+    }
+    if (!hasExpectedOrigin(c, service)) {
+      return c.json(
+        errorBody("Request origin is not allowed", {
+          code: "frostfox_origin_invalid",
+        }),
+        403,
+      );
+    }
+    const principal = c.get("frostFoxPrincipal");
+    if (!principal) {
+      return c.json(
+        errorBody("FrostFox account connection required", {
+          code: "frostfox_account_required",
+        }),
+        401,
+      );
+    }
+    const body: unknown = await c.req.json().catch(() => null);
+    const story = readScheduleStory(body);
+    if (!story) {
+      return c.json(
+        errorBody("Model schedule is invalid", {
+          code: "frostfox_model_schedule_invalid",
+        }),
+        400,
+      );
+    }
+    try {
+      const schedule = await service.setModelSchedule(principal, story);
+      return c.json({ ...schedule, canEdit: true });
     } catch (error) {
       return serviceError(c, error);
     }
@@ -286,6 +362,31 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
 function noStore(c: { header(name: string, value: string): void }): void {
   c.header("Cache-Control", "no-store, max-age=0");
   c.header("Pragma", "no-cache");
+  c.header("Vary", "Cookie");
+}
+
+function readScheduleStory(
+  value: unknown,
+): Array<{ channelKey: string; modelId: string }> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const story = (value as { story?: unknown }).story;
+  if (!Array.isArray(story) || story.length > 8) return null;
+  const entries: Array<{ channelKey: string; modelId: string }> = [];
+  for (const item of story) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const entry = item as Record<string, unknown>;
+    if (
+      typeof entry.channelKey !== "string" ||
+      typeof entry.modelId !== "string"
+    ) {
+      return null;
+    }
+    entries.push({
+      channelKey: entry.channelKey,
+      modelId: entry.modelId,
+    });
+  }
+  return entries;
 }
 
 function hasExpectedOrigin(
@@ -310,10 +411,7 @@ function redirectWithResult(
 
 function serviceError(
   c: {
-    json(
-      body: ReturnType<typeof errorBody>,
-      status: 400 | 401 | 409 | 502,
-    ): Response;
+    json(body: ApiErrorResponse, status: 400 | 401 | 403 | 409 | 502): Response;
   },
   error: unknown,
 ): Response {
@@ -321,6 +419,7 @@ function serviceError(
     const status =
       error.status === 400 ||
       error.status === 401 ||
+      error.status === 403 ||
       error.status === 409 ||
       error.status === 502
         ? error.status

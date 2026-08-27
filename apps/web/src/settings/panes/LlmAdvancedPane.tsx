@@ -110,7 +110,7 @@ export function parseNumericParameterOverride(
   return Math.min(max, Math.max(min, value));
 }
 
-export function LlmAdvancedPane() {
+export function LlmAdvancedPane({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useTranslation();
   const { state } = useSession();
   const llm = state.llmConfig;
@@ -197,13 +197,14 @@ export function LlmAdvancedPane() {
   };
 
   useEffect(() => {
+    if (readOnly) return;
     const next = pruneInvalidReasoningEffortOverride(
       paramOverrides,
       selectedSlot,
       reasoningProfile,
     );
     if (next !== paramOverrides) commit(next);
-  }, [reasoningProfile, selectedSlot, current.reasoningEffort]);
+  }, [reasoningProfile, selectedSlot, current.reasoningEffort, readOnly]);
 
   const resetSlot = () => {
     const next = { ...paramOverrides };
@@ -212,7 +213,7 @@ export function LlmAdvancedPane() {
   };
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={readOnly} className="min-w-0 space-y-4">
       <div className="flex items-start gap-2 border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span className="leading-relaxed">{t("settings.advancedDesc")}</span>
@@ -284,7 +285,7 @@ export function LlmAdvancedPane() {
         <RotateCcw className="h-3.5 w-3.5" />
         {t("settings.resetToDefaults", "Reset to defaults")}
       </Button>
-    </div>
+    </fieldset>
   );
 }
 

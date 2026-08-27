@@ -4,11 +4,14 @@ import {
   deriveFrostFoxGatewayKey,
   FrostFoxService,
   type FrostFoxHostEnvironment,
+  type FrostFoxPrincipal,
 } from "../../src/frostfox/service.js";
 import {
+  createFrostFoxCredentialStore,
   createMemoryCredentialStore,
   openSecret,
   sealSecret,
+  type FrostFoxBinding,
 } from "../../src/frostfox/credentials.js";
 const CLIENT_SECRET = "ffsc_test_secret";
 const CREDENTIAL_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -39,10 +42,184 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+async function createBoundService(
+  isAdmin: boolean,
+  options: { staleImageDefault?: boolean; imageCatalog?: boolean } = {},
+) {
+  const store = createMemoryCredentialStore();
+  const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/api/account/v1/saas/client-config")) {
+      return json({
+        protocolVersion: "2.0",
+        clientId: "covel",
+        displayName: "Covel",
+        callbackUrl: SOURCE.COVEL_FROSTFOX_CALLBACK_URL,
+        channelSelectorHeader: "X-FrostFox-Channel-Id",
+        configurationVersion: "test-schedule-v1",
+        channelMappings: [
+          {
+            channelKey: "story",
+            routerChannelId: CHANNEL_ID,
+            routerChannelName: "story",
+            routerChannelDisplayName: "Story",
+            enabled: true,
+          },
+        ],
+      });
+    }
+    if (url.endsWith("/v1/models")) {
+      return json({
+        object: "list",
+        data: [
+          { id: "story-primary", name: "Story Primary" },
+          { id: "story-backup", name: "Story Backup" },
+          ...(options.imageCatalog
+            ? [
+                {
+                  id: "router-image",
+                  name: "Router Image",
+                  mode: "image_generation",
+                },
+              ]
+            : []),
+        ],
+      });
+    }
+    return json({ error: "not_found" }, 404);
+  });
+  const ai = createAiStack();
+  if (options.staleImageDefault) {
+    ai.config.presets.push({
+      id: "slot-image",
+      name: "Stale local image",
+      provider: "story",
+      model: "stale-local-image",
+      tier: "medium",
+      supportedModes: ["image"],
+      enabled: true,
+      defaultSlot: "image",
+      tag: "image",
+    });
+  }
+  const service = await FrostFoxService.create({
+    env: HOST_ENV,
+    ai,
+    source: SOURCE,
+    fetchImpl: fetchImpl as typeof fetch,
+    credentialStore: store,
+  });
+  if (!service) throw new Error("expected FrostFox test service");
+  services.push(service);
+
+  const now = new Date().toISOString();
+  const issuer = SOURCE.COVEL_FROSTFOX_ROUTER_BASE_URL;
+  const routerAccountId = isAdmin ? "admin-account" : "player-account";
+  const localUserId = isAdmin ? "admin-local" : "player-local";
+  const binding: FrostFoxBinding = {
+    localUserId,
+    issuer,
+    routerAccountId,
+    accountName: isAdmin ? "Admin" : "Player",
+    balance: 10,
+    isAdmin,
+    accountKeyCiphertext: sealSecret(
+      ACCOUNT_KEY,
+      Buffer.from(CREDENTIAL_KEY, "base64url"),
+      `binding\n${issuer}\n${routerAccountId}\ncovel`,
+    ),
+    credentialState: "active",
+    credentialGenerationUpdatedAt: now,
+    lastVerifiedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await store.upsertBinding(binding);
+  const principal: FrostFoxPrincipal = {
+    localUserId,
+    routerAccountId,
+    accountName: binding.accountName,
+    balance: binding.balance,
+    isAdmin,
+    credentialState: "active",
+    lastVerifiedAt: now,
+  };
+  return { service, principal };
+}
+
 describe("FrostFox first-party SaaS", () => {
   it("matches the protocol v2 Gateway-key vector", () => {
     expect(deriveFrostFoxGatewayKey(ACCOUNT_KEY, "frostfox-engine")).toBe(
       "sk-ff-J8pedIxw2vqiB3Smv6kstCQaXlfOBHIXFGLBJm7RU_M",
+    );
+  });
+  it("rejects model schedule writes for non-admin accounts", async () => {
+    const { service, principal } = await createBoundService(false);
+
+    await expect(
+      service.setModelSchedule(principal, [
+        { channelKey: "story", modelId: "story-primary" },
+      ]),
+    ).rejects.toMatchObject({
+      code: "frostfox_admin_required",
+      status: 403,
+    });
+  });
+
+  it("publishes the ordered story fallback chain for admins", async () => {
+    const { service, principal } = await createBoundService(true);
+
+    await service.setModelSchedule(principal, [
+      { channelKey: "story", modelId: "story-primary" },
+      { channelKey: "story", modelId: "story-backup" },
+    ]);
+    const context = await service.prepareAiContext(principal);
+    const defaults = context?.managedSlotDefaults;
+    expect(context?.managedModelPolicy).toBeUndefined();
+    const primaryId = defaults?.slotPresetOverrides?.story;
+    expect(primaryId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(defaults?.slotPresetOverrides).toMatchObject({
+      story: primaryId,
+      plugin: primaryId,
+      default: primaryId,
+    });
+    expect(defaults?.customPresets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: primaryId,
+          model: "story-primary",
+          fallbackPresetIds: [
+            expect.stringMatching(/^frostfox-managed-[0-9a-f]{24}$/),
+          ],
+        }),
+        expect.objectContaining({ model: "story-backup" }),
+      ]),
+    );
+  });
+  it("replaces stale image defaults with the current Router catalog model", async () => {
+    const { service, principal } = await createBoundService(false, {
+      staleImageDefault: true,
+      imageCatalog: true,
+    });
+
+    const context = await service.prepareAiContext(principal);
+    const imagePresetId =
+      context?.managedSlotDefaults?.slotPresetOverrides?.image;
+
+    expect(imagePresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(context?.managedSlotDefaults?.customPresets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: imagePresetId,
+          model: "router-image",
+          tag: "image",
+        }),
+      ]),
+    );
+    expect(context?.managedSlotDefaults?.customPresets).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ model: "stale-local-image", tag: "image" }),
+      ]),
     );
   });
 
@@ -167,7 +344,6 @@ describe("FrostFox first-party SaaS", () => {
       code: "ffac_test_code",
       state: authorizeUrl.searchParams.get("state")!,
       transactionToken: start.transactionToken,
-      currentSessionToken: undefined,
     });
     expect(connected.principal).toMatchObject({
       routerAccountId: "account-1",
@@ -219,6 +395,12 @@ describe("FrostFox first-party SaaS", () => {
       context?.managedSlotDefaults?.slotPresetOverrides?.story;
     const managedImagePresetId =
       context?.managedSlotDefaults?.slotPresetOverrides?.image;
+    expect(context?.managedModelPolicy).toEqual({
+      presetIdsByTag: {
+        text: managedPresetId,
+        image: managedImagePresetId,
+      },
+    });
     expect(managedPresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
     expect(managedImagePresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
     expect(context?.managedSlotDefaults?.slotPresetOverrides).toEqual({
@@ -365,7 +547,6 @@ describe("FrostFox first-party SaaS", () => {
         code: "ffac_test_code",
         state: authorizeUrl.searchParams.get("state")!,
         transactionToken: start.transactionToken,
-        currentSessionToken: connected.sessionToken,
       }),
     ).rejects.toMatchObject({
       code: "frostfox_login_transaction_invalid",
@@ -381,6 +562,91 @@ describe("FrostFox first-party SaaS", () => {
 
     await service!.unbind(connected.principal);
     expect(await service!.resolvePrincipal(connected.sessionToken)).toBeNull();
+  });
+  it("switches accounts without reusing the previous local identity", async () => {
+    const accountAKey = "ffak_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const accountBKey = "ffak_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    const accountByKey: Record<
+      string,
+      { id: string; name: string; balance: number }
+    > = {
+      [accountAKey]: { id: "account-a", name: "Account A", balance: 11 },
+      [accountBKey]: { id: "account-b", name: "Account B", balance: 22 },
+    };
+    const fetchImpl = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/account/v1/saas/client-config")) {
+          return json({
+            protocolVersion: "2.0",
+            clientId: "covel",
+            displayName: "Covel",
+            callbackUrl: SOURCE.COVEL_FROSTFOX_CALLBACK_URL,
+            channelSelectorHeader: "X-FrostFox-Channel-Id",
+            configurationVersion: "account-switch-test",
+            channelMappings: [],
+          });
+        }
+        if (url.endsWith("/api/account/v1/saas/exchange")) {
+          const body = JSON.parse(String(init?.body)) as { code?: string };
+          return json({
+            accountKey:
+              body.code === "ffac_account_a" ? accountAKey : accountBKey,
+          });
+        }
+        if (url.endsWith("/api/account/v1/me")) {
+          const authorization = new Headers(init?.headers).get("authorization");
+          const account =
+            accountByKey[authorization?.replace(/^Bearer /, "") ?? ""];
+          return account ? json(account) : json({ error: "invalid_key" }, 401);
+        }
+        return json({ error: "not_found" }, 404);
+      },
+    );
+    const store = await createFrostFoxCredentialStore(HOST_ENV);
+    const service = await FrostFoxService.create({
+      env: HOST_ENV,
+      ai: createAiStack(),
+      source: SOURCE,
+      fetchImpl: fetchImpl as typeof fetch,
+      credentialStore: store,
+    });
+    expect(service).not.toBeNull();
+    services.push(service!);
+
+    const firstStart = await service!.startAuthorization();
+    const first = await service!.completeAuthorization({
+      code: "ffac_account_a",
+      state: new URL(firstStart.redirectUrl).searchParams.get("state")!,
+      transactionToken: firstStart.transactionToken,
+    });
+    const secondStart = await service!.startAuthorization();
+    const second = await service!.completeAuthorization({
+      code: "ffac_account_b",
+      state: new URL(secondStart.redirectUrl).searchParams.get("state")!,
+      transactionToken: secondStart.transactionToken,
+    });
+
+    expect(second.principal).toMatchObject({
+      routerAccountId: "account-b",
+      accountName: "Account B",
+      balance: 22,
+    });
+    expect(second.principal.localUserId).not.toBe(first.principal.localUserId);
+    expect(await service!.resolvePrincipal(first.sessionToken)).toMatchObject({
+      routerAccountId: "account-a",
+      localUserId: first.principal.localUserId,
+    });
+    expect(await service!.resolvePrincipal(second.sessionToken)).toMatchObject({
+      routerAccountId: "account-b",
+      localUserId: second.principal.localUserId,
+    });
+    expect(
+      await store.getBindingBySubject(
+        SOURCE.COVEL_FROSTFOX_ROUTER_BASE_URL,
+        "account-a",
+      ),
+    ).toMatchObject({ localUserId: first.principal.localUserId });
   });
 
   it("rewrites the retired Router origin before SaaS authorization", async () => {

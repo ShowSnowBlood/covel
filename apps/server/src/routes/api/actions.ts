@@ -85,6 +85,7 @@ interface MemorySystemFacade {
         updatedAt: string;
       }[];
       locale?: string;
+      llm?: LLMAdapter;
     }): Promise<{
       updated: boolean;
       blocksChanged: readonly string[];

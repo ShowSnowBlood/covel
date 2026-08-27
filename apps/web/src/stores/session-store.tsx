@@ -62,6 +62,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ds,
     refs,
     handleSseEvent,
+    allowModelOverrides: !(
+      frostFoxStatus?.enabled &&
+      frostFoxStatus.authenticated &&
+      frostFoxStatus.account &&
+      frostFoxStatus.account.isAdmin !== true
+    ),
   });
 
   useBootEffect(

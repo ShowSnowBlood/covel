@@ -20,10 +20,24 @@ const principal: FrostFoxPrincipal = {
   lastVerifiedAt: "2026-08-25T00:00:00.000Z",
 };
 
+type PingCompletionResult = {
+  text: string;
+  finishReason: string;
+  usage: { inputTokens: number; outputTokens: number };
+  reasoningContent?: string;
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+};
+
 function makeHarness(
   streamEvents: readonly Record<string, unknown>[] = [
     { type: "text-delta", textDelta: "hello" },
   ],
+  generateText?: (
+    input: unknown,
+    options: unknown,
+  ) => Promise<PingCompletionResult>,
+  streamError?: Error,
+  principalOverride: FrostFoxPrincipal = principal,
 ): {
   app: Hono;
   frostFox: FrostFoxService;
@@ -87,8 +101,23 @@ function makeHarness(
       streamText: (input: unknown, options: unknown) =>
         (async function* () {
           streamCalls.push({ input, options });
-          for (const event of streamEvents) yield event;
+          for (const event of streamEvents) {
+            if (event.type === "wait-for-abort") {
+              const signal = (options as { signal?: AbortSignal }).signal;
+              if (signal && !signal.aborted) {
+                await new Promise<void>((resolve) => {
+                  signal.addEventListener("abort", () => resolve(), {
+                    once: true,
+                  });
+                });
+              }
+              continue;
+            }
+            yield event;
+          }
+          if (streamError) throw streamError;
         })(),
+      ...(generateText ? { generateText } : {}),
     },
   };
   const frostFox = {
@@ -107,7 +136,7 @@ function makeHarness(
   } as unknown as FrostFoxService;
   const app = new Hono();
   app.use("*", async (c, next) => {
-    c.set("frostFoxPrincipal", principal);
+    c.set("frostFoxPrincipal", principalOverride);
     await next();
   });
   app.route(
@@ -117,6 +146,7 @@ function makeHarness(
       {} as never,
       createMemoryStore(),
       frostFox,
+      { deepseek: "env-key" },
     ),
   );
   return { app, frostFox, streamCalls };
@@ -165,6 +195,9 @@ describe("FrostFox account model ping", () => {
         reasoningEffort: "disabled",
       },
     });
+    expect(streamCalls[0]?.options).toMatchObject({
+      envApiKeys: { deepseek: "env-key" },
+    });
   });
 
   it("allows a connected account to test any configured model", async () => {
@@ -208,6 +241,72 @@ describe("FrostFox account model ping", () => {
     ).toBe(true);
   });
 
+  it("falls back to a completion when the stream has no content", async () => {
+    let completionCalls = 0;
+    const { app } = makeHarness(
+      [{ type: "done", usage: { inputTokens: 1, outputTokens: 0 } }],
+      async () => {
+        completionCalls += 1;
+        return {
+          text: "OK",
+          finishReason: "stop",
+          usage: { inputTokens: 3, outputTokens: 1 },
+        };
+      },
+      new Error("Provider returned no content"),
+    );
+    const response = await app.request("/api/ai/ping", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ presetId: "slot-story" }),
+    });
+    const body = (await response.json()) as {
+      ok: boolean;
+      latencyMs: number;
+      ttfbMs?: number;
+      usage?: { inputTokens: number; outputTokens: number };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      usage: { inputTokens: 3, outputTokens: 1 },
+    });
+    expect(body.latencyMs).toEqual(expect.any(Number));
+    expect(body.ttfbMs).toBeUndefined();
+    expect(completionCalls).toBe(1);
+  });
+
+  it("falls back to completion when streaming never emits content", async () => {
+    vi.useFakeTimers();
+    try {
+      let completionCalls = 0;
+      const { app } = makeHarness([{ type: "wait-for-abort" }], async () => {
+        completionCalls += 1;
+        return {
+          text: "OK",
+          finishReason: "stop",
+          usage: { inputTokens: 2, outputTokens: 1 },
+        };
+      });
+      const responsePromise = app.request("/api/ai/ping", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ presetId: "slot-story" }),
+      });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      const response = await responsePromise;
+      await expect(response.json()).resolves.toMatchObject({
+        ok: true,
+        usage: { inputTokens: 2, outputTokens: 1 },
+      });
+      expect(completionCalls).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports a deliberate no-content response instead of throwing", async () => {
     const { app } = makeHarness([{ type: "done", usage: null }]);
     const response = await app.request("/api/ai/ping", {
@@ -223,8 +322,37 @@ describe("FrostFox account model ping", () => {
       error: "Provider returned no content",
     });
   });
+
+  it("falls back to completion when the stream response is not parseable", async () => {
+    const generateText = vi.fn(async () => ({
+      text: "OK",
+      finishReason: "stop",
+      usage: { inputTokens: 2, outputTokens: 1 },
+    }));
+    const { app } = makeHarness(
+      [{ type: "done", usage: { inputTokens: 1, outputTokens: 0 } }],
+      generateText,
+      new Error("Provider returned non-JSON response (HTTP 200): <html>"),
+    );
+
+    const response = await app.request("/api/ai/ping", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ presetId: "slot-story" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      usage: { inputTokens: 2, outputTokens: 1 },
+    });
+    expect(generateText).toHaveBeenCalledOnce();
+  });
   it("rejects an invalid browser model binding before registering an overlay", async () => {
-    const { app, frostFox } = makeHarness();
+    const { app, frostFox } = makeHarness(undefined, undefined, undefined, {
+      ...principal,
+      isAdmin: true,
+    });
     vi.mocked(frostFox.sanitizeSlotOverrides).mockImplementationOnce(() => {
       throw new FrostFoxServiceError("frostfox_model_binding_invalid", 400);
     });

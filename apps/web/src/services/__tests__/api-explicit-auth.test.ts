@@ -120,3 +120,26 @@ describe("operator auth on hosted administration routes", () => {
     expect(api.getSessionToken("sess-1")).toBe("owner-secret");
   });
 });
+
+describe("FrostFox auth transport", () => {
+  it("bypasses caches and sends the account cookie", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJson({ enabled: true, authenticated: false }))
+      .mockResolvedValueOnce(okJson({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.fetchFrostFoxAccount(true);
+    await api.signOutFrostFox();
+
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      cache: "no-store",
+      credentials: "same-origin",
+      method: "POST",
+    });
+  });
+});

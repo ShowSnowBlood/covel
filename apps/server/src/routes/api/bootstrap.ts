@@ -136,10 +136,11 @@ export interface ApiBootstrapConfig {
    * Optional embedding function for the semantic (vector) memory tier. When
    * provided AND the store supports vectors, the memory system upgrades
    * recall/archival from keyword to vector search and gains a real embed-on-
-   * write ingestion path. The composition root builds it from
-   * `createAiStack().gateway.embed`. Absent → keyword-only memory (unchanged).
+   * write ingestion path. The optional session context lets the composition
+   * root preserve account/model routing for each session. Absent → keyword-
+   * only memory (unchanged).
    */
-  readonly memoryEmbed?: (texts: readonly string[]) => Promise<Float32Array[]>;
+  readonly memoryEmbed?: import("@covel/memory").EmbedFn;
   /** Optional pre-created state manager. */
   readonly stateManager?: StateManager;
   /**

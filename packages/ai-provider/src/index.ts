@@ -45,6 +45,7 @@ export type {
   ModelSlotConfig,
   ModelParameterOverrides,
   ModelSlotMap,
+  ManagedModelPolicy,
   CacheStrategy,
   SlotOverridesInput,
   CustomPresetInput,

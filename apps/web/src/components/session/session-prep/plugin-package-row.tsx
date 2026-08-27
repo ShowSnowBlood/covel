@@ -12,6 +12,7 @@ import {
   recommendationReason,
   type PluginPack,
 } from "@/lib/session-plugin-selection.js";
+import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
 import { getSettings } from "@/settings/store.js";
 import { resolveProviderSlot } from "./model-slot-helpers.js";
 import type * as api from "@/services/api.js";
@@ -26,6 +27,8 @@ export interface PluginPackageRowProps {
   bindingState: UseRuntimeBindingsResult;
   resolvedSlots: ResolvedSlot[];
   resolveDeclaredSlot: (slotId: string) => ResolvedSlot | null;
+  /** Hosted non-admin players use the administrator's model policy. */
+  modelControlsLocked?: boolean;
   onTogglePlugin: (name: string) => void;
 }
 
@@ -39,9 +42,19 @@ export function PluginPackageRow({
   bindingState,
   resolvedSlots,
   resolveDeclaredSlot,
+  modelControlsLocked,
   onTogglePlugin,
 }: PluginPackageRowProps) {
   const { t, i18n } = useTranslation();
+  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
+  const hostedPlayerModelLocked =
+    modelControlsLocked ??
+    Boolean(
+      frostFoxAccount?.status?.enabled &&
+      frostFoxAccount.status.authenticated &&
+      frostFoxAccount.status.account &&
+      frostFoxAccount.status.account.isAdmin !== true,
+    );
   const displayName = text(pkg.displayName) || pkg.name;
   const description = text(pkg.description);
   const isSelected = selectedPluginIdSet.has(pkg.name);
@@ -164,7 +177,6 @@ export function PluginPackageRow({
       }`}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-2">
-        {/* Toggle Switch */}
         <button
           type="button"
           role="switch"
@@ -183,12 +195,10 @@ export function PluginPackageRow({
           />
         </button>
 
-        {/* Plugin Name */}
-        <span className="min-w-0 max-w-full truncate text-xs font-semibold text-foreground sm:text-sm">
+        <span className="min-w-0 max-w-full flex-1 truncate text-xs font-semibold text-foreground sm:flex-none sm:text-sm">
           {displayName}
         </span>
 
-        {/* Core Lock Badge */}
         {isLocked && (
           <span
             className="flex shrink-0 items-center gap-1 rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
@@ -205,7 +215,6 @@ export function PluginPackageRow({
           </span>
         )}
 
-        {/* Stage / Runtime Badges */}
         {runtimes[0]?.stage && (
           <Badge variant="outline" className="shrink-0 font-mono text-[9px]">
             {stageLabel(runtimes[0].stage, t)}
@@ -222,14 +231,23 @@ export function PluginPackageRow({
             {tools.length}
           </span>
         )}
+        {hostedPlayerModelLocked && (
+          <Badge
+            variant="outline"
+            className="flex shrink-0 items-center gap-1 border-primary/30 text-[9px] text-primary"
+          >
+            <Lock className="h-2.5 w-2.5" />
+            {t("plugin.modelManagedByAdmin", "model managed")}
+          </Badge>
+        )}
 
-        {/* Single Primary Binding Select */}
         {hasAgentRuntime &&
           isSelected &&
           primaryBinding &&
           pluginBindings.length === 1 &&
           !hasMissingRuntimeSlot &&
-          primaryBindingSlots.length > 1 && (
+          primaryBindingSlots.length > 1 &&
+          !hostedPlayerModelLocked && (
             <select
               value={primaryBinding.slotName}
               onChange={(event) =>
@@ -297,13 +315,15 @@ export function PluginPackageRow({
       </div>
 
       {/* Provider Slot Config */}
-      {isSelected && providerSlotSetting && (
-        <div className="mt-2.5 pl-1 sm:pl-9 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground min-w-0">
-          <KeyRound className="w-3 h-3 shrink-0" />
-          <span className="font-mono text-[10px] truncate">{pkg.name}</span>
+      {isSelected && providerSlotSetting && !hostedPlayerModelLocked && (
+        <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2 pl-1 text-[11px] text-muted-foreground sm:pl-9">
+          <KeyRound className="h-3 w-3 shrink-0" />
+          <span className="min-w-0 max-w-full truncate font-mono text-[10px]">
+            {pkg.name}
+          </span>
           <Badge
             variant={providerSlotMissing ? "destructive" : "outline"}
-            className="text-[9px] px-1.5 py-0.2 shrink-0 font-mono"
+            className="shrink-0 px-1.5 py-0.2 font-mono text-[9px]"
           >
             {providerSlotMissing
               ? t("plugin.slotMissingShort", {
@@ -324,7 +344,7 @@ export function PluginPackageRow({
                   : ""
               }
               onChange={(event) => handleProviderSlotChange(event.target.value)}
-              className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
+              className="w-full min-w-0 max-w-full rounded-xl border border-border/80 bg-background/80 px-2.5 py-1 text-[11px] outline-none sm:ml-auto sm:w-auto sm:max-w-[240px]"
             >
               <option value="">
                 {manifestDefaultSlot
@@ -344,12 +364,18 @@ export function PluginPackageRow({
           )}
         </div>
       )}
+      {isSelected && providerSlotSetting && hostedPlayerModelLocked && (
+        <div className="mt-2.5 flex min-w-0 items-center gap-2 pl-1 text-[11px] text-muted-foreground sm:pl-9">
+          <Lock className="h-3 w-3 shrink-0 text-primary" />
+          <span>{t("plugin.modelManagedByAdmin", "Model managed")}</span>
+        </div>
+      )}
 
-      {/* Multi-Binding Selectors */}
       {isSelected &&
+        !hostedPlayerModelLocked &&
         pluginBindings.length > 0 &&
         (pluginBindings.length > 1 || hasMissingRuntimeSlot) && (
-          <div className="mt-2.5 pl-1 sm:pl-9 space-y-2">
+          <div className="mt-2.5 space-y-2 pl-1 sm:pl-9">
             {pluginBindings.map((binding) => {
               const declaredSlot = binding.defaultSlot;
               const configuredDefault = isMissingTextRuntimeSlot(declaredSlot)
@@ -364,18 +390,18 @@ export function PluginPackageRow({
               return (
                 <div
                   key={binding.qualifiedId}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground min-w-0"
+                  className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground"
                 >
-                  <Cpu className="w-3 h-3 shrink-0" />
+                  <Cpu className="h-3 w-3 shrink-0" />
                   <span
-                    className="font-mono text-[10px] truncate max-w-[200px]"
+                    className="min-w-0 max-w-full truncate font-mono text-[10px] sm:max-w-[200px]"
                     title={binding.qualifiedId}
                   >
                     {binding.qualifiedId}
                   </span>
                   <Badge
                     variant={missingDefault ? "destructive" : "outline"}
-                    className="text-[9px] px-1.5 py-0.2 shrink-0 font-mono"
+                    className="shrink-0 px-1.5 py-0.2 font-mono text-[9px]"
                   >
                     {missingDefault
                       ? `missing [${declaredSlot}]`
@@ -390,7 +416,7 @@ export function PluginPackageRow({
                           event.target.value,
                         )
                       }
-                      className="w-full sm:w-auto sm:ml-auto text-[11px] bg-background/80 border border-border/80 rounded-xl px-2.5 py-1 max-w-full sm:max-w-[240px] outline-none"
+                      className="w-full min-w-0 max-w-full rounded-xl border border-border/80 bg-background/80 px-2.5 py-1 text-[11px] outline-none sm:ml-auto sm:w-auto sm:max-w-[240px]"
                     >
                       <option value="">
                         {configuredDefault

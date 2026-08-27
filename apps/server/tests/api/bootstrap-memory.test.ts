@@ -72,6 +72,28 @@ describe("createBootstrapMemorySystem", () => {
     expect(llm.models).toEqual(["memory"]);
   });
 
+  it("uses the turn adapter for hosted model policy and credentials", async () => {
+    const startup = new RecordingLlm();
+    const request = new RecordingLlm();
+    const result = createBootstrapMemorySystem({
+      manifestCache: new Map(),
+      store: createMemoryStore(),
+      llmAdapter: startup,
+      preferredMemorySlot: "memory",
+      resolveModel: (manifest) => `resolved:${manifest.name}`,
+    });
+
+    await result!.memorySystem.updater.updateAfterTurn({
+      sessionId: "session-request-scoped",
+      narrativeText: "new clue",
+      currentBlocks: [],
+      llm: request,
+    });
+
+    expect(startup.models).toEqual([]);
+    expect(request.models).toEqual(["memory"]);
+  });
+
   it("mirrors core memory blocks to the plugin that declares memory-panel capability", async () => {
     const store = createMemoryStore();
     const manifestCache = new Map<string, readonly ParsedPluginMd[]>([

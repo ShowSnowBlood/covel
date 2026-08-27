@@ -117,7 +117,13 @@ export async function handleTargetFailure(args: {
 
   const normalized = normalizeError(error, provider);
 
-  if (!canFallback || !shouldFallback(normalized)) {
+  if (
+    !canFallback ||
+    !shouldFallback(normalized, {
+      allowProviderFallbackOnClientError:
+        options?.allowProviderFallbackOnClientError,
+    })
+  ) {
     throw normalized;
   }
 

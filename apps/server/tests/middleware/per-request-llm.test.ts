@@ -33,6 +33,11 @@ interface RecordedCall {
   presetId: string | undefined;
   apiKeys: Record<string, string> | undefined;
   envApiKeys: Record<string, string> | undefined;
+  managedModelPolicy: GenerateOptions extends {
+    managedModelPolicy?: infer P;
+  }
+    ? P
+    : never;
   slotOverrides: GenerateOptions extends { slotOverrides?: infer S }
     ? S
     : never;
@@ -95,6 +100,7 @@ function createMockAi(): {
         presetId: input.presetId,
         apiKeys: options?.apiKeys,
         envApiKeys: options?.envApiKeys,
+        managedModelPolicy: options?.managedModelPolicy,
         slotOverrides: options?.slotOverrides,
       });
       return {
@@ -166,6 +172,7 @@ function buildTestApp(opts: {
   defaultAdapter: LLMAdapter;
   defaultPluginGateway?: PluginRuntimeGateway;
   frostFox?: FrostFoxService;
+  principal?: FrostFoxPrincipal;
 }) {
   const defaultPluginGateway =
     opts.defaultPluginGateway ?? stubDefaultPluginGateway();
@@ -189,7 +196,10 @@ function buildTestApp(opts: {
   app.use("*", async (c, next) => {
     c.set("llmAdapter", opts.defaultAdapter);
     c.set("pluginGateway", defaultPluginGateway);
-    c.set("frostFoxPrincipal", opts.frostFox ? TEST_PRINCIPAL : null);
+    c.set(
+      "frostFoxPrincipal",
+      opts.frostFox ? (opts.principal ?? TEST_PRINCIPAL) : null,
+    );
     await next();
   });
   app.use("*", mw);
@@ -255,6 +265,7 @@ const TEST_PRINCIPAL: FrostFoxPrincipal = {
   routerAccountId: "account-1",
   accountName: "Player One",
   balance: 10,
+  isAdmin: true,
   credentialState: "active",
   lastVerifiedAt: "2026-08-25T00:00:00.000Z",
 };
@@ -427,6 +438,81 @@ describe("per-request LLM middleware", () => {
       },
       customPresets: [browserPreset],
     });
+  });
+  it("ignores browser provider overrides for non-admin hosted users", async () => {
+    const { ai, calls } = createMockAi();
+    const managedPreset = {
+      id: "managed-story",
+      name: "Managed Story",
+      provider: "frostfox-story",
+      model: "story-model",
+      protocol: "openai-chat-v1" as const,
+    };
+    const frostFox = {
+      async prepareAiContext(principal: FrostFoxPrincipal | null) {
+        return principal
+          ? {
+              principal,
+              apiKeys: { [managedPreset.provider]: "derived-key" },
+              managedSlotDefaults: {
+                slotPresetOverrides: { story: managedPreset.id },
+                customPresets: [managedPreset],
+              },
+              managedModelPolicy: {
+                presetIdsByTag: { text: managedPreset.id },
+              },
+            }
+          : null;
+      },
+      sanitizeSlotOverrides(overrides: SlotOverridesInput | null) {
+        return overrides;
+      },
+    } as unknown as FrostFoxService;
+    const app = buildTestApp({
+      ai,
+      envApiKeys: {},
+      defaultAdapter: {
+        async generate() {
+          throw new Error("non-admin request used the default adapter");
+        },
+      },
+      frostFox,
+      principal: { ...TEST_PRINCIPAL, isAdmin: false },
+    });
+
+    const browserPreset = {
+      id: "browser-choice",
+      name: "Browser Choice",
+      provider: "vendor-x",
+      baseUrl: "https://vendor.example/v1",
+      model: "model-x",
+      protocol: "openai-chat-v1",
+    };
+    const response = await app.request("/echo", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Provider-Keys": b64({ "vendor-x": "browser-key" }),
+        "X-Slot-Config": b64({
+          slotPresetOverrides: { story: browserPreset.id },
+          customPresets: [browserPreset],
+        }),
+      },
+      body: JSON.stringify({ model: "story" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      apiKeys: { [managedPreset.provider]: "derived-key" },
+      slotOverrides: {
+        slotPresetOverrides: { story: managedPreset.id },
+        customPresets: [managedPreset],
+      },
+    });
+    expect(calls[0]?.managedModelPolicy).toEqual({
+      presetIdsByTag: { text: managedPreset.id },
+    });
+    expect(calls[0]?.apiKeys).not.toHaveProperty("vendor-x");
   });
 
   it("keeps the managed image tag when the browser repeats its binding", () => {

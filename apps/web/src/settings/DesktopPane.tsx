@@ -52,7 +52,7 @@ interface DesktopInfo {
   serverPort: number;
 }
 
-export function DesktopPane() {
+export function DesktopPane({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useTranslation();
   const { state } = useSession();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
@@ -155,7 +155,7 @@ export function DesktopPane() {
   }
 
   return (
-    <div className="space-y-5">
+    <fieldset disabled={readOnly} className="min-w-0 space-y-5">
       {toast && (
         <div className="text-xs px-3 py-2 rounded bg-primary/10 border border-primary/20 text-primary">
           {toast}
@@ -358,7 +358,7 @@ export function DesktopPane() {
           </span>
         </div>
       </section>
-    </div>
+    </fieldset>
   );
 }
 

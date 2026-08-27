@@ -54,7 +54,7 @@ function deferred<T>() {
 }
 
 function RefreshProbe() {
-  const { status, catalog, refresh } = useFrostFoxAccount();
+  const { status, catalog, refresh, refreshModels } = useFrostFoxAccount();
   return (
     <>
       <output data-testid="account-name">{status?.account?.name ?? ""}</output>
@@ -63,6 +63,9 @@ function RefreshProbe() {
       </output>
       <button type="button" onClick={() => void refresh()}>
         refresh
+      </button>
+      <button type="button" onClick={() => void refreshModels()}>
+        refresh-models
       </button>
     </>
   );
@@ -138,6 +141,7 @@ describe("FrostFoxAccountSummary", () => {
     expect(screen.getByText("Connected")).toBeTruthy();
     expect(screen.getByText("Account Settings")).toBeTruthy();
     expect(screen.getByText("Sign Out")).toBeTruthy();
+    expect(screen.getByText("Switch Account")).toBeTruthy();
 
     // Clicking Account Settings opens SettingsDialog
     const settingsBtn = screen.getByText("Account Settings");
@@ -234,6 +238,48 @@ describe("FrostFoxAccountSummary", () => {
     fireEvent.click(screen.getByRole("button", { name: "refresh" }));
     await waitFor(() => expect(api.fetchAccount).toHaveBeenCalledTimes(2));
     expect(api.hydrateManagedFrostFoxModels).toHaveBeenCalledTimes(1);
+  });
+  it("retries a failed model catalog load on demand", async () => {
+    api.fetchAccount.mockResolvedValue({
+      enabled: true,
+      authenticated: true,
+      account: {
+        id: "account-retry",
+        name: "retry-account",
+        balance: 1,
+        credentialState: "active",
+        lastVerifiedAt: "2026-08-26T00:00:00.000Z",
+      },
+    });
+    api.hydrateManagedFrostFoxModels
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        configurationVersion: "retry-version",
+        channels: [],
+      });
+
+    render(
+      <FrostFoxAccountProvider>
+        <RefreshProbe />
+      </FrostFoxAccountProvider>,
+    );
+    await waitFor(() =>
+      expect(api.hydrateManagedFrostFoxModels).toHaveBeenCalledTimes(1),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "refresh-models" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-version").textContent).toBe(
+        "retry-version",
+      ),
+    );
+    expect(api.hydrateManagedFrostFoxModels).toHaveBeenCalledTimes(2);
+    expect(api.hydrateManagedFrostFoxModels).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        account: expect.objectContaining({ id: "account-retry" }),
+      }),
+      true,
+    );
   });
 
   it("keeps the newest account state when refreshes resolve out of order", async () => {

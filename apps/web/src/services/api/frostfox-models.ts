@@ -116,6 +116,7 @@ export function getManagedFrostFoxPresetSummaries(): PresetSummary[] {
 
 export async function hydrateManagedFrostFoxModels(
   accountStatus?: FrostFoxAccountStatus,
+  force = false,
 ): Promise<FrostFoxModelCatalog | null> {
   let account: FrostFoxAccountStatus;
   try {
@@ -146,12 +147,13 @@ export async function hydrateManagedFrostFoxModels(
     return null;
   }
 
-  if (managedCatalog && managedCatalogAccountId === accountId) {
+  if (managedCatalog && managedCatalogAccountId === accountId && !force) {
     return managedCatalog;
   }
   if (managedHydrationPromise && managedHydrationAccountId === accountId) {
     return managedHydrationPromise;
   }
+  if (force) managedHydrationAttemptedAccountId = null;
   if (managedHydrationAttemptedAccountId === accountId) {
     return managedCatalog;
   }
@@ -182,9 +184,13 @@ export async function hydrateManagedFrostFoxModels(
     })
     .catch(() => {
       if (hydrationVersion === managedHydrationVersion) {
-        publishManagedFrostFoxCatalog(null);
+        // Keep a previously published catalog usable until the user explicitly
+        // requests a forced refresh. Ordinary account polling must stay cheap.
+        if (!managedCatalog || managedCatalogAccountId !== accountId) {
+          publishManagedFrostFoxCatalog(null);
+        }
       }
-      return null;
+      return managedCatalog;
     })
     .finally(() => {
       if (managedHydrationPromise === request) {

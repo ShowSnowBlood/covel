@@ -22,6 +22,7 @@
  * throws on re-lock attempts (ADR-005), so duplicate calls are safe.
  */
 
+import type { GatewayOptions } from "@covel/ai-provider";
 import type {
   DataStore,
   EmbeddingModelIdentity,
@@ -35,19 +36,34 @@ interface CachedDim {
   modelId: string;
 }
 
+/** Request-specific routing used by hosted/account-bound embedding probes. */
+export interface EmbeddingLockRequest {
+  readonly presetId?: string;
+  readonly options?: GatewayOptions;
+}
+
+type ResolveEmbeddingRequest = (
+  sessionId: string,
+) => Promise<EmbeddingLockRequest | null>;
+
 /** Build a session-locking helper bound to a specific store + AI stack. */
 export function createEmbeddingLockHelper(opts: {
   store: DataStore;
   ai: AiStack;
   /**
-   * API keys to pass to the embedding probe. Should match the same keys
-   * the runtime uses for chat calls. In practice the server boot path
-   * supplies env-derived keys; per-request key overrides are not yet
-   * supported on this hot path.
+   * API keys used by the startup/self-hosted embedding probe. Hosted callers
+   * should use `resolveEmbeddingRequest` so their account policy and keys are
+   * selected from the session owner rather than process-global configuration.
    */
   apiKeys?: Record<string, string>;
+  /**
+   * Resolve request-scoped routing for a session. `null` means the session is
+   * account-bound but its owner/policy could not be resolved; fail closed and
+   * leave vector memory disabled instead of locking a local model.
+   */
+  resolveEmbeddingRequest?: ResolveEmbeddingRequest;
 }): (sessionId: string) => Promise<void> {
-  const { store, ai, apiKeys } = opts;
+  const { store, ai, apiKeys, resolveEmbeddingRequest } = opts;
 
   // Per-session promise cache — collapses concurrent first-turn calls.
   const inflight = new Map<string, Promise<VectorTarget | null>>();
@@ -58,6 +74,7 @@ export function createEmbeddingLockHelper(opts: {
   async function probeDimension(
     provider: string,
     modelName: string,
+    request: EmbeddingLockRequest | undefined,
   ): Promise<CachedDim | null> {
     const cacheKey = `${provider}/${modelName}`;
     const cached = dimCache.get(cacheKey);
@@ -65,13 +82,14 @@ export function createEmbeddingLockHelper(opts: {
 
     try {
       const result = await ai.gateway.embed(
-        { values: ["covel-embed-probe"] },
-        // Boot-path keys are env-derived → origin-gated channel.
-        apiKeys ? { envApiKeys: apiKeys } : undefined,
+        {
+          ...(request?.presetId ? { presetId: request.presetId } : {}),
+          values: ["covel-embed-probe"],
+        },
+        request?.options ?? (apiKeys ? { envApiKeys: apiKeys } : undefined),
       );
       const vector = result.embeddings?.[0];
       if (!Array.isArray(vector) || vector.length === 0) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[embedding-lock] embed probe for ${cacheKey} returned no vector`,
         );
@@ -81,7 +99,6 @@ export function createEmbeddingLockHelper(opts: {
       dimCache.set(cacheKey, entry);
       return entry;
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[embedding-lock] embed probe failed for ${cacheKey}: ${
           err instanceof Error ? err.message : String(err)
@@ -98,18 +115,56 @@ export function createEmbeddingLockHelper(opts: {
     const existing = await store.resolveSessionVectorTarget(sessionId);
     if (existing) return existing;
 
-    // Find the embed slot. Throws when none configured — treat as RAG off.
-    let target;
-    try {
-      target = ai.presetRegistry.resolveEmbeddingTarget();
-    } catch {
-      return null;
+    let request: EmbeddingLockRequest | undefined;
+    if (resolveEmbeddingRequest) {
+      try {
+        const resolvedRequest = await resolveEmbeddingRequest(sessionId);
+        // An account-bound session that cannot resolve its owner must not fall
+        // through to the process-global/local embedding provider.
+        if (resolvedRequest === null) return null;
+        request = resolvedRequest;
+      } catch (err) {
+        console.warn(
+          `[embedding-lock] request routing failed for ${sessionId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        return null;
+      }
     }
 
-    const provider = target.profile.provider;
-    const modelName = target.profile.model;
+    let provider: string;
+    let modelName: string;
+    if (request) {
+      // Resolve the same effective target that the probe will use. This keeps
+      // the immutable vector-model identity aligned with managed policy after
+      // overlays are applied.
+      let resolved;
+      try {
+        resolved = ai.gateway.resolveSlot(request.presetId, {
+          ...(request.options ?? {}),
+          fallbackTag: "embedding",
+        });
+      } catch {
+        return null;
+      }
+      if (!resolved) return null;
+      provider = resolved.provider;
+      modelName = resolved.model;
+    } else {
+      // Find the process-global embed slot. Throws when none configured —
+      // treat RAG as disabled.
+      let target;
+      try {
+        target = ai.presetRegistry.resolveEmbeddingTarget();
+      } catch {
+        return null;
+      }
+      provider = target.profile.provider;
+      modelName = target.profile.model;
+    }
 
-    const probed = await probeDimension(provider, modelName);
+    const probed = await probeDimension(provider, modelName, request);
     if (!probed) return null;
 
     const identity: EmbeddingModelIdentity = {

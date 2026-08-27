@@ -27,6 +27,7 @@ This release rebuilds provider and model configuration around explicit connectio
 - **Reasoning controls reject unsupported combinations before they reach providers.** Claude 4.0 no longer receives newer Anthropic effort fields, `gpt-5-pro` exposes only `high`, and Qwen thinking-only models cannot be forced into disabled thinking.
 - **Provider migration preserves independent credentials and model references.** Canonical provider ids no longer collapse distinct connections, request routing uses the connection namespace, legacy family-level keys remain available as a fallback, and orphaned preset secrets are cleaned up.
 - **World setup controls keep their shape and model probes stay bounded.** The loaded-plugin tab now uses the same layout contract as the model and session tabs, while connectivity checks request a short non-reasoning response instead of inheriting production-sized reasoning and output settings.
+- **Mobile session rails now open as full-height drawers.** The studio and context panels no longer join a short vertical stack above the story, so persisted desktop/mobile sizes cannot leave a clipped settings footer or paint the world archive under the game header; each drawer has an explicit close path and preserves its context-tab navigation.
 - **Submitted character names now complete setup exactly once.** `char-creator/player-init` keeps both form projection and submitted-player persistence inside its deterministic function handler; the previous manifest guard was unreachable for function runtimes, so every submission generated another form and left setup pending.
 - **Post-turn trackers no longer exhaust their deadlines after doing the work.** Codex, action guide, and NPC graph writes now terminate their runtime directly instead of requiring another provider call solely for `runtime-done`; EOF-truncated tool JSON can recover omitted closing delimiters; the default shared-channel concurrency cap drops from four to two; and the three affected runtimes have explicit 90-second call budgets.
 - **Image models now stay in the image role.** Metadata-light models from FrostFox's dedicated image channel are classified as image generators instead of text LLMs; model-role selectors exclude incompatible managed models and deployment-bound provider duplicates; existing `openai-image` assignments migrate into the single canonical `image` role.
@@ -35,6 +36,8 @@ This release rebuilds provider and model configuration around explicit connectio
 - **舞台世界 UI 恢复了正确的视觉与行动契约。** 透明 `sprite` 才会进入前景合成，带背景的 `avatar` 不再变成立绘矩形；传统世界切入舞台时保留场景背景与 `action-guide` 建议而不显示头像，消息数据在会话恢复后也会水合到舞台所用的 store。
 - **SaaS 模型目录改为登录周期加载。** 账号余额和登录状态可以继续刷新，但同一账号不会重复拉取 `modellist`；客户端共享登录时目录，服务端按账号凭据世代与 client-config 版本缓存，并合并并发请求。
 - **FrostFox 账号可以跨设备继续自己的历史会话。** Hosted 会话鉴权现在接受匹配账号的 HttpOnly Cookie 作为 owner 身份；未绑定账号的会话仍严格要求 owner token 或运维 token，避免跨账号访问。
+
+- **FrostFox 账号切换与退出登录恢复。** 重新授权会替换当前会话并为不同账号保留独立本地绑定；账号状态请求禁用缓存，避免继续显示旧账号。
 
 ## [0.0.25] - 2026-08-11
 

@@ -83,7 +83,14 @@ export function createBootstrapCompactorRunner(
   };
 
   return {
-    async run(sessionId, systemPromptPreview, messages, locale, traceId) {
+    async run(
+      sessionId,
+      systemPromptPreview,
+      messages,
+      locale,
+      traceId,
+      requestLlmAdapter,
+    ) {
       // The compactor only ships zh-CN / en-US prompt templates; map the
       // session locale by prefix (en* → en-US, else the zh-CN default).
       const compactorLocale =
@@ -97,7 +104,23 @@ export function createBootstrapCompactorRunner(
         {
           store,
           estimator: estimateTokens,
-          fastSlotLlm,
+          fastSlotLlm: requestLlmAdapter
+            ? {
+                async complete(input) {
+                  const response = await requestLlmAdapter.generate({
+                    model: "fast",
+                    messages: [
+                      { role: "system", content: input.systemPrompt },
+                      ...input.messages.map((message) => ({
+                        role: message.role,
+                        content: message.content,
+                      })),
+                    ],
+                  });
+                  return { content: response.content ?? "" };
+                },
+              }
+            : fastSlotLlm,
           // Resolved per run so llm.toml hot-reloads take effect immediately.
           contextWindow: resolveContextWindow(params),
         },

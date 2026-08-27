@@ -277,4 +277,52 @@ describe("Navigation loading progress transitions", () => {
     expect(screen.getByTestId("scene-loading-transition")).toBeTruthy();
     expect(screen.getByTestId("transition-title").textContent).toBe("选择世界");
   });
+  it("uses full-height overlay drawers on mobile instead of stacked rails", () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes("max-width: 768px"),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    const session: SessionRecord = {
+      id: "sess_mobile",
+      worldId: "fog-port",
+      status: "active",
+      turnCount: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    render(<GameView session={session} />);
+
+    expect(document.querySelectorAll("[data-panel]")).toHaveLength(1);
+    const leftDrawer = document.querySelector(
+      '[data-testid="mobile-rail-drawer"][data-side="left"]',
+    );
+    const rightDrawer = document.querySelector(
+      '[data-testid="mobile-rail-drawer"][data-side="right"]',
+    );
+    expect(leftDrawer?.getAttribute("data-open")).toBe("false");
+    expect(rightDrawer?.getAttribute("data-open")).toBe("false");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "session.toggleStoryPanel" }),
+    );
+    expect(leftDrawer?.getAttribute("data-open")).toBe("true");
+    expect(leftDrawer?.querySelector('[role="dialog"]')).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(leftDrawer?.getAttribute("data-open")).toBe("false");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "session.toggleContextPanel" }),
+    );
+    expect(rightDrawer?.getAttribute("data-open")).toBe("true");
+    expect(leftDrawer?.getAttribute("data-open")).toBe("false");
+  });
 });

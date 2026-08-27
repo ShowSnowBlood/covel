@@ -34,7 +34,7 @@ export type {
 
 export { DEFAULT_CORE_MEMORY_BLOCKS } from "./types.js";
 
-export type { EmbedFn } from "./vector-common.js";
+export type { EmbedContext, EmbedFn } from "./vector-common.js";
 
 // ── Memory system facade ─────────────────────────────────────────
 export { createMemorySystem } from "./memory-system.js";

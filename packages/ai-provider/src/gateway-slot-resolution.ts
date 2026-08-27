@@ -9,6 +9,7 @@ import {
 } from "./slot-overlay.js";
 import { targetModel, targetProvider } from "./gateway-lifecycle.js";
 import type {
+  ManagedModelPolicy,
   ModelParameterOverrides,
   OperationMode,
   PresetConfig,
@@ -49,17 +50,16 @@ export interface GatewaySlotResolutionDependencies {
 
 export interface GatewayOptions {
   /**
+   * Server-owned model policy. When present, the preset selected for the
+   * operation's fallback tag wins over every caller-supplied preset or slot.
+   */
+  managedModelPolicy?: ManagedModelPolicy;
+  /**
    * Request-supplied API keys (X-Provider-Keys header). Applied to any
    * resolved target — the caller explicitly chose to send these keys.
    */
   apiKeys?: Record<string, string>;
-  /**
-   * Server-env / platform API keys. Unlike `apiKeys`, these only
-   * attach when the resolved target's baseUrl origin matches trusted
-   * config (llm.toml / registered provider defaults) — a request-scoped
-   * custom preset redirecting a provider to another origin never receives
-   * them. Request keys win when both maps carry the same provider.
-   */
+  /** Server-env keys — origin-gated by the gateway, unlike apiKeys. */
   envApiKeys?: Record<string, string>;
   /** Trace ID for observability. */
   traceId?: string;
@@ -69,11 +69,14 @@ export interface GatewayOptions {
   signal?: AbortSignal;
   /**
    * Per-request overlay that transiently extends the gateway's preset /
-   * provider / slot view. Populated by server middleware from the
-   * `X-Slot-Config` header so browser-only custom slots propagate into
-   * real LLM calls. See {@link SlotOverridesInput}.
+   * provider / slot view.
    */
   slotOverrides?: SlotOverridesInput;
+  /**
+   * Managed account schedules may continue to the next configured provider
+   * when a provider returns an authentication/availability 4xx.
+   */
+  allowProviderFallbackOnClientError?: boolean;
 }
 
 export interface GatewaySlotResolution {
@@ -215,8 +218,19 @@ export function createGatewaySlotResolution(
     fallbackTag: string = "text",
     options?: GatewayOptions,
   ): string | undefined {
+    // A present policy is authoritative even when it has no entry for the
+    // requested modality. Never fall back to a caller-selected or process
+    // default preset in that case; doing so would let a missing managed image
+    // or embedding route spend against an unrelated local provider.
+    const managedPolicy = options?.managedModelPolicy;
+    if (managedPolicy) {
+      const managedPresetId = managedPolicy.presetIdsByTag[fallbackTag];
+      if (managedPresetId) return requestPresetId(managedPresetId, options);
+      throw new Error(
+        `managed model policy has no preset for tag "${fallbackTag}"`,
+      );
+    }
     if (!presetId) return presetId;
-
     const clientOverride = resolveSlotOverride(
       presetId,
       options?.slotOverrides,

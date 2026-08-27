@@ -35,11 +35,16 @@ import {
   parseSlotOverrides,
 } from "../middleware/per-request-llm.js";
 
+const PING_TOTAL_TIMEOUT_MS = 30_000;
+const PING_STREAM_TIMEOUT_MS = 10_000;
+
 export function createMiscApiRoutes(
   ai: AiStack,
   registry: PluginRegistry,
   store: DataStore,
   frostFox?: FrostFoxService | null,
+  /** Startup provider keys for self/desktop model probes. */
+  envApiKeys: Record<string, string> = {},
 ): Hono {
   const app = new Hono();
 
@@ -178,6 +183,8 @@ export function createMiscApiRoutes(
   // 200 on a completed reload — the body's `ok` / `error` conveys whether the
   // file parsed (a broken file falls back to the default, reported via `error`).
   app.post("/api/llm-config/reload", (c) => {
+    const denied = checkHostedOperator(c);
+    if (denied) return denied;
     const env = readRuntimeEnv();
     if (env.desktopRestToken && bearerToken(c) !== env.desktopRestToken) {
       return c.json({ error: "Unauthorized" }, 401);
@@ -277,11 +284,13 @@ export function createMiscApiRoutes(
     const requested =
       body.presetId ?? (body.slot ? `slot-${body.slot}` : "slot-default");
 
-    // Decode per-request API keys (base64 JSON). Keys are never persisted
-    // server-side. Malformed header → undefined; let the gateway raise a
-    // clearer error later if the key is actually needed.
-    let apiKeys: Record<string, string> | undefined =
-      parseProviderKeys(c.req.header("X-Provider-Keys")) ?? undefined;
+    const canUseModelOverrides =
+      !frostFox || operator || principal?.isAdmin === true;
+    // Decode per-request API keys only for self-hosted/admin callers. A
+    // hosted player must use the managed account credential and route.
+    let apiKeys: Record<string, string> | undefined = canUseModelOverrides
+      ? (parseProviderKeys(c.req.header("X-Provider-Keys")) ?? undefined)
+      : undefined;
     if (frostFoxContext) {
       // The derived managed key wins over any browser-supplied value for the
       // reserved FrostFox provider ids.
@@ -294,7 +303,9 @@ export function createMiscApiRoutes(
     // middleware runs (same request, but the resolution we do here happens
     // against the already-mutated registries).
     // Malformed header → behave as if no overrides were supplied.
-    const browserSlotConfig = parseSlotOverrides(c.req.header("X-Slot-Config"));
+    const browserSlotConfig = canUseModelOverrides
+      ? parseSlotOverrides(c.req.header("X-Slot-Config"))
+      : null;
     let sanitizedSlotConfig: SlotOverridesInput | null;
     try {
       sanitizedSlotConfig = frostFox
@@ -333,52 +344,56 @@ export function createMiscApiRoutes(
       return allPresets.find((p) => p.id === effective);
     };
 
-    // Resolution chain:
-    //   1. Direct preset id match (includes overlay-registered ones)
-    //   2. `slot-<name>` → client slotPresetOverrides → slotRegistry
-    //   3. Text-tag fallback (mirrors gateway.streamText behaviour)
-    //   4. Any enabled preset
-    //
     // `resolvedVia` is echoed back in `testedTarget` so the UI can warn
-    // when a slot Ping silently fell through to a tag-fallback preset
-    // (i.e. the slot the user typed isn't actually configured).
-    type ResolvedVia = "direct" | "slot" | "tag-fallback" | "any";
+    // when a slot Ping silently fell through to a tag-fallback preset.
+    type ResolvedVia = "managed" | "direct" | "slot" | "tag-fallback" | "any";
     let resolvedVia: ResolvedVia = "direct";
-    // `slot-<name>` is the browser's reserved slot request namespace. A
-    // server preset can also happen to use that string as its id, but letting
-    // the direct-preset branch win would bypass FrostFox managed slot
-    // defaults and test the wrong provider.
-    let preset = requested.startsWith("slot-")
-      ? undefined
-      : findPresetById(requested);
-    if (!preset && requested.startsWith("slot-")) {
-      const slotName = requested.slice("slot-".length);
-      const overrideId = slotConfig.slotPresetOverrides?.[slotName];
-      if (overrideId) {
-        preset = findPresetById(overrideId);
-        if (preset) resolvedVia = "slot";
-      }
-      if (!preset) {
-        const presetIdFromSlot = ai.slotRegistry.resolveSlot(slotName);
-        if (presetIdFromSlot) {
-          preset = allPresets.find((p) => p.id === presetIdFromSlot);
+    let preset: (typeof allPresets)[number] | undefined;
+
+    const managedPresetId =
+      frostFoxContext?.managedModelPolicy?.presetIdsByTag.text;
+    if (frostFoxContext?.managedModelPolicy) {
+      // Hosted players cannot select a local or browser-declared model. The
+      // gateway enforces the same policy for the actual request; selecting
+      // it here keeps `testedTarget` honest in the response/UI.
+      preset = findPresetById(managedPresetId);
+      resolvedVia = "managed";
+    } else {
+      // `slot-<name>` is the browser's reserved slot request namespace. A
+      // server preset can also happen to use that string as its id, but the
+      // direct-preset branch must not win for slot requests.
+      preset = requested.startsWith("slot-")
+        ? undefined
+        : findPresetById(requested);
+      if (!preset && requested.startsWith("slot-")) {
+        const slotName = requested.slice("slot-".length);
+        const overrideId = slotConfig.slotPresetOverrides?.[slotName];
+        if (overrideId) {
+          preset = findPresetById(overrideId);
           if (preset) resolvedVia = "slot";
         }
+        if (!preset) {
+          const presetIdFromSlot = ai.slotRegistry.resolveSlot(slotName);
+          if (presetIdFromSlot) {
+            preset = allPresets.find((p) => p.id === presetIdFromSlot);
+            if (preset) resolvedVia = "slot";
+          }
+        }
       }
-    }
-    if (!preset) {
-      preset = findPresetById(requested);
-    }
-    if (!preset) {
-      const textSlots = ai.slotRegistry.listSlotsByTag("text");
-      if (textSlots.length > 0) {
-        preset = allPresets.find((p) => p.id === textSlots[0].presetId);
-        if (preset) resolvedVia = "tag-fallback";
+      if (!preset) {
+        preset = findPresetById(requested);
       }
-    }
-    if (!preset) {
-      preset = allPresets[0];
-      if (preset) resolvedVia = "any";
+      if (!preset) {
+        const textSlots = ai.slotRegistry.listSlotsByTag("text");
+        if (textSlots.length > 0) {
+          preset = allPresets.find((p) => p.id === textSlots[0].presetId);
+          if (preset) resolvedVia = "tag-fallback";
+        }
+      }
+      if (!preset) {
+        preset = allPresets[0];
+        if (preset) resolvedVia = "any";
+      }
     }
 
     if (!preset) {
@@ -418,6 +433,22 @@ export function createMiscApiRoutes(
       resolvedVia,
     };
 
+    // Keep the probe request identical across streaming and completion paths.
+    // Some OpenAI-compatible gateways accept chat completions but return an
+    // empty SSE stream; the completion fallback below still proves the model
+    // is reachable without making the user retry manually.
+    const pingInput = {
+      presetId: preset.id,
+      messages: [{ role: "user", content: "Reply with OK." }],
+    };
+    const pingSlotOverrides = {
+      ...(slotConfig.slotPresetOverrides
+        ? { slotPresetOverrides: slotConfig.slotPresetOverrides }
+        : {}),
+      ...(slotConfig.parameterOverrides
+        ? { parameterOverrides: slotConfig.parameterOverrides }
+        : {}),
+    };
     const startedAt = Date.now();
     let ttfbMs: number | null = null;
     let firstText = "";
@@ -425,46 +456,40 @@ export function createMiscApiRoutes(
     const abort = new AbortController();
     let aborted = false;
     let timedOut = false;
+    let streamError: unknown = null;
 
-    // Safety timeout — a ping that can't even start streaming within 30s is
-    // effectively broken. Without this the endpoint would hang indefinitely
-    // on misconfigured providers (wrong baseUrl, unreachable host, ...).
+    // Keep one total budget for both probes. A provider that accepts ordinary
+    // completions but never produces SSE must not make the user wait 30s for
+    // the stream and another 30s for the fallback.
+    const deadline = startedAt + PING_TOTAL_TIMEOUT_MS;
     const timeout = setTimeout(() => {
       if (!aborted) {
         timedOut = true;
         aborted = true;
         abort.abort();
       }
-    }, 30_000);
+    }, PING_STREAM_TIMEOUT_MS);
 
     try {
-      for await (const event of ai.gateway.streamText(
-        {
-          presetId: preset.id,
-          messages: [{ role: "user", content: "Reply with OK." }],
+      for await (const event of ai.gateway.streamText(pingInput, {
+        apiKeys,
+        envApiKeys,
+        ...(frostFoxContext?.managedModelPolicy
+          ? { managedModelPolicy: frostFoxContext.managedModelPolicy }
+          : {}),
+        allowProviderFallbackOnClientError: !!frostFoxContext,
+        // Some OpenAI-compatible gateways reject an eight-token ceiling,
+        // and reasoning-capable models may consume that entire allowance
+        // before emitting visible text. The probe still aborts after eight
+        // received characters, so a 64-token ceiling remains cheap while
+        // leaving enough room for a standards-compliant proof of life.
+        parameterOverrides: {
+          maxOutputTokens: 64,
+          reasoningEffort: "disabled",
         },
-        {
-          apiKeys,
-          // Some OpenAI-compatible gateways reject an eight-token ceiling,
-          // and reasoning-capable models may consume that entire allowance
-          // before emitting visible text. The probe still aborts after eight
-          // received characters, so a 64-token ceiling remains cheap while
-          // leaving enough room for a standards-compliant proof of life.
-          parameterOverrides: {
-            maxOutputTokens: 64,
-            reasoningEffort: "disabled",
-          },
-          signal: abort.signal,
-          slotOverrides: {
-            ...(slotConfig.slotPresetOverrides
-              ? { slotPresetOverrides: slotConfig.slotPresetOverrides }
-              : {}),
-            ...(slotConfig.parameterOverrides
-              ? { parameterOverrides: slotConfig.parameterOverrides }
-              : {}),
-          },
-        },
-      )) {
+        signal: abort.signal,
+        slotOverrides: pingSlotOverrides,
+      })) {
         if (event.type === "text-delta" && event.textDelta.length > 0) {
           if (ttfbMs === null) ttfbMs = Date.now() - startedAt;
           firstText += event.textDelta;
@@ -492,31 +517,109 @@ export function createMiscApiRoutes(
         }
       }
     } catch (err) {
-      if (!aborted) {
-        const message = err instanceof Error ? err.message : String(err);
-        clearTimeout(timeout);
-        cleanupTransient();
-        return c.json({
-          ok: false,
-          latencyMs: Date.now() - startedAt,
-          ...(ttfbMs !== null ? { ttfbMs } : {}),
-          error: message,
-          testedTarget,
-        });
-      }
+      if (!aborted) streamError = err;
       // Deliberate abort — either a post-TTFB early-stop or our 30s timeout.
     }
-
     clearTimeout(timeout);
+
+    // A few OpenAI-compatible gateways implement the ordinary completion
+    // endpoint but produce no usable SSE content. Ping is a connectivity
+    // check, not a streaming-capability check, so retry once through the
+    // completion path before surfacing a no-content failure. The fallback is
+    // included in the same overall deadline as the stream probe.
+    const remainingMs = deadline - Date.now();
+    const canTryCompletion =
+      ttfbMs === null &&
+      remainingMs > 0 &&
+      (streamError === null ||
+        timedOut ||
+        isCompletionFallbackError(streamError));
+
+    if (canTryCompletion && typeof ai.gateway.generateText === "function") {
+      let completionTimedOut = false;
+      const completionAbort = new AbortController();
+      const completionTimeout = setTimeout(() => {
+        completionTimedOut = true;
+        completionAbort.abort();
+      }, remainingMs);
+
+      try {
+        const result = await ai.gateway.generateText(pingInput, {
+          apiKeys,
+          envApiKeys,
+          ...(frostFoxContext?.managedModelPolicy
+            ? { managedModelPolicy: frostFoxContext.managedModelPolicy }
+            : {}),
+          parameterOverrides: {
+            maxOutputTokens: 64,
+            reasoningEffort: "disabled",
+          },
+          allowProviderFallbackOnClientError: !!frostFoxContext,
+          signal: completionAbort.signal,
+          slotOverrides: pingSlotOverrides,
+        });
+        if (completionTimedOut) {
+          streamError = new Error(
+            `Provider did not return any content within ${PING_TOTAL_TIMEOUT_MS / 1000}s`,
+          );
+        } else {
+          const hasOutput =
+            (typeof result.text === "string" &&
+              result.text.trim().length > 0) ||
+            (result.reasoningContent?.trim().length ?? 0) > 0 ||
+            (result.toolCalls?.length ?? 0) > 0;
+          if (hasOutput) {
+            cleanupTransient();
+            return c.json({
+              ok: true,
+              latencyMs: Date.now() - startedAt,
+              text: `${preset.name} (${preset.provider}/${preset.model})`,
+              usage: result.usage,
+              testedTarget,
+            });
+          }
+          streamError = new Error("Provider returned no content");
+        }
+      } catch (err) {
+        streamError = completionTimedOut
+          ? new Error(
+              `Provider did not return any content within ${PING_TOTAL_TIMEOUT_MS / 1000}s`,
+            )
+          : err;
+      } finally {
+        clearTimeout(completionTimeout);
+      }
+    }
+
     cleanupTransient();
     const latencyMs = Date.now() - startedAt;
     if (ttfbMs === null) {
+      const error =
+        streamError instanceof Error && streamError.message
+          ? streamError.message
+          : streamError !== null
+            ? String(streamError)
+            : timedOut
+              ? "Provider did not return any content within 30s"
+              : "Provider returned no content";
       return c.json({
         ok: false,
         latencyMs,
-        error: timedOut
-          ? "Provider did not return any content within 30s"
-          : "Provider returned no content",
+        error,
+        testedTarget,
+      });
+    }
+
+    if (ttfbMs !== null && streamError !== null) {
+      const error =
+        streamError instanceof Error && streamError.message
+          ? streamError.message
+          : String(streamError);
+      return c.json({
+        ok: false,
+        latencyMs,
+        ttfbMs,
+        error,
         testedTarget,
       });
     }
@@ -532,4 +635,22 @@ export function createMiscApiRoutes(
   });
 
   return app;
+}
+
+/**
+ * A ping should validate provider reachability, not require streaming support.
+ * Providers commonly return a useful completion while their SSE endpoint is
+ * disabled or wrapped in an HTML/proxy response. Retry those failures through
+ * the ordinary completion endpoint, but do not double-submit clear client
+ * errors such as authentication, rate-limit, or configuration failures.
+ */
+function isCompletionFallbackError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return !(
+    /\bHTTP\s+4\d\d\b/i.test(message) ||
+    /\b(401|403|404|408|409|422|429)\b/.test(message) ||
+    /unauthori[sz]|forbidden|rate[-\s]?limit|invalid\s+(?:api\s*)?key|configuration|schema/i.test(
+      message,
+    )
+  );
 }

@@ -18,13 +18,22 @@ import {
   createMediaStoreFromEnv,
   createStoreFromEnv,
   resolveBackendFromEnv,
+  supportsVector,
 } from "@covel/store";
-import { createEmbeddingLockHelper } from "./embedding-lock.js";
+import {
+  createEmbeddingLockHelper,
+  type EmbeddingLockRequest,
+} from "./embedding-lock.js";
 import {
   createGatewayAdapter,
   createPluginRuntimeGateway,
 } from "@covel/runtime";
-import { fetchWithRetry, validateBaseUrlForPlugin } from "@covel/ai-provider";
+import {
+  fetchWithRetry,
+  validateBaseUrlForPlugin,
+  type GatewayOptions,
+} from "@covel/ai-provider";
+import { FROSTFOX_LOCAL_USER_ID_KEY } from "./routes/api/session/session-guard.js";
 import { bootstrapApi } from "./routes/api/bootstrap.js";
 import {
   createInProcessSessionLock,
@@ -265,6 +274,91 @@ const pluginUtils = {
 };
 const preferredMemorySlot = resolvePreferredMemorySlot(ai.slotRegistry);
 
+/**
+ * Resolve the account-owned embedding route for a server-side session. Vector
+ * tables are immutable per session, so an existing lock takes precedence over
+ * a newly refreshed catalog; otherwise a later catalog refresh could produce
+ * vectors with a different dimension than the rows already stored.
+ */
+const resolveSessionEmbeddingRequest = async (
+  sessionId: string,
+): Promise<EmbeddingLockRequest | null> => {
+  if (!frostFox) return null;
+  try {
+    const session = await store.getSession(sessionId);
+    const localUserId = session?.metadata?.[FROSTFOX_LOCAL_USER_ID_KEY];
+    if (typeof localUserId !== "string" || !localUserId) return null;
+    const principal = await frostFox.resolvePrincipalForLocalUser(localUserId);
+    if (!principal) return null;
+    const context = await frostFox.prepareAiContext(principal);
+    if (!context) return null;
+    const defaults = context.managedSlotDefaults;
+    const vectorTarget = supportsVector(store)
+      ? await store.resolveSessionVectorTarget(sessionId)
+      : null;
+    const isEmbeddingPreset = (preset: {
+      tag?: string;
+      capability?: { output?: readonly string[] };
+      provider: string;
+      model: string;
+    }) =>
+      preset.tag === "embedding" ||
+      preset.tag === "embed" ||
+      preset.capability?.output?.includes("embedding") === true;
+    let presetId =
+      context.managedModelPolicy?.presetIdsByTag.embedding ??
+      defaults?.slotPresetOverrides?.embedding ??
+      defaults?.slotPresetOverrides?.embed;
+    let managedModelPolicy: GatewayOptions["managedModelPolicy"] =
+      context.managedModelPolicy;
+
+    if (vectorTarget) {
+      const lockedPreset = defaults?.customPresets?.find(
+        (preset) =>
+          isEmbeddingPreset(preset) &&
+          `${preset.provider}/${preset.model}` === vectorTarget.modelId,
+      );
+      // The current catalog no longer describes the immutable locked model.
+      // Do not embed with a new model and corrupt the session's vector table.
+      if (!lockedPreset) return null;
+      presetId = lockedPreset.id;
+      managedModelPolicy = {
+        presetIdsByTag: {
+          ...(managedModelPolicy?.presetIdsByTag ?? {}),
+          embedding: lockedPreset.id,
+        },
+      };
+    }
+
+    // A hosted account must never silently fall through to a process-global
+    // embedding provider. An absent managed embedding route simply disables
+    // semantic memory and leaves keyword recall available.
+    if (managedModelPolicy && !managedModelPolicy.presetIdsByTag.embedding) {
+      // Non-admin FrostFox sessions must not use an embedding preset left in
+      // the host's local llm.toml when the account has no managed route.
+      return null;
+    }
+    if (!managedModelPolicy && !presetId) return null;
+
+    return {
+      ...(presetId ? { presetId } : {}),
+      options: {
+        apiKeys: context.apiKeys,
+        ...(defaults ? { slotOverrides: defaults } : {}),
+        ...(managedModelPolicy ? { managedModelPolicy } : {}),
+        allowProviderFallbackOnClientError: true,
+      },
+    };
+  } catch (err) {
+    console.warn(
+      `[server] hosted embedding route unavailable for ${sessionId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return null;
+  }
+};
+
 // Live budget view of the main narrative slot ("default" when configured,
 // else the isDefault/first preset). Resolved per call — never cached — so
 // llm.toml hot-reloads propagate to compaction thresholds and prompt budget.
@@ -292,17 +386,43 @@ const resolveNarrativeBudget = () => {
 const bundledPluginsDir =
   env.pluginsDir ?? resolve(import.meta.dirname, "../../../plugins");
 const pluginsDirs = mergeDirs(bundledPluginsDir, env.userPluginsDir);
-const ensureEmbeddingLock = createEmbeddingLockHelper({ store, ai, apiKeys });
+const ensureEmbeddingLock = createEmbeddingLockHelper({
+  store,
+  ai,
+  apiKeys,
+  ...(frostFox
+    ? { resolveEmbeddingRequest: resolveSessionEmbeddingRequest }
+    : {}),
+});
 // Embedding seam for the semantic memory tier. The memory package never
-// imports a provider — it gets this injected (mirrors the LLM adapter). Routes
-// through the same gateway embed slot the embedding-lock probe uses, so the
-// produced dimension always matches the session's locked vector model.
+// imports a provider — it gets this injected (mirrors the LLM adapter). Each
+// call carries its session id so hosted account policy and the immutable vector
+// lock resolve to the same model instead of using process-global llm.toml.
 const memoryEmbed = async (
   texts: readonly string[],
+  context?: { readonly sessionId?: string },
 ): Promise<Float32Array[]> => {
+  let request: EmbeddingLockRequest | null | undefined;
+  if (frostFox) {
+    // Every hosted vector belongs to a session-locked model. A missing session
+    // identity must never fall through to the process-global/local embedding
+    // provider, even if a future memory caller forgets to pass its context.
+    if (!context?.sessionId) {
+      throw new Error("hosted embedding requires a session context");
+    }
+    request = await resolveSessionEmbeddingRequest(context.sessionId);
+    if (!request) {
+      throw new Error(
+        `hosted embedding route unavailable for session ${context.sessionId}`,
+      );
+    }
+  }
   const res = await ai.gateway.embed(
-    { values: [...texts] },
-    apiKeys ? { envApiKeys: apiKeys } : undefined,
+    {
+      ...(request?.presetId ? { presetId: request.presetId } : {}),
+      values: [...texts],
+    },
+    request?.options ?? (apiKeys ? { envApiKeys: apiKeys } : undefined),
   );
   return res.embeddings.map((e) => Float32Array.from(e));
 };
@@ -313,8 +433,6 @@ const perRequestLlm = createPerRequestLlmMiddleware({
   defaultPluginGateway: pluginGateway,
   frostFox,
 });
-// ── Seed worlds ──────────────────────────────────────────────────
-// Bundled worlds are always seeded. When COVEL_USER_WORLDS_DIR is set
 // (desktop app points it at userData/worlds), user-created worlds are
 // merged on top and hot-reloaded alongside.
 const bundledWorldsDir =
@@ -439,7 +557,7 @@ export const drainServerResources = async (): Promise<void> => {
 app.route("/", createFrostFoxRoutes(frostFox));
 app.route("/", api.app);
 app.route("/", createModelDbRoutes(ai));
-app.route("/", createMiscApiRoutes(ai, api.registry, store, frostFox));
+app.route("/", createMiscApiRoutes(ai, api.registry, store, frostFox, apiKeys));
 app.route("/", createConfigApiRoutes({ apiKeys }));
 
 // ── Static file serving (production) ─────────────────────────────

@@ -266,13 +266,19 @@ export function mergeCapability(
  * Which of the server's resolution rules picked the preset:
  *   - `direct`: exact presetId match
  *   - `slot`: `slot-<name>` -> client override or slotRegistry
+ *   - `managed`: hosted account policy selected the administrator's preset
  *   - `tag-fallback`: text-tag fallback (slot didn't exist -> first text preset)
  *   - `any`: last-resort "any enabled preset"
  *
- * UIs should flag `tag-fallback` / `any` when the user explicitly requested
- * a specific slot - it means that slot isn't actually configured.
+ * UIs should flag `tag-fallback` / `any` when the user explicitly requested a
+ * specific slot - it means that slot isn't actually configured.
  */
-export type PingResolvedVia = "direct" | "slot" | "tag-fallback" | "any";
+export type PingResolvedVia =
+  | "direct"
+  | "slot"
+  | "managed"
+  | "tag-fallback"
+  | "any";
 
 export interface PingTestedTarget {
   presetId: string;

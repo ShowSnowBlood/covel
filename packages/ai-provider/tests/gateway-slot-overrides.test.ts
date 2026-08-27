@@ -210,6 +210,79 @@ describe("gateway + slotOverrides", () => {
     });
   });
 
+  it("forces the managed preset over direct and slot client choices", async () => {
+    const { gateway, calls } = setup();
+    const managedPreset = {
+      id: "managed-text",
+      name: "Managed text",
+      provider: "vendorX",
+      baseUrl: "https://managed.vendorx.example/v1",
+      model: "managed-7b",
+      protocol: "openai-chat-v1" as const,
+      tag: "text",
+    };
+    const browserPreset = {
+      id: "browser-text",
+      name: "Browser text",
+      provider: "deepseek",
+      baseUrl: "https://browser.example/v1",
+      model: "browser-7b",
+      protocol: "openai-chat-v1" as const,
+      tag: "text",
+    };
+
+    await gateway.generateText(
+      {
+        presetId: "ds-chat",
+        messages: [{ role: "user", content: "hi" }],
+      },
+      {
+        apiKeys: { vendorX: "sk-managed" },
+        managedModelPolicy: {
+          presetIdsByTag: { text: managedPreset.id },
+        },
+        slotOverrides: {
+          slotPresetOverrides: { story: browserPreset.id },
+          customPresets: [managedPreset, browserPreset],
+        },
+      },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      provider: "vendorX",
+      model: "managed-7b",
+      baseUrl: "https://managed.vendorx.example/v1",
+      apiKey: "sk-managed",
+    });
+  });
+  it("forces the managed image target over a caller-selected slot", () => {
+    const { gateway } = setup();
+
+    const resolved = gateway.resolveSlot("story", {
+      fallbackTag: "image",
+      managedModelPolicy: { presetIdsByTag: { image: "image-preset" } },
+    });
+
+    expect(resolved).toMatchObject({
+      presetId: "image-preset",
+      provider: "vendorX",
+      model: "gpt-image-2-2k",
+      tag: "image",
+    });
+  });
+
+  it("fails closed when a managed policy has no embedding target", () => {
+    const { gateway } = setup();
+
+    expect(() =>
+      gateway.resolveSlot(undefined, {
+        fallbackTag: "embedding",
+        managedModelPolicy: { presetIdsByTag: { text: "ds-chat" } },
+      }),
+    ).toThrow('managed model policy has no preset for tag "embedding"');
+  });
+
   it("keeps a valid image slot override on the image target", () => {
     const { gateway } = setup();
 

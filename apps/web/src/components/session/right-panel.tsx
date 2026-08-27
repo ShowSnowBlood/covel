@@ -61,20 +61,22 @@ function resolvePluginIcon(name: string): Icons.LucideIcon {
 
 export interface RightPanelProps {
   sessionId: string;
-  /** Currently loaded world — its `lore` (WORLD.md) is rendered in the World tab. */
+  /** Currently loaded world — its `lore` (WORLD.md) is rendered in the right-panel "World" tab. */
   world: WorldRecord | null;
-  /**
-   * State change patches — only used as a freshness signal for the DB
-   * tab. We pass the length as `refreshKey` so the panel re-fetches
-   * whenever a new patch lands.
-   */
+  /** State change patches used as a freshness signal for the DB tab. */
   statePatches: Array<{ id: string }>;
+  /** A mobile topbar request, retained until plugin tabs finish loading. */
+  requestedEvent?: {
+    event: "open-images" | "open-database";
+    sequence: number;
+  } | null;
 }
 
 export function RightPanel({
   sessionId,
   world,
   statePatches,
+  requestedEvent,
 }: RightPanelProps): ReactElement {
   const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -149,6 +151,23 @@ export function RightPanel({
     });
   }, [pluginTabGroups]);
 
+  // A topbar event can arrive before the async UI-spec request has populated
+  // plugin groups. Replay the request whenever that list changes.
+  useEffect(() => {
+    if (!requestedEvent) return;
+    if (requestedEvent.event === "open-database") {
+      setActiveTab("database");
+      return;
+    }
+    const imageTab = pluginTabGroups.find(
+      (g) =>
+        g.id.includes("image") ||
+        g.id.includes("gallery") ||
+        g.id.includes("portrait"),
+    );
+    if (imageTab) setActiveTab(`plugin-${imageTab.id}`);
+  }, [pluginTabGroups, requestedEvent]);
+
   // Load right-rail UI specs
   useEffect(() => {
     let cancelled = false;
@@ -171,7 +190,10 @@ export function RightPanel({
           listPluginData(sessionId, pid)
             .then((items) => {
               if (cancelled) return;
-              const byNamespace = new Map<string, Array<{ key: string; value: unknown }>>();
+              const byNamespace = new Map<
+                string,
+                Array<{ key: string; value: unknown }>
+              >();
               for (const item of items) {
                 const list = byNamespace.get(item.namespace) ?? [];
                 list.push({ key: item.key, value: item.value });
@@ -205,7 +227,7 @@ export function RightPanel({
         {/* Navigation Rail / Header Bar */}
         {isMobile ? (
           /* Mobile Horizontal Tab Scroller */
-          <div className="border-b border-border/80 bg-card/75 backdrop-blur-md px-2 py-1.5 overflow-x-auto flex items-center gap-1 shrink-0 ui-scroll max-w-full z-10 shadow-xs">
+          <div className="border-b border-border/80 bg-card/75 backdrop-blur-md px-2 py-1.5 pr-12 overflow-x-auto flex items-center gap-1 shrink-0 ui-scroll max-w-full z-10 shadow-xs">
             <TabsList className="flex h-auto w-auto items-center justify-start rounded-none bg-transparent p-0 gap-1 text-muted-foreground">
               {tabItems.map((item) => {
                 const ItemIcon = item.icon;
@@ -224,7 +246,9 @@ export function RightPanel({
                     )}
                   >
                     <ItemIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{item.shortLabel ?? compactTabLabel(item.label)}</span>
+                    <span>
+                      {item.shortLabel ?? compactTabLabel(item.label)}
+                    </span>
                   </TabsTrigger>
                 );
               })}
@@ -291,7 +315,10 @@ export function RightPanel({
 
         {/* Content Area */}
         <ScrollArea className="flex-1 min-h-0 min-w-0">
-          <TabsContent value="world" className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200">
+          <TabsContent
+            value="world"
+            className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200"
+          >
             <div className="mb-3.5 flex min-w-0 items-center justify-between gap-2 border-b border-[var(--rule-color)] pb-3">
               <div className="flex items-center gap-2 min-w-0">
                 <BookOpen className="w-4 h-4 shrink-0 text-primary" />
@@ -303,7 +330,10 @@ export function RightPanel({
             <WorldDocumentPanel world={world} />
           </TabsContent>
 
-          <TabsContent value="database" className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200">
+          <TabsContent
+            value="database"
+            className="p-3.5 sm:p-4 m-0 max-w-full animate-in fade-in-0 duration-200"
+          >
             <div className="mb-3.5 flex min-w-0 items-center justify-between gap-2 border-b border-[var(--rule-color)] pb-3">
               <div className="flex items-center gap-2 min-w-0">
                 <Database className="w-4 h-4 shrink-0 text-primary" />

@@ -40,6 +40,8 @@ interface PluginSelectionCardProps {
   bindingState: UseRuntimeBindingsResult;
   resolvedSlots: ResolvedSlot[];
   resolveDeclaredSlot: (slotId: string) => ResolvedSlot | null;
+  /** Hide per-runtime model selectors for hosted non-admin players. */
+  modelControlsLocked?: boolean;
   onTogglePlugin: (name: string) => void;
   worldDataPreflight: api.WorldDataPreflightResponse | null;
   worldDataPreflightStatus: PrepSectionStatus;
@@ -133,13 +135,14 @@ export function PluginSelectionCard({
   bindingState,
   resolvedSlots,
   resolveDeclaredSlot,
-  onTogglePlugin,
+  modelControlsLocked = false,
   worldDataPreflight,
   worldDataPreflightStatus,
   worldDataPreflightError,
   onRetryWorldDataPreflight,
   flowData,
   selectedFlowSteps,
+  onTogglePlugin,
 }: PluginSelectionCardProps) {
   const { t } = useTranslation();
   const totalRuntimes = selectedPackages.reduce(
@@ -185,6 +188,7 @@ export function PluginSelectionCard({
                 bindingState={bindingState}
                 resolvedSlots={resolvedSlots}
                 resolveDeclaredSlot={resolveDeclaredSlot}
+                modelControlsLocked={modelControlsLocked}
                 onTogglePlugin={onTogglePlugin}
               />
             ))}

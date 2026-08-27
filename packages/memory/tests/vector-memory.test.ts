@@ -34,13 +34,19 @@ function embedText(text: string): Float32Array {
 const embed: EmbedFn = async (texts) => texts.map(embedText);
 
 // Track embed calls so we can assert the hot-path contract / batching.
-function spyEmbed(): { fn: EmbedFn; calls: string[][] } {
+function spyEmbed(): {
+  fn: EmbedFn;
+  calls: string[][];
+  sessionIds: Array<string | undefined>;
+} {
   const calls: string[][] = [];
-  const fn: EmbedFn = async (texts) => {
+  const sessionIds: Array<string | undefined> = [];
+  const fn: EmbedFn = async (texts, context) => {
     calls.push([...texts]);
+    sessionIds.push(context?.sessionId);
     return texts.map(embedText);
   };
-  return { fn, calls };
+  return { fn, calls, sessionIds };
 }
 
 const llm: MemoryLLMAdapter = {
@@ -183,11 +189,12 @@ describe("vector recall (semantic)", () => {
   });
 
   it("is incremental: a second sweep only embeds new messages", async () => {
-    const { fn, calls } = spyEmbed();
+    const { fn, calls, sessionIds } = spyEmbed();
     const ingestor = createVectorIngestor({ store, embed: fn });
 
     const first = await ingestor.ingest(sessionId);
     expect(first.recall).toBe(3);
+    expect(sessionIds).toEqual([sessionId]);
     const firstBatchLen = calls[0].length;
     expect(firstBatchLen).toBe(3);
 

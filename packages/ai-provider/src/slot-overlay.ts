@@ -87,6 +87,7 @@ function overlayPresetKey(cp: CustomPresetInput): string {
       cp.protocol ?? null,
       cp.name ?? null,
       cp.tag ?? null,
+      cp.fallbackPresetIds ?? [],
     ])
   );
 }
@@ -129,25 +130,38 @@ export function applySlotOverlay(
   // gateway without having to implement overlay methods.
   if (!hasPreset || !addPreset || !removePreset) return noop;
 
-  // Track the scoped ids WE took a reference on so cleanup only
-  // decrements refs for them.
+  // Resolve every public id up front so a managed preset can point at another
+  // request-scoped preset in its fallback chain. Base presets remain untouched.
+  const scopedIds = new Map<string, string>();
+  for (const cp of customPresets) {
+    if (
+      isUsableCustomPreset(cp) &&
+      !hasPreset.call(deps.presetRegistry, cp.id) &&
+      !scopedIds.has(cp.id)
+    ) {
+      scopedIds.set(cp.id, overlayPresetKey(cp));
+    }
+  }
+
+  // Track the scoped ids WE took a reference on so cleanup only decrements
+  // refs for them.
   const ownedPresetKeys: string[] = [];
 
   for (const cp of customPresets) {
     if (!isUsableCustomPreset(cp)) continue;
+    const key = scopedIds.get(cp.id);
+    if (!key) continue;
 
-    // Never shadow an llm.toml / process-wide preset — the base entry
-    // keeps resolving under its public id.
-    if (hasPreset.call(deps.presetRegistry, cp.id)) continue;
-
-    const key = overlayPresetKey(cp);
     const current = presetRefs.get(key);
     if (current !== undefined) {
-      // Identical (id, config) already registered by a concurrent
-      // request — safe to share, just take a reference.
+      // Identical (id, config) already registered by a concurrent request —
+      // safe to share, just take a reference.
       presetRefs.set(key, current + 1);
     } else {
       const capability = resolveCapability(cp.model, cp.provider, cp.protocol);
+      const fallbackPresetIds = cp.fallbackPresetIds
+        ?.map((id) => scopedIds.get(id) ?? id)
+        .filter((id, index, ids) => ids.indexOf(id) === index);
       addPreset.call(deps.presetRegistry, {
         id: key,
         name: cp.name || cp.id,
@@ -155,6 +169,9 @@ export function applySlotOverlay(
         model: cp.model,
         ...(cp.protocol ? { protocol: cp.protocol } : {}),
         ...(cp.baseUrl ? { baseUrl: cp.baseUrl } : {}),
+        ...(fallbackPresetIds && fallbackPresetIds.length > 0
+          ? { fallbackPresetIds }
+          : {}),
         tier: "medium",
         supportedModes: supportedModesFor(capability),
         enabled: true,

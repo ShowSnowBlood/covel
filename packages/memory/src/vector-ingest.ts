@@ -132,7 +132,7 @@ async function ingestRecall(
     Boolean(String(m.content ?? "").trim());
   const embeddable = batch.filter(isEmbeddable);
   const vectors = embeddable.length
-    ? await embed(embeddable.map((m) => String(m.content)))
+    ? await embed(embeddable.map((m) => String(m.content)), { sessionId })
     : [];
 
   let written = 0;
@@ -244,7 +244,10 @@ async function ingestArchival(
   if (changed.length === 0) return 0;
 
   const batch = changed.slice(0, MAX_INGEST_BATCH);
-  const vectors = await embed(batch.map((it) => it.text));
+  const vectors = await embed(
+    batch.map((it) => it.text),
+    { sessionId },
+  );
 
   const nextHashes: ArchivalHashes = { ...hashes };
   let written = 0;

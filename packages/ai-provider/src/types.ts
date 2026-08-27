@@ -169,6 +169,8 @@ export interface CustomPresetInput {
   protocol?: ProviderProtocol;
   /** Slot compatibility tag supplied by a trusted managed catalog or client overlay. */
   tag?: string;
+  /** Public preset ids to try when this managed target fails. */
+  fallbackPresetIds?: string[];
 }
 
 /**
@@ -498,6 +500,19 @@ export interface ResolvedSlotConfig {
  *   Phase 1 supports only text content parts; Phase 2 will add images.
  */
 export type EmbeddingFormat = "openai" | "nemotron-multimodal";
+
+/**
+ * Server-owned model routing policy for a request.
+ *
+ * Keys are gateway fallback tags (`text`, `image`, `speech`,
+ * `transcription`, or `embedding`) and values are the only preset ids that
+ * may be used for that operation. The gateway applies this after request
+ * overlays, so an untrusted caller cannot select a different model by sending
+ * a raw preset id or slot name.
+ */
+export interface ManagedModelPolicy {
+  readonly presetIdsByTag: Readonly<Record<string, string>>;
+}
 
 export interface ModelSlotConfig {
   slotId: string;

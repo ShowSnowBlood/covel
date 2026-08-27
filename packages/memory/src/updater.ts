@@ -18,7 +18,7 @@
  * rather than free-form LLM editing.
  */
 
-import { resolveI18nText } from "@covel/shared";
+import { resolveI18nText, type LLMAdapter } from "@covel/shared";
 import type {
   CoreMemoryBlock,
   CoreMemoryBlockSchema,
@@ -108,6 +108,7 @@ export function createMemoryUpdater(
     authoritativeFacts?: MemoryAuthoritativeFacts;
     currentBlocks: readonly CoreMemoryBlock[];
     locale?: string;
+    llm?: LLMAdapter;
   }): Promise<MemoryUpdateResult>;
   awaitPending(sessionId: string): Promise<void>;
 } {
@@ -127,6 +128,7 @@ export function createMemoryUpdater(
     authoritativeFacts?: MemoryAuthoritativeFacts;
     currentBlocks: readonly CoreMemoryBlock[];
     locale?: string;
+    llm?: LLMAdapter;
   }): Promise<MemoryUpdateResult> {
     const {
       sessionId,
@@ -135,6 +137,7 @@ export function createMemoryUpdater(
       authoritativeFacts,
       currentBlocks,
       locale,
+      llm: requestLlm,
     } = params;
     const effectiveLocale = locale ?? resolvedLocale;
     const lang = effectiveLocale.startsWith("zh") ? "zh" : "en";
@@ -181,13 +184,22 @@ export function createMemoryUpdater(
         .join("\n\n");
       const userPrompt = `## 当前记忆块\n${blockSection || "（全部为空，首次初始化）"}${authoritativeSection}\n\n## 本轮叙事\n${narrativeText}${toolSection}\n\n请输出需要更新的记忆块 JSON。`;
 
-      const response = await llm.complete({
-        systemPrompt: buildSystemPrompt(schema, lang, effectiveLocale),
-        messages: [{ role: "user", content: userPrompt }],
-        model: config?.modelSlot,
-      });
+      const systemPrompt = buildSystemPrompt(schema, lang, effectiveLocale);
+      const response = requestLlm
+        ? await requestLlm.generate({
+            model: config?.modelSlot,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+          })
+        : await llm.complete({
+            systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+            model: config?.modelSlot,
+          });
 
-      const parsed = parseBlockUpdates(response.content, validLabels);
+      const parsed = parseBlockUpdates(response.content ?? "", validLabels);
       enforceAuthoritativePlayerProfile({
         updates: parsed,
         currentBlocks: effectiveCurrentBlocks,

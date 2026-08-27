@@ -172,6 +172,151 @@ describe("gateway", () => {
     expect(callCount).toBe(2);
     expect(result.text).toBe("backup response");
   });
+  it("falls back when the primary stream returns no output", async () => {
+    let streamCalls = 0;
+    const { gateway } = setup({
+      async *streamText() {
+        streamCalls++;
+        if (streamCalls === 1) {
+          yield {
+            type: "done" as const,
+            finishReason: "stop",
+            usage: { inputTokens: 1, outputTokens: 0 },
+          };
+          return;
+        }
+        yield { type: "text-delta" as const, textDelta: "backup" };
+        yield {
+          type: "done" as const,
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    });
+
+    const events: StreamEvent[] = [];
+    for await (const event of gateway.streamText({
+      messages: [{ role: "user", content: "hi" }],
+    })) {
+      events.push(event);
+    }
+
+    expect(streamCalls).toBe(2);
+    expect(events).toEqual([
+      { type: "text-delta", textDelta: "backup" },
+      {
+        type: "done",
+        finishReason: "stop",
+        usage: { inputTokens: 1, outputTokens: 1 },
+      },
+    ]);
+  });
+  it("falls back when the primary response has no output", async () => {
+    let generateCalls = 0;
+    const { gateway } = setup({
+      async generateText() {
+        generateCalls++;
+        return generateCalls === 1
+          ? {
+              text: "",
+              finishReason: "stop",
+              usage: { inputTokens: 1, outputTokens: 0 },
+            }
+          : {
+              text: "backup response",
+              finishReason: "stop",
+              usage: { inputTokens: 1, outputTokens: 2 },
+            };
+      },
+    });
+
+    const result = await gateway.generateText({
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(generateCalls).toBe(2);
+    expect(result.text).toBe("backup response");
+  });
+  it("keeps local fallback disabled for a plain HTTP 401", async () => {
+    let generateCalls = 0;
+    const { gateway } = setup({
+      async generateText() {
+        generateCalls++;
+        if (generateCalls === 1) {
+          throw new Error(
+            "Provider returned non-JSON response (HTTP 401): unauthorized",
+          );
+        }
+        return {
+          text: "should not be reached",
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    });
+
+    await expect(
+      gateway.generateText({
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    ).rejects.toThrow(/HTTP 401/);
+    expect(generateCalls).toBe(1);
+  });
+  it("allows managed fallback across a plain HTTP 401", async () => {
+    let generateCalls = 0;
+    const { gateway } = setup({
+      async generateText() {
+        generateCalls++;
+        if (generateCalls === 1) {
+          throw new Error(
+            "Provider returned non-JSON response (HTTP 401): unauthorized",
+          );
+        }
+        return {
+          text: "managed backup",
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    });
+
+    const result = await gateway.generateText(
+      { messages: [{ role: "user", content: "hi" }] },
+      { allowProviderFallbackOnClientError: true },
+    );
+    expect(generateCalls).toBe(2);
+    expect(result.text).toBe("managed backup");
+  });
+  it("allows managed fallback across a rate-limit response", async () => {
+    let generateCalls = 0;
+    const { gateway } = setup({
+      async generateText() {
+        generateCalls++;
+        if (generateCalls === 1) {
+          throw new Error(
+            JSON.stringify({
+              code: "RATE_LIMITED",
+              provider: "test",
+              retriable: true,
+              statusCode: 429,
+            }),
+          );
+        }
+        return {
+          text: "rate-limit backup",
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    });
+
+    const result = await gateway.generateText(
+      { messages: [{ role: "user", content: "hi" }] },
+      { allowProviderFallbackOnClientError: true },
+    );
+    expect(generateCalls).toBe(2);
+    expect(result.text).toBe("rate-limit backup");
+  });
 
   it("does not fallback on non-retriable error", async () => {
     let callCount = 0;

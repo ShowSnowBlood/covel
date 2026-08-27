@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge.js";
 import { resolveI18n } from "@/lib/catalog/helpers.js";
 import { stageLabel } from "@/lib/stage-label.js";
 import { useRuntimeModelSlotOverride } from "./runtime-model-slot-override.js";
+import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
 import { SetupRecovery } from "./setup-recovery.js";
 import {
   RUNTIME_TYPE_ICONS,
@@ -29,6 +30,13 @@ export function SessionPluginItem({
   setupRuntimes,
 }: SessionPluginItemProps) {
   const { t, i18n } = useTranslation();
+  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
+  const modelControlsLocked = Boolean(
+    frostFoxAccount?.status?.enabled &&
+    frostFoxAccount.status.authenticated &&
+    frostFoxAccount.status.account &&
+    frostFoxAccount.status.account.isAdmin !== true,
+  );
   const [expanded, setExpanded] = useState(false);
 
   const textSlots = useMemo(
@@ -98,18 +106,18 @@ export function SessionPluginItem({
     RUNTIME_TYPE_ICONS[plugin.runtimeType ?? "agent"] ?? "LLM";
 
   return (
-    <div className="border border-border rounded-[var(--radius-card)] overflow-hidden">
-      <div className="flex items-center hover:bg-muted/50 transition-colors">
+    <div className="min-w-0 overflow-hidden rounded-[var(--radius-card)] border border-border">
+      <div className="flex min-w-0 items-stretch hover:bg-muted/50 transition-colors">
         <button
           type="button"
-          className="flex-1 flex items-center gap-2 px-2.5 py-2 text-left min-w-0"
+          className="min-w-0 flex-1 flex items-center gap-2 px-2.5 py-2 text-left"
           onClick={() => setExpanded((v) => !v)}
         >
           <ChevronRight
             className={`w-3 h-3 shrink-0 text-muted-foreground transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
           />
           <Puzzle className="w-3.5 h-3.5 shrink-0 text-primary/60" />
-          <span className="text-xs font-medium truncate flex-1 min-w-0">
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">
             {displayName}
           </span>
           {stageLabel(plugin.stage, t) && (
@@ -135,9 +143,14 @@ export function SessionPluginItem({
           )}
         </button>
         {plugin.runtimeType !== "function" &&
+          !modelControlsLocked &&
           (textSlots.length > 0 ? (
             <select
-              value={textSlots.some((slot) => slot.slotId === boundSlot) ? boundSlot : ""}
+              value={
+                textSlots.some((slot) => slot.slotId === boundSlot)
+                  ? boundSlot
+                  : ""
+              }
               onChange={(e) => handleSlotChange(e.target.value)}
               onClick={(e) => e.stopPropagation()}
               disabled={executing}
@@ -169,6 +182,15 @@ export function SessionPluginItem({
               no slots
             </span>
           ))}
+        {plugin.runtimeType !== "function" && modelControlsLocked && (
+          <span
+            className="mr-2 flex shrink-0 items-center gap-1 text-[9px] text-muted-foreground"
+            title={t("plugin.modelManagedByAdmin", "Model managed")}
+          >
+            <Lock className="h-2.5 w-2.5 text-primary" />
+            {t("plugin.modelManagedByAdmin", "Model managed")}
+          </span>
+        )}
         {onToggle && !isLocked && (
           <button
             type="button"

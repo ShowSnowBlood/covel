@@ -136,13 +136,15 @@ export function OnboardingWizard() {
     status,
     catalog: managedCatalog,
     loading: managedLoading,
-    refresh: refreshManagedModels,
+    refreshModels: refreshManagedModels,
   } = useFrostFoxAccount();
   const accountId =
     status?.authenticated && status.account ? status.account.id : undefined;
   const managedOnly = Boolean(
     status?.enabled && status.authenticated && status.account,
   );
+  const isAdmin = status?.account?.isAdmin === true;
+  const modelSelectionLocked = managedOnly && !isAdmin;
   const managedModelsLoading = managedOnly && managedLoading;
   const dismissing = useRef(false);
   const [step, setStep] = useState<OnboardingStep>(0);
@@ -213,32 +215,44 @@ export function OnboardingWizard() {
   }, []);
 
   const handleBeforePingStory = useCallback(async () => {
+    if (modelSelectionLocked) return;
     await persistSlot(storyForm, "story", availablePresets);
-  }, [storyForm, availablePresets]);
+  }, [modelSelectionLocked, storyForm, availablePresets]);
 
   const handleBeforePingPlugin = useCallback(async () => {
+    if (modelSelectionLocked) return;
     await persistSlot(pluginForm, "plugin", availablePresets);
-  }, [pluginForm, availablePresets]);
+  }, [modelSelectionLocked, pluginForm, availablePresets]);
 
   const handleContinueFromStory = useCallback(async () => {
-    await persistSlot(storyForm, "story", availablePresets);
-    bindPluginSlotToStory();
+    if (!modelSelectionLocked) {
+      await persistSlot(storyForm, "story", availablePresets);
+      bindPluginSlotToStory();
+    }
     setStep((current) => nextStep(current));
-  }, [storyForm, availablePresets]);
+  }, [modelSelectionLocked, storyForm, availablePresets]);
 
   const handleContinueFromPlugin = useCallback(async () => {
     if (
+      !modelSelectionLocked &&
       pluginMode === "different" &&
       (pluginForm.modelSource === "managed" || pluginForm.apiKey.trim())
     ) {
       await persistSlot(pluginForm, "plugin", availablePresets);
-    } else {
+    } else if (!modelSelectionLocked) {
       persistPluginModeSame();
     }
     setStep((current) => nextStep(current));
-  }, [pluginForm, pluginMode, availablePresets]);
+  }, [modelSelectionLocked, pluginForm, pluginMode, availablePresets]);
 
-  if (!visible || managedLoading) return null;
+  if (!visible) return null;
+  if (!status) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-6 text-center text-sm text-muted-foreground">
+        {t("onboarding.loadingAccount", "Loading account settings…")}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm">
@@ -265,10 +279,18 @@ export function OnboardingWizard() {
               managedCatalog={managedCatalog}
               managedModelsLoading={managedModelsLoading}
               managedOnly={managedOnly}
-              storyContinueDisabled={isStoryContinueDisabled(
-                storyForm,
-                managedCatalog,
-              )}
+              modelSelectionLocked={modelSelectionLocked}
+              storyContinueDisabled={
+                modelSelectionLocked
+                  ? managedModelsLoading ||
+                    !availablePresets.some(
+                      (preset) =>
+                        preset.enabled &&
+                        preset.scope === "frostfox" &&
+                        preset.capability?.output.includes("text"),
+                    )
+                  : isStoryContinueDisabled(storyForm, managedCatalog)
+              }
               onBeforePingStory={handleBeforePingStory}
               onRefreshManagedModels={refreshManagedModels}
               onContinue={handleContinueFromStory}
@@ -287,11 +309,22 @@ export function OnboardingWizard() {
               managedCatalog={managedCatalog}
               managedModelsLoading={managedModelsLoading}
               managedOnly={managedOnly}
-              pluginContinueDisabled={isPluginContinueDisabled(
-                pluginMode,
-                pluginForm,
-                managedCatalog,
-              )}
+              modelSelectionLocked={modelSelectionLocked}
+              pluginContinueDisabled={
+                modelSelectionLocked
+                  ? managedModelsLoading ||
+                    !availablePresets.some(
+                      (preset) =>
+                        preset.enabled &&
+                        preset.scope === "frostfox" &&
+                        preset.capability?.output.includes("text"),
+                    )
+                  : isPluginContinueDisabled(
+                      pluginMode,
+                      pluginForm,
+                      managedCatalog,
+                    )
+              }
               onBeforePingPlugin={handleBeforePingPlugin}
               onRefreshManagedModels={refreshManagedModels}
               onBack={handleBack}

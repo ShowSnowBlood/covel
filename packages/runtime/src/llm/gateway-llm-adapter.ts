@@ -20,16 +20,25 @@ import type {
  * Duplicated here to keep `@covel/runtime` decoupled from the ai-provider
  * package (which already depends on `@covel/runtime`'s sibling).
  */
+export type ProviderProtocol =
+  "anthropic-messages-v1" | "openai-chat-v1" | "openai-responses-v1";
+
 export interface SlotOverridesInput {
   slotPresetOverrides?: Record<string, string>;
   customPresets?: Array<{
     id: string;
     name: string;
     provider: string;
-    baseUrl?: string;
     model: string;
-    protocol?: string;
+    baseUrl?: string;
+    protocol?: ProviderProtocol;
+    fallbackPresetIds?: string[];
   }>;
+  parameterOverrides?: Record<string, unknown>;
+}
+/** Structural form of the server-owned gateway model policy. */
+export interface ManagedModelPolicy {
+  readonly presetIdsByTag: Readonly<Record<string, string>>;
 }
 
 /**
@@ -67,11 +76,13 @@ export interface GatewayLike {
       providerRequestMetadata?: Record<string, unknown>;
     },
     options?: {
+      managedModelPolicy?: ManagedModelPolicy;
       apiKeys?: Record<string, string>;
       envApiKeys?: Record<string, string>;
       traceId?: string;
       signal?: AbortSignal;
       slotOverrides?: SlotOverridesInput;
+      allowProviderFallbackOnClientError?: boolean;
     },
   ): Promise<{
     text: string;
@@ -102,11 +113,13 @@ export interface GatewayLike {
       providerRequestMetadata?: Record<string, unknown>;
     },
     options?: {
+      managedModelPolicy?: ManagedModelPolicy;
       apiKeys?: Record<string, string>;
       envApiKeys?: Record<string, string>;
       traceId?: string;
       signal?: AbortSignal;
       slotOverrides?: SlotOverridesInput;
+      allowProviderFallbackOnClientError?: boolean;
     },
   ): AsyncIterable<{
     type: string;
@@ -121,22 +134,18 @@ export interface GatewayLike {
 }
 
 export interface GatewayAdapterConfig {
+  /** Server-owned model routing policy. */
+  readonly managedModelPolicy?: ManagedModelPolicy;
   /** API keys from the request (e.g., from X-Provider-Keys header). */
   readonly apiKeys?: Record<string, string>;
-  /**
-   * Server-env / platform API keys. The gateway only attaches these when
-   * the resolved target's baseUrl origin matches trusted server config —
-   * request-scoped custom presets never receive them.
-   */
+  /** Server-env keys, origin-gated by the gateway. */
   readonly envApiKeys?: Record<string, string>;
   /** Trace ID for observability. */
   readonly traceId?: string;
-  /**
-   * Per-request slot/preset overlay forwarded to the gateway. Lets a
-   * browser-only custom slot (e.g. `fast` → `custom_abc`) resolve to a
-   * client-declared preset without needing a server-side llm.toml entry.
-   */
+  /** Per-request slot/preset overlay. */
   readonly slotOverrides?: SlotOverridesInput;
+  /** Permit managed fallback chains to continue across provider 4xx errors. */
+  readonly allowProviderFallbackOnClientError?: boolean;
 }
 
 /**
@@ -165,11 +174,17 @@ export function createGatewayAdapter(
           tools: tools && tools.length > 0 ? tools : undefined,
         },
         {
+          ...(config?.managedModelPolicy
+            ? { managedModelPolicy: config.managedModelPolicy }
+            : {}),
           apiKeys: config?.apiKeys,
           ...(config?.envApiKeys ? { envApiKeys: config.envApiKeys } : {}),
           traceId: config?.traceId,
           ...(config?.slotOverrides
             ? { slotOverrides: config.slotOverrides }
+            : {}),
+          ...(config?.allowProviderFallbackOnClientError
+            ? { allowProviderFallbackOnClientError: true }
             : {}),
           ...(params.signal ? { signal: params.signal } : {}),
         },
@@ -213,11 +228,17 @@ export function createGatewayAdapter(
           tools: tools && tools.length > 0 ? tools : undefined,
         },
         {
+          ...(config?.managedModelPolicy
+            ? { managedModelPolicy: config.managedModelPolicy }
+            : {}),
           apiKeys: config?.apiKeys,
           ...(config?.envApiKeys ? { envApiKeys: config.envApiKeys } : {}),
           traceId: config?.traceId,
           ...(config?.slotOverrides
             ? { slotOverrides: config.slotOverrides }
+            : {}),
+          ...(config?.allowProviderFallbackOnClientError
+            ? { allowProviderFallbackOnClientError: true }
             : {}),
           ...(params.signal ? { signal: params.signal } : {}),
         },

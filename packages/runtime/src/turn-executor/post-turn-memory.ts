@@ -57,6 +57,7 @@ export function schedulePostTurnMemoryUpdate(args: {
       authoritativeFacts,
       currentBlocks: coreMemoryBlocks,
       locale: input.locale,
+      llm: deps.llm,
     })
     .then((result) => {
       if (result.error) {

@@ -9,14 +9,18 @@
  */
 
 /**
- * Inject-only embedding function. The memory package never imports a concrete
- * provider — `@covel/ai-provider` is composed in at the server bootstrap layer
- * and handed in as this seam (mirrors how the LLM adapter is injected). Returns
- * one `Float32Array` per input string, in order. The dimension must match the
- * session's locked embedding model (the store throws on mismatch).
+ * Optional request context for an embedding call. The session id lets a
+ * composition root select the same account/model policy that locked the
+ * session's vector table without storing mutable request state in a shared
+ * closure.
  */
+export interface EmbedContext {
+  readonly sessionId?: string;
+}
+
 export type EmbedFn = (
   texts: readonly string[],
+  context?: EmbedContext,
 ) => Promise<readonly Float32Array[]>;
 
 /**

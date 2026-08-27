@@ -45,6 +45,7 @@ import {
   isLockedCorePackage,
 } from "./session-prep/plugin-selection-helpers.js";
 import { ShinyText, Magnet, StarBorder } from "@/components/reactbits/index.js";
+import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { cn } from "@/lib/utils.js";
 import { ignoreError } from "@/lib/ignore-error.js";
@@ -80,6 +81,13 @@ export function SessionPrepScreen({
   settingsInitialKey,
 }: SessionPrepScreenProps) {
   const { t } = useTranslation();
+  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
+  const modelControlsLocked = Boolean(
+    frostFoxAccount?.status?.enabled &&
+    frostFoxAccount.status.authenticated &&
+    frostFoxAccount.status.account &&
+    frostFoxAccount.status.account.isAdmin !== true,
+  );
   const { resolvedSlots, refresh: refreshSlots } = useSlotConfig(
     presets,
     llmConfig,
@@ -379,22 +387,28 @@ export function SessionPrepScreen({
             {/* Cockpit Header with Tab Switches */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3.5 sm:pb-4 shrink-0">
               {/* Tabs */}
-              <div className="flex items-center gap-1 p-1 rounded-2xl bg-background/60 border border-border/80 backdrop-blur-xs overflow-x-auto max-w-full ui-scroll">
+              <div className="flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-2xl border border-border/80 bg-background/60 p-1 backdrop-blur-xs sm:w-auto sm:flex-1 ui-scroll">
                 <button
                   type="button"
+                  title={t("session.plugins", "Gameplay Plugins")}
                   onClick={() => setActiveTab("plugins")}
                   className={cn(
-                    "flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    "flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1.5 py-1.5 text-[11px] font-semibold transition-all duration-200 cursor-pointer select-none xl:gap-2 xl:px-3.5 xl:text-xs",
                     activeTab === "plugins"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+                      : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
                   )}
                 >
-                  <Puzzle className="w-3.5 h-3.5" />
-                  <span>{t("session.plugins", "Gameplay Plugins")}</span>
+                  <Puzzle className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate xl:hidden">
+                    {t("session.pluginsShort", "Plugins")}
+                  </span>
+                  <span className="hidden min-w-0 truncate xl:inline">
+                    {t("session.plugins", "Gameplay Plugins")}
+                  </span>
                   <Badge
                     variant={activeTab === "plugins" ? "secondary" : "outline"}
-                    className="text-[9px] px-1.5 py-0 font-mono"
+                    className="shrink-0 px-1 py-0 text-[9px] font-mono xl:px-1.5"
                   >
                     {selectedPluginIds.length}/{packages.length}
                   </Badge>
@@ -402,19 +416,25 @@ export function SessionPrepScreen({
 
                 <button
                   type="button"
+                  title={t("session.activeModels", "AI Models")}
                   onClick={() => setActiveTab("models")}
                   className={cn(
-                    "flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    "flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1.5 py-1.5 text-[11px] font-semibold transition-all duration-200 cursor-pointer select-none xl:gap-2 xl:px-3.5 xl:text-xs",
                     activeTab === "models"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+                      : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
                   )}
                 >
-                  <Cpu className="w-3.5 h-3.5" />
-                  <span>{t("session.activeModels", "AI Models")}</span>
+                  <Cpu className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate xl:hidden">
+                    {t("session.activeModelsShort", "Models")}
+                  </span>
+                  <span className="hidden min-w-0 truncate xl:inline">
+                    {t("session.activeModels", "AI Models")}
+                  </span>
                   <Badge
                     variant={activeTab === "models" ? "secondary" : "outline"}
-                    className="text-[9px] px-1.5 py-0 font-mono"
+                    className="shrink-0 px-1 py-0 text-[9px] font-mono xl:px-1.5"
                   >
                     {resolvedSlots.length}
                   </Badge>
@@ -422,22 +442,28 @@ export function SessionPrepScreen({
 
                 <button
                   type="button"
+                  title={t("session.sessions", "Saved Sessions")}
                   onClick={() => setActiveTab("history")}
                   className={cn(
-                    "flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer select-none",
+                    "flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1.5 py-1.5 text-[11px] font-semibold transition-all duration-200 cursor-pointer select-none xl:gap-2 xl:px-3.5 xl:text-xs",
                     activeTab === "history"
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+                      : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
                   )}
                 >
-                  <History className="w-3.5 h-3.5" />
-                  <span>{t("session.sessions", "Saved Sessions")}</span>
+                  <History className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate xl:hidden">
+                    {t("session.sessionsShort", "Sessions")}
+                  </span>
+                  <span className="hidden min-w-0 truncate xl:inline">
+                    {t("session.sessions", "Saved Sessions")}
+                  </span>
                   {activeSessions.length > 0 && (
                     <Badge
                       variant={
                         activeTab === "history" ? "secondary" : "outline"
                       }
-                      className="text-[9px] px-1.5 py-0 font-mono"
+                      className="shrink-0 px-1 py-0 text-[9px] font-mono xl:px-1.5"
                     >
                       {activeSessions.length}
                     </Badge>
@@ -483,6 +509,7 @@ export function SessionPrepScreen({
                     bindingState={bindingState}
                     resolvedSlots={resolvedSlots}
                     resolveDeclaredSlot={resolveSelectedDeclaredSlot}
+                    modelControlsLocked={modelControlsLocked}
                     onTogglePlugin={togglePlugin}
                     worldDataPreflight={worldDataPreflight}
                     worldDataPreflightStatus={worldDataPreflightStatus}
@@ -503,28 +530,38 @@ export function SessionPrepScreen({
                         {t("session.activeModels", "Configured Model Slots")}
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {resolvedSlots.length > 0
-                          ? t("session.slotsConfigured", {
-                              count: resolvedSlots.length,
-                            })
-                          : t("session.slotsUnconfigured")}
+                        {modelControlsLocked
+                          ? t(
+                              "session.modelsManagedByAdminHint",
+                              "The administrator selects the active model schedule.",
+                            )
+                          : resolvedSlots.length > 0
+                            ? t("session.slotsConfigured", {
+                                count: resolvedSlots.length,
+                              })
+                            : t("session.slotsUnconfigured")}
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      radius="full"
-                      className="gap-1.5 text-xs"
-                      onClick={() => onSettingsOpenChange(true)}
-                    >
-                      <KeyRound className="w-3.5 h-3.5" />
-                      {t(
-                        "session.configureModelRoles",
-                        "Configure model roles",
-                      )}
-                    </Button>
+                    {!modelControlsLocked && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        radius="full"
+                        className="gap-1.5 text-xs"
+                        onClick={() => onSettingsOpenChange(true)}
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        {t(
+                          "session.configureModelRoles",
+                          "Configure model roles",
+                        )}
+                      </Button>
+                    )}
                   </div>
-                  <ActiveModelSlots slots={resolvedSlots} />
+                  <ActiveModelSlots
+                    slots={resolvedSlots}
+                    modelControlsLocked={modelControlsLocked}
+                  />
                 </div>
               )}
 

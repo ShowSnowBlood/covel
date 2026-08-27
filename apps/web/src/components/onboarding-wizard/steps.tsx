@@ -94,6 +94,7 @@ interface StoryStepProps {
   managedCatalog?: FrostFoxModelCatalog | null;
   managedModelsLoading?: boolean;
   managedOnly?: boolean;
+  modelSelectionLocked?: boolean;
   storyContinueDisabled: boolean;
   onBeforePingStory: () => Promise<void>;
   onRefreshManagedModels?: () => Promise<void>;
@@ -108,6 +109,7 @@ export function StoryStep({
   managedCatalog = null,
   managedModelsLoading = false,
   managedOnly = false,
+  modelSelectionLocked = false,
   storyContinueDisabled,
   onBeforePingStory,
   onRefreshManagedModels,
@@ -127,6 +129,7 @@ export function StoryStep({
         managedCatalog={managedCatalog}
         managedModelsLoading={managedModelsLoading}
         managedOnly={managedOnly}
+        modelSelectionLocked={modelSelectionLocked}
         slotName="story"
       />
 
@@ -183,6 +186,7 @@ interface PluginStepProps {
   managedCatalog?: FrostFoxModelCatalog | null;
   managedModelsLoading?: boolean;
   managedOnly?: boolean;
+  modelSelectionLocked?: boolean;
   pluginContinueDisabled: boolean;
   onBeforePingPlugin: () => Promise<void>;
   onRefreshManagedModels?: () => Promise<void>;
@@ -200,6 +204,7 @@ export function PluginStep({
   managedCatalog = null,
   managedModelsLoading = false,
   managedOnly = false,
+  modelSelectionLocked = false,
   pluginContinueDisabled,
   onBeforePingPlugin,
   onRefreshManagedModels,
@@ -228,72 +233,95 @@ export function PluginStep({
         </p>
       </div>
 
-      <div className="space-y-2">
-        <button
-          onClick={() => setPluginMode("same")}
-          className={`w-full flex items-start gap-3 p-3 rounded-[var(--radius-card)] border text-left transition-colors ${
-            pluginMode === "same"
-              ? "border-primary bg-primary/10"
-              : "border-border hover:border-primary/40"
-          }`}
-        >
-          <div
-            className={`mt-0.5 h-3.5 w-3.5 rounded-full border shrink-0 ${
-              pluginMode === "same"
-                ? "border-primary bg-primary"
-                : "border-border"
-            }`}
+      {modelSelectionLocked ? (
+        <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-primary/25 bg-primary/5 p-3">
+          <Sparkles
+            className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+            aria-hidden="true"
           />
-          <div className="min-w-0">
-            <div className="text-xs font-medium">
-              {t("onboarding.pluginSame", "Use same as narrator")}
-            </div>
-            <div className="text-[11px] text-muted-foreground font-mono truncate">
-              {storySummary}
-            </div>
-          </div>
-        </button>
-        <button
-          onClick={() => setPluginMode("different")}
-          className={`w-full flex items-start gap-3 p-3 rounded-[var(--radius-card)] border text-left transition-colors ${
-            pluginMode === "different"
-              ? "border-primary bg-primary/10"
-              : "border-border hover:border-primary/40"
-          }`}
-        >
-          <div
-            className={`mt-0.5 h-3.5 w-3.5 rounded-full border shrink-0 ${
-              pluginMode === "different"
-                ? "border-primary bg-primary"
-                : "border-border"
-            }`}
-          />
-          <div className="min-w-0">
-            <div className="text-xs font-medium">
-              {t("onboarding.pluginDifferent", "Use a different model")}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
+          <div className="min-w-0 space-y-1">
+            <p className="text-xs font-medium">
               {t(
-                "onboarding.pluginDifferentHint",
-                "Route plugins to a faster/cheaper provider.",
+                "onboarding.pluginModelsManagedByAdmin",
+                "Plugin models follow the administrator's schedule.",
               )}
-            </div>
+            </p>
+            <p className="truncate font-mono text-[11px] text-muted-foreground">
+              {storySummary}
+            </p>
           </div>
-        </button>
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <button
+              onClick={() => setPluginMode("same")}
+              className={`w-full flex items-start gap-3 p-3 rounded-[var(--radius-card)] border text-left transition-colors ${
+                pluginMode === "same"
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div
+                className={`mt-0.5 h-3.5 w-3.5 rounded-full border shrink-0 ${
+                  pluginMode === "same"
+                    ? "border-primary bg-primary"
+                    : "border-border"
+                }`}
+              />
+              <div className="min-w-0">
+                <div className="text-xs font-medium">
+                  {t("onboarding.pluginSame", "Use same as narrator")}
+                </div>
+                <div className="text-[11px] text-muted-foreground font-mono truncate">
+                  {storySummary}
+                </div>
+              </div>
+            </button>
+            <button
+              onClick={() => setPluginMode("different")}
+              className={`w-full flex items-start gap-3 p-3 rounded-[var(--radius-card)] border text-left transition-colors ${
+                pluginMode === "different"
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div
+                className={`mt-0.5 h-3.5 w-3.5 rounded-full border shrink-0 ${
+                  pluginMode === "different"
+                    ? "border-primary bg-primary"
+                    : "border-border"
+                }`}
+              />
+              <div className="min-w-0">
+                <div className="text-xs font-medium">
+                  {t("onboarding.pluginDifferent", "Use a different model")}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {t(
+                    "onboarding.pluginDifferentHint",
+                    "Route plugins to a faster/cheaper provider.",
+                  )}
+                </div>
+              </div>
+            </button>
+          </div>
 
-      {pluginMode === "different" && (
-        <ProviderForm
-          state={pluginForm}
-          onChange={setPluginForm}
-          onBeforePing={onBeforePingPlugin}
-          onRefreshManagedModels={onRefreshManagedModels}
-          presets={availablePresets}
-          managedCatalog={managedCatalog}
-          managedModelsLoading={managedModelsLoading}
-          managedOnly={managedOnly}
-          slotName="plugin"
-        />
+          {pluginMode === "different" && (
+            <ProviderForm
+              state={pluginForm}
+              onChange={setPluginForm}
+              onBeforePing={onBeforePingPlugin}
+              onRefreshManagedModels={onRefreshManagedModels}
+              presets={availablePresets}
+              managedCatalog={managedCatalog}
+              managedModelsLoading={managedModelsLoading}
+              managedOnly={managedOnly}
+              modelSelectionLocked={modelSelectionLocked}
+              slotName="plugin"
+            />
+          )}
+        </>
       )}
 
       {pluginContinueDisabled && (

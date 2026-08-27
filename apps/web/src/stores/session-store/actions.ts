@@ -36,6 +36,8 @@ interface UseSessionActionsOptions {
   ds: DataService;
   refs: SessionRuntimeRefs;
   handleSseEvent: SseEventHandler;
+  /** Hosted non-admin accounts cannot persist caller-selected model slots. */
+  allowModelOverrides?: boolean;
 }
 
 /** Page size for the scroll-up "load older messages" fetch. */
@@ -69,6 +71,7 @@ export function useBuildSessionActions({
   ds,
   refs,
   handleSseEvent,
+  allowModelOverrides = true,
 }: UseSessionActionsOptions): SessionActions {
   const { sessionIdRef, stateRef } = refs;
 
@@ -103,9 +106,18 @@ export function useBuildSessionActions({
         presets: state.presets,
         llmConfig: state.llmConfig,
         plugins,
+        allowModelOverrides,
       });
     },
-    [ds, dispatch, sessionIdRef, state.world, state.presets, state.llmConfig],
+    [
+      allowModelOverrides,
+      ds,
+      dispatch,
+      sessionIdRef,
+      state.world,
+      state.presets,
+      state.llmConfig,
+    ],
   );
 
   const resyncSession = useCallback(

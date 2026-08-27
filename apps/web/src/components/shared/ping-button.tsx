@@ -242,10 +242,10 @@ export function PingButton({
   const errInfo = result && !result.ok ? classifyPingError(result.error) : null;
 
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
       {button}
       {result && !testing && (
-        <span className="inline-flex items-center gap-1 text-xs">
+        <span className="inline-flex min-w-0 max-w-full items-center gap-1 text-xs">
           {result.ok ? (
             <>
               <CheckCircle2 className="w-3 h-3 text-green-500" />
@@ -275,7 +275,7 @@ export function PingButton({
                 {errInfo?.kind ?? "error"}
               </span>
               <span
-                className="text-destructive truncate max-w-[180px]"
+                className="min-w-0 max-w-[180px] flex-1 truncate text-destructive"
                 title={result.error}
               >
                 {result.error?.slice(0, 40) ??

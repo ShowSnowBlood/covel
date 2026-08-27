@@ -18,6 +18,8 @@ interface StartGameOptions {
   presets: readonly api.PresetSummary[];
   llmConfig: api.LlmConfigResponse | null;
   plugins?: string[];
+  /** Hosted non-admin accounts use the server-owned model policy. */
+  allowModelOverrides?: boolean;
 }
 
 function selectPresetId(
@@ -95,6 +97,7 @@ export async function startGameSession({
   presets,
   llmConfig,
   plugins,
+  allowModelOverrides = true,
 }: StartGameOptions): Promise<void> {
   try {
     const session = await ds.createSession(
@@ -111,7 +114,9 @@ export async function startGameSession({
     // authoritative and implements syncToServer as a no-op.
     await ds.syncToServer(session.id);
     api.markServerAck();
-    await persistPrepRuntimeBindings(world.id, session.id);
+    if (allowModelOverrides) {
+      await persistPrepRuntimeBindings(world.id, session.id);
+    }
 
     setActivePluginDataSession(session.id);
     dispatch({ type: "SET_SESSION", session });

@@ -96,11 +96,13 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 | 方法   | 路径                                                | 说明                                                                                          |
 | ------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | GET    | `/auth/frostfox/start`                              | 创建一次性登录事务，生成 state + PKCE，并跳转到 Router `/saas/authorize`                      |
-| GET    | `/auth/frostfox/callback?code=<code>&state=<state>` | 校验登录事务并 exchange；成功后用 `/me` 原子建立或恢复本地绑定，然后回到 Covel 根路径         |
+| GET    | `/auth/frostfox/callback?code=<code>&state=<state>` | 校验登录事务并 exchange；成功后建立或恢复所选账户的本地绑定，若当前会话属于另一账户则安全切换到新绑定，然后回到 Covel 根路径 |
 | GET    | `/api/frostfox/account`                             | 返回启用状态和当前账户的最小身份视图，不返回任何凭据                                          |
 | GET    | `/api/frostfox/models`                              | 用托管 Gateway Key 按同步渠道读取模型目录；返回的 provider/model 绑定只用于当前会话的模型选择 |
 | POST   | `/api/frostfox/logout`                              | 清除当前 Covel 会话 Cookie，不解绑账户凭据                                                    |
 | DELETE | `/api/frostfox/account`                             | 显式解绑当前 SaaS 本地账户、删除服务端账户 Key 密文并撤销会话；不轮转 Router 账户 Key         |
+
+- 重新授权会以 Router 返回的账户为准；不同账户使用不同的 `localUserId`，因此切换账号不会覆盖原账户的会话、存档或进度。
 
 - `/api/frostfox/models` 的目录按 `client-config.configurationVersion` 和凭据世代缓存；同一账号登录周期内复用结果，账号重新登录、解绑或配置版本变化时失效，并发读取共享同一个上游请求。模型请求最终仍由 Router Gateway 执行渠道启用态、分组货架、余额、限流、计费和模型上架判断。渠道映射是命名同步，不是 ACL。
 

@@ -18,7 +18,7 @@
  * X-Provider-Keys header flow driven by browser localStorage.
  */
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { resolve, join, dirname, isAbsolute } from "node:path";
 import {
   readFileSync,
@@ -38,6 +38,7 @@ import {
 import { errorBody, readJsonBody } from "../api-error.js";
 import { parseEnvLines } from "../lib/env-file.js";
 import { makeDesktopRestTokenGuard } from "./privileged-auth.js";
+import { checkHostedOperator } from "./api/session/session-guard.js";
 
 export interface ConfigApiDeps {
   /** Mutable map shared with the gateway adapter. PUT handlers mutate in-place. */
@@ -47,7 +48,11 @@ export interface ConfigApiDeps {
 export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
   const app = new Hono();
   const requireToken = makeDesktopRestTokenGuard();
-
+  const requireAdminOrToken: MiddlewareHandler = async (c, next) => {
+    const denied = checkHostedOperator(c);
+    if (denied) return denied;
+    return requireToken(c, next);
+  };
   app.get("/api/config/info", (c) => {
     const covelHome = resolveCovelHome();
     const env = readRuntimeEnv();
@@ -90,7 +95,7 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
 
   // PUT /api/config/keys — body: { [provider]: value }
   // Empty string / null value → remove that provider's key.
-  app.put("/api/config/keys", requireToken, async (c) => {
+  app.put("/api/config/keys", requireAdminOrToken, async (c) => {
     const covelHome = resolveCovelHome();
     if (!covelHome) {
       return c.json(
@@ -168,7 +173,7 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
   // Atomically rewrites the bundle. Mode 0600 to match `keys.env` — even
   // though `settings.json` should not contain secrets, the user might
   // import/export with `includeSecrets: true`.
-  app.put("/api/config/settings", requireToken, async (c) => {
+  app.put("/api/config/settings", requireAdminOrToken, async (c) => {
     const covelHome = resolveCovelHome();
     if (!covelHome) {
       return c.json(
@@ -215,7 +220,7 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
   // Rewrites `[paths] data_root` in `~/.covel/config.toml`. Does NOT move
   // existing data: the contract is "new location, fresh start; old data
   // stays where it is". Caller must restart the server to pick up.
-  app.put("/api/config/data-root", requireToken, async (c) => {
+  app.put("/api/config/data-root", requireAdminOrToken, async (c) => {
     const covelHome = resolveCovelHome();
     if (!covelHome) {
       return c.json(
@@ -270,7 +275,7 @@ export function createConfigApiRoutes(deps: ConfigApiDeps): Hono {
   // POST /api/config/open-folder — body: { target: "config" | "data" | "logs" | "llm.toml" | "keys.env" }
   // Opens the requested folder or file in the platform default application.
   // The whitelist keeps callers from reaching arbitrary filesystem paths.
-  app.post("/api/config/open-folder", requireToken, async (c) => {
+  app.post("/api/config/open-folder", requireAdminOrToken, async (c) => {
     const parsed = await readJsonBody(c);
     if (parsed instanceof Response) return parsed;
     const body = parsed.body;

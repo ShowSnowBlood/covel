@@ -9,6 +9,7 @@ import {
 import {
   resolveCapabilityDetails,
   type InputModality,
+  type ManagedModelPolicy,
   type ManualCapabilityOverride,
   type ModelCapability,
   type OutputModality,
@@ -37,6 +38,8 @@ import {
   sealSecret,
   type FrostFoxBinding,
   type FrostFoxCredentialStore,
+  type FrostFoxModelSchedule,
+  type FrostFoxModelScheduleEntry,
 } from "./credentials.js";
 
 const AUTH_TRANSACTION_TTL_MS = 5 * 60_000;
@@ -51,6 +54,8 @@ export interface FrostFoxPrincipal {
   readonly routerAccountId: string;
   readonly accountName: string;
   readonly balance: number;
+  /** Router-admin role; optional for compatibility with pre-role fixtures. */
+  readonly isAdmin?: boolean;
   readonly credentialState: "active" | "recovery_required";
   readonly lastVerifiedAt: string;
 }
@@ -99,14 +104,16 @@ export interface FrostFoxAiContext {
   readonly principal: FrostFoxPrincipal;
   readonly apiKeys: Record<string, string>;
   readonly managedSlotDefaults: SlotOverridesInput | undefined;
+  /** Forced preset selection applied by the gateway for non-admin accounts. */
+  readonly managedModelPolicy?: ManagedModelPolicy;
 }
 
 interface RouterAccount {
   readonly id: string;
   readonly name: string;
   readonly balance: number;
+  readonly isAdmin: boolean;
 }
-
 /**
  * The catalog is keyed by config version and credential generation rather
  * than wall-clock expiry, so one login does not repeatedly probe every channel.
@@ -261,7 +268,6 @@ export class FrostFoxService {
     readonly code: string;
     readonly state: string;
     readonly transactionToken: string | undefined;
-    readonly currentSessionToken: string | undefined;
   }): Promise<FrostFoxAuthorizationResult> {
     if (
       !AUTHORIZATION_CODE_RE.test(input.code) ||
@@ -292,18 +298,16 @@ export class FrostFoxService {
       verifier,
     );
     const account = await this.readRouterAccount(accountKey);
-    const current = await this.resolvePrincipal(input.currentSessionToken);
-    if (current && current.routerAccountId !== account.id) {
-      throw new FrostFoxServiceError("frostfox_account_conflict", 409);
-    }
-
     const existing = await this.store.getBindingBySubject(
       this.runtimeConfig.routerBaseUrl,
       account.id,
     );
     const now = new Date().toISOString();
-    const localUserId =
-      existing?.localUserId ?? current?.localUserId ?? randomUUID();
+    // A new authorization may intentionally select a different Router account.
+    // Keep each account's durable local identity separate: reusing the current
+    // session's localUserId would overwrite the old binding (or violate the
+    // SQLite primary key) and leak its progression/session ownership.
+    const localUserId = existing?.localUserId ?? randomUUID();
     const createdAt = existing?.createdAt ?? now;
     const accountKeyCiphertext = sealSecret(
       accountKey,
@@ -320,6 +324,7 @@ export class FrostFoxService {
       routerAccountId: account.id,
       accountName: account.name,
       balance: account.balance,
+      isAdmin: account.isAdmin === true,
       accountKeyCiphertext,
       credentialState: "active",
       credentialGenerationUpdatedAt: now,
@@ -341,6 +346,19 @@ export class FrostFoxService {
     sessionToken: string | undefined,
   ): Promise<FrostFoxPrincipal | null> {
     const localUserId = this.verifySessionToken(sessionToken);
+    if (!localUserId) return null;
+    const binding = await this.store.getBindingByLocalUserId(localUserId);
+    return binding ? principalFromBinding(binding) : null;
+  }
+
+  /**
+   * Resolve the durable account binding used by a server-side session.
+   * Internal background work (embedding and memory ingestion) has a session
+   * id, not the browser cookie, so it cannot use resolvePrincipal directly.
+   */
+  async resolvePrincipalForLocalUser(
+    localUserId: string,
+  ): Promise<FrostFoxPrincipal | null> {
     if (!localUserId) return null;
     const binding = await this.store.getBindingByLocalUserId(localUserId);
     return binding ? principalFromBinding(binding) : null;
@@ -377,6 +395,54 @@ export class FrostFoxService {
       level,
     );
     return progressionStatus(progression.completedLevel, progression.updatedAt);
+  }
+
+  async getModelSchedule(
+    principal: FrostFoxPrincipal,
+  ): Promise<FrostFoxModelSchedule | null> {
+    const binding = await this.requiredBinding(principal.localUserId);
+    if (binding.credentialState !== "active") {
+      throw new FrostFoxServiceError("frostfox_reconnect_required", 401);
+    }
+    return this.store.getModelSchedule();
+  }
+
+  async setModelSchedule(
+    principal: FrostFoxPrincipal,
+    story: readonly FrostFoxModelScheduleEntry[],
+  ): Promise<FrostFoxModelSchedule> {
+    const binding = await this.requiredBinding(principal.localUserId);
+    if (!binding.isAdmin) {
+      throw new FrostFoxServiceError("frostfox_admin_required", 403);
+    }
+    if (binding.credentialState !== "active") {
+      throw new FrostFoxServiceError("frostfox_reconnect_required", 401);
+    }
+
+    const normalized = normalizeScheduleEntries(story);
+    if (normalized.length > 0) {
+      const catalog = await this.listModels(principal);
+      const available = new Set(
+        catalog.channels
+          .filter((channel) => channel.enabled && !channel.error)
+          .flatMap((channel) =>
+            channel.models
+              .filter((model) => model.capability.output.includes("text"))
+              .map((model) => `${channel.channelKey}\n${model.id}`),
+          ),
+      );
+      if (
+        normalized.some(
+          (entry) => !available.has(`${entry.channelKey}\n${entry.modelId}`),
+        )
+      ) {
+        throw new FrostFoxServiceError(
+          "frostfox_model_schedule_model_invalid",
+          400,
+        );
+      }
+    }
+    return this.store.setModelSchedule(normalized);
   }
 
   async handleGatewayUnauthorized(principal: FrostFoxPrincipal): Promise<void> {
@@ -427,7 +493,8 @@ export class FrostFoxService {
       body.id !== binding.routerAccountId ||
       typeof body.name !== "string" ||
       typeof body.balance !== "number" ||
-      !Number.isFinite(body.balance)
+      !Number.isFinite(body.balance) ||
+      (body.isAdmin !== undefined && typeof body.isAdmin !== "boolean")
     ) {
       return principalFromBinding(binding);
     }
@@ -435,6 +502,7 @@ export class FrostFoxService {
       ...binding,
       accountName: body.name,
       balance: body.balance,
+      isAdmin: body.isAdmin === undefined ? binding.isAdmin : body.isAdmin,
       credentialState: "active",
       lastVerifiedAt: now,
       updatedAt: now,
@@ -463,9 +531,15 @@ export class FrostFoxService {
     );
     let managedSlotDefaults = this.managedSlotDefaults;
     try {
+      const catalog = await this.listModels(principal);
+      managedSlotDefaults = withManagedStorySchedule(
+        managedSlotDefaults,
+        await this.store.getModelSchedule(),
+        catalog,
+      );
       managedSlotDefaults = withManagedImageDefaults(
         managedSlotDefaults,
-        await this.listModels(principal),
+        catalog,
         this.preferredImageModel,
       );
     } catch {
@@ -476,6 +550,12 @@ export class FrostFoxService {
       principal,
       apiKeys,
       managedSlotDefaults,
+      ...(!principal.isAdmin
+        ? {
+            managedModelPolicy:
+              managedModelPolicyFromSlots(managedSlotDefaults),
+          }
+        : {}),
     };
   }
 
@@ -709,11 +789,17 @@ export class FrostFoxService {
       typeof body.name !== "string" ||
       body.name.length === 0 ||
       typeof body.balance !== "number" ||
-      !Number.isFinite(body.balance)
+      !Number.isFinite(body.balance) ||
+      (body.isAdmin !== undefined && typeof body.isAdmin !== "boolean")
     ) {
       throw new FrostFoxServiceError("frostfox_account_response_invalid", 502);
     }
-    return { id: body.id, name: body.name, balance: body.balance };
+    return {
+      id: body.id,
+      name: body.name,
+      balance: body.balance,
+      isAdmin: body.isAdmin === true,
+    };
   }
 
   private async requiredBinding(localUserId: string): Promise<FrostFoxBinding> {
@@ -772,6 +858,115 @@ export class FrostFoxService {
       ? localUserId
       : null;
   }
+}
+
+function normalizeScheduleEntries(
+  entries: readonly FrostFoxModelScheduleEntry[],
+): FrostFoxModelScheduleEntry[] {
+  if (!Array.isArray(entries) || entries.length > 8) {
+    throw new FrostFoxServiceError("frostfox_model_schedule_invalid", 400);
+  }
+  const seen = new Set<string>();
+  const normalized: FrostFoxModelScheduleEntry[] = [];
+  for (const entry of entries) {
+    if (
+      !entry ||
+      typeof entry.channelKey !== "string" ||
+      typeof entry.modelId !== "string"
+    ) {
+      throw new FrostFoxServiceError("frostfox_model_schedule_invalid", 400);
+    }
+    const channelKey = entry.channelKey.trim();
+    const modelId = entry.modelId.trim();
+    if (
+      !channelKey ||
+      channelKey.length > 64 ||
+      !modelId ||
+      modelId.length > 200
+    ) {
+      throw new FrostFoxServiceError("frostfox_model_schedule_invalid", 400);
+    }
+    const key = `${channelKey}\n${modelId}`;
+    if (seen.has(key)) {
+      throw new FrostFoxServiceError("frostfox_model_schedule_invalid", 400);
+    }
+    seen.add(key);
+    normalized.push({ channelKey, modelId });
+  }
+  return normalized;
+}
+
+function withManagedStorySchedule(
+  defaults: SlotOverridesInput | undefined,
+  schedule: FrostFoxModelSchedule | null,
+  catalog: FrostFoxModelCatalog,
+): SlotOverridesInput | undefined {
+  if (!schedule || schedule.story.length === 0) return defaults;
+
+  const candidates: Array<{
+    channel: FrostFoxModelChannel;
+    model: FrostFoxModelEntry;
+  }> = [];
+  const seen = new Set<string>();
+  for (const entry of schedule.story) {
+    const channel = catalog.channels.find(
+      (item) =>
+        item.channelKey === entry.channelKey && item.enabled && !item.error,
+    );
+    const model = channel?.models.find((item) => item.id === entry.modelId);
+    if (!channel || !model || !model.capability.output.includes("text")) {
+      continue;
+    }
+    const key = `${channel.channelKey}\n${model.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ channel, model });
+  }
+  if (candidates.length === 0) return defaults;
+
+  const slotPresetOverrides = { ...(defaults?.slotPresetOverrides ?? {}) };
+  const customPresets = new Map(
+    (defaults?.customPresets ?? []).map((preset) => [preset.id, preset]),
+  );
+  const presetIds = candidates.map(({ channel, model }) =>
+    managedPresetId(channel.channelKey, model.id),
+  );
+  for (const [index, { channel, model }] of candidates.entries()) {
+    customPresets.set(presetIds[index]!, {
+      id: presetIds[index]!,
+      name: `${channel.displayName} · ${model.name}`,
+      provider: channel.providerId,
+      baseUrl: channel.baseUrl,
+      model: model.id,
+      protocol: channel.protocol,
+      tag: "text",
+      ...(presetIds.slice(index + 1).length > 0
+        ? { fallbackPresetIds: presetIds.slice(index + 1) }
+        : {}),
+    });
+  }
+
+  const previousStory = slotPresetOverrides.story;
+  const primary = presetIds[0]!;
+  slotPresetOverrides.story = primary;
+  if (
+    !slotPresetOverrides.default ||
+    slotPresetOverrides.default === previousStory
+  ) {
+    slotPresetOverrides.default = primary;
+  }
+  if (
+    !slotPresetOverrides.plugin ||
+    slotPresetOverrides.plugin === previousStory
+  ) {
+    slotPresetOverrides.plugin = primary;
+  }
+
+  return {
+    ...(defaults ?? {}),
+    slotPresetOverrides,
+    customPresets: [...customPresets.values()],
+  };
 }
 
 function buildManagedSlotDefaults(
@@ -836,53 +1031,66 @@ function withManagedImageDefaults(
   catalog: FrostFoxModelCatalog,
   preferredModel: string | undefined,
 ): SlotOverridesInput | undefined {
-  const slotPresetOverrides = { ...(defaults?.slotPresetOverrides ?? {}) };
-  const customPresets = new Map(
-    (defaults?.customPresets ?? []).map((preset) => [preset.id, preset]),
-  );
-  let imagePresetId = slotPresetOverrides.image;
+  let firstImage:
+    { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
+  let firstDedicatedImage:
+    { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
+  let selected:
+    { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
 
-  if (!imagePresetId) {
-    let firstImage:
-      { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
-    let firstDedicatedImage:
-      { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
-    let selected:
-      { channel: FrostFoxModelChannel; model: FrostFoxModelEntry } | undefined;
-    findImage: for (const channel of catalog.channels) {
-      if (!channel.enabled || channel.error) continue;
-      for (const model of channel.models) {
-        if (!model.capability.output.includes("image")) continue;
-        firstImage ??= { channel, model };
-        if (channel.channelKey.toLowerCase() === "image") {
-          firstDedicatedImage ??= { channel, model };
-        }
-        if (preferredModel && model.id === preferredModel) {
-          selected = { channel, model };
-          break findImage;
-        }
+  findImage: for (const channel of catalog.channels) {
+    if (!channel.enabled || channel.error) continue;
+    for (const model of channel.models) {
+      if (!model.capability.output.includes("image")) continue;
+      firstImage ??= { channel, model };
+      if (channel.channelKey.toLowerCase() === "image") {
+        firstDedicatedImage ??= { channel, model };
       }
-    }
-    selected ??= firstDedicatedImage ?? firstImage;
-    if (selected) {
-      imagePresetId = managedPresetId(
-        selected.channel.channelKey,
-        selected.model.id,
-      );
-      customPresets.set(imagePresetId, {
-        id: imagePresetId,
-        name: `${selected.channel.displayName} · ${selected.model.name}`,
-        provider: selected.channel.providerId,
-        baseUrl: selected.channel.baseUrl,
-        model: selected.model.id,
-        protocol: selected.channel.protocol,
-        tag: "image",
-      });
+      if (preferredModel && model.id === preferredModel) {
+        selected = { channel, model };
+        break findImage;
+      }
     }
   }
 
-  if (!imagePresetId) return defaults;
-  slotPresetOverrides.image ??= imagePresetId;
+  selected ??= firstDedicatedImage ?? firstImage;
+  // No image model in the Router catalog: preserve the startup defaults and
+  // let the caller's existing configuration decide whether image generation
+  // is available. A partial/failed catalog must never erase a working route.
+  if (!selected) return defaults;
+
+  const imagePresetId = managedPresetId(
+    selected.channel.channelKey,
+    selected.model.id,
+  );
+  const slotPresetOverrides = {
+    ...(defaults?.slotPresetOverrides ?? {}),
+    // Router catalog selection is authoritative for hosted image calls. Do
+    // not use `??=` here: a stale local/default image binding would otherwise
+    // survive and make the UI and the server disagree about the target.
+    image: imagePresetId,
+  };
+  const customPresets = new Map(
+    (defaults?.customPresets ?? []).map((preset) => [preset.id, preset]),
+  );
+  // Drop stale managed image definitions. They are not active after the
+  // assignment above, but retaining them needlessly enlarges every request's
+  // overlay and can leave an old account/configuration visible to diagnostics.
+  for (const [id, preset] of customPresets) {
+    if (id.startsWith("frostfox-managed-") && preset.tag === "image") {
+      customPresets.delete(id);
+    }
+  }
+  customPresets.set(imagePresetId, {
+    id: imagePresetId,
+    name: `${selected.channel.displayName} · ${selected.model.name}`,
+    provider: selected.channel.providerId,
+    baseUrl: selected.channel.baseUrl,
+    model: selected.model.id,
+    protocol: selected.channel.protocol,
+    tag: "image",
+  });
+
   return {
     ...(defaults ?? {}),
     slotPresetOverrides,
@@ -894,6 +1102,31 @@ function managedPresetId(channelKey: string, model: string): string {
     .update(`${channelKey}\n${model}`, "utf8")
     .digest("hex")
     .slice(0, 24)}`;
+}
+
+function managedModelPolicyFromSlots(
+  defaults: SlotOverridesInput | undefined,
+): ManagedModelPolicy {
+  const slots = defaults?.slotPresetOverrides ?? {};
+  const first = (...slotIds: string[]): string | undefined => {
+    for (const slotId of slotIds) {
+      const presetId = slots[slotId];
+      if (typeof presetId === "string" && presetId.length > 0) return presetId;
+    }
+    return undefined;
+  };
+  const presetIdsByTag: Record<string, string> = {};
+  const text = first("story", "default", "plugin");
+  const image = first("image");
+  const embedding = first("embedding", "embed");
+  const speech = first("speech");
+  const transcription = first("transcription");
+  if (text) presetIdsByTag.text = text;
+  if (image) presetIdsByTag.image = image;
+  if (embedding) presetIdsByTag.embedding = embedding;
+  if (speech) presetIdsByTag.speech = speech;
+  if (transcription) presetIdsByTag.transcription = transcription;
+  return { presetIdsByTag };
 }
 
 export function deriveFrostFoxGatewayKey(
@@ -913,6 +1146,7 @@ function principalFromBinding(binding: FrostFoxBinding): FrostFoxPrincipal {
     routerAccountId: binding.routerAccountId,
     accountName: binding.accountName,
     balance: binding.balance,
+    isAdmin: binding.isAdmin,
     credentialState: binding.credentialState,
     lastVerifiedAt: binding.lastVerifiedAt,
   };

@@ -13,6 +13,7 @@
 
 import type {
   I18nText,
+  LLMAdapter,
   MemoryBlockSchema,
   SimpleCompletionAdapter,
 } from "@covel/shared";
@@ -256,6 +257,13 @@ export interface MemoryUpdater {
     authoritativeFacts?: MemoryAuthoritativeFacts;
     currentBlocks: readonly CoreMemoryBlock[];
     locale?: string;
+    /**
+     * Request-scoped full adapter. When present, the updater uses it for this
+     * turn's extraction call so hosted model policy and credentials stay in
+     * lockstep with the narrative runtime. Standalone callers omit it and
+     * use the adapter captured at construction.
+     */
+    llm?: LLMAdapter;
   }): Promise<MemoryUpdateResult>;
 
   /**
@@ -335,11 +343,11 @@ export interface ArchivalSearcher {
  * Inject-only embedding function for the semantic (vector) memory tier. The
  * memory package never imports a concrete provider; the server bootstrap layer
  * builds this from `@covel/ai-provider`'s gateway and passes it in, exactly as
- * it does for the {@link MemoryLLMAdapter}. Returns one embedding per input, in
- * order. Aliased from the vector-tier primitives so the public type surface
- * lives in one place.
+ * it does for the {@link MemoryLLMAdapter}. The optional session context lets
+ * account-bound deployments select the same model that owns the session's
+ * immutable vector table. Returns one embedding per input, in order.
  */
-export type { EmbedFn } from "./vector-common.js";
+export type { EmbedContext, EmbedFn } from "./vector-common.js";
 
 export interface MemorySystemDeps {
   readonly store: DataStore;

@@ -112,15 +112,39 @@ export function hasOperatorToken(c: Context): boolean {
   return provided !== undefined && safeEqual(provided, expected);
 }
 
-/** Require the configured operator credential for global hosted mutations. */
+/** Require the configured operator credential or a FrostFox administrator. */
 export function checkHostedOperator(c: Context): Response | undefined {
   if (!isOwnerAuthEnforced()) return undefined;
   if (hasOperatorToken(c)) return undefined;
+  const principal = c.get("frostFoxPrincipal") as
+    FrostFoxPrincipal | null | undefined;
+  if (principal?.isAdmin === true) return undefined;
   return c.json(
-    errorBody("Operator token required on this tier", {
+    errorBody("Operator token or administrator account required on this tier", {
       code: OPERATOR_TOKEN_REQUIRED_CODE,
     }),
     401,
+  );
+}
+/**
+ * Require the operator credential or a first-party FrostFox administrator
+ * before accepting a caller-owned model-routing mutation. Owner/session
+ * credentials deliberately do not grant this capability: they authorize
+ * access to one session, not changes to the model policy used by its turns.
+ * Self/desktop tiers remain unchanged because their model configuration is
+ * already local and operator-controlled by the deployment boundary.
+ */
+export function checkHostedModelAdmin(c: Context): Response | undefined {
+  if (!isOwnerAuthEnforced()) return undefined;
+  if (hasOperatorToken(c)) return undefined;
+  const principal = c.get("frostFoxPrincipal") as
+    FrostFoxPrincipal | null | undefined;
+  if (principal?.isAdmin === true) return undefined;
+  return c.json(
+    errorBody("FrostFox administrator account required", {
+      code: "frostfox_admin_required",
+    }),
+    403,
   );
 }
 
@@ -145,9 +169,7 @@ export function checkSessionOwner(
   // binding grants this path; it cannot authorize unbound or other-account
   // sessions.
   const principal = c.get("frostFoxPrincipal") as
-    | FrostFoxPrincipal
-    | null
-    | undefined;
+    FrostFoxPrincipal | null | undefined;
   if (
     env.deploymentTier === "commercial" &&
     env.frostFoxSaasEnabled &&

@@ -317,12 +317,12 @@ describe("commercial tier — FrostFox account sessions", () => {
     const appB = createTestApp(store, registry, accountB);
 
     const created = await createSession(appA);
-    expect(
-      (await appA.request(`/api/sessions/${created.id}`)).status,
-    ).toBe(200);
-    expect(
-      (await appB.request(`/api/sessions/${created.id}`)).status,
-    ).toBe(401);
+    expect((await appA.request(`/api/sessions/${created.id}`)).status).toBe(
+      200,
+    );
+    expect((await appB.request(`/api/sessions/${created.id}`)).status).toBe(
+      401,
+    );
     expect(created.metadata).not.toHaveProperty("frostFoxLocalUserId");
     expect(await (await appA.request("/api/sessions")).json()).toMatchObject({
       items: [{ id: created.id }],
@@ -330,6 +330,55 @@ describe("commercial tier — FrostFox account sessions", () => {
     expect(await (await appB.request("/api/sessions")).json()).toEqual({
       items: [],
     });
+  });
+
+  it("lets only a FrostFox administrator change runtime model bindings", async () => {
+    process.env.DEPLOYMENT_TIER = "commercial";
+    process.env.COVEL_DESKTOP_REST_TOKEN = "operator-secret";
+    process.env.COVEL_FROSTFOX_SAAS_ENABLED = "1";
+
+    const player: FrostFoxPrincipal = {
+      localUserId: "model-player",
+      routerAccountId: "router-player",
+      accountName: "Player",
+      balance: 10,
+      isAdmin: false,
+      credentialState: "active",
+      lastVerifiedAt: new Date().toISOString(),
+    };
+    const playerApp = createTestApp(store, createPluginRegistry(), player);
+    const playerSession = await createSession(playerApp);
+    const denied = await playerApp.request(
+      `/api/sessions/${playerSession.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${playerSession.ownerToken}`,
+        },
+        body: JSON.stringify({ runtimeModelOverrides: { narrator: "fast" } }),
+      },
+    );
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as { code?: string }).code).toBe(
+      "frostfox_admin_required",
+    );
+
+    const admin: FrostFoxPrincipal = {
+      ...player,
+      localUserId: "model-admin",
+      routerAccountId: "router-admin",
+      accountName: "Admin",
+      isAdmin: true,
+    };
+    const adminApp = createTestApp(store, createPluginRegistry(), admin);
+    const adminSession = await createSession(adminApp);
+    const allowed = await adminApp.request(`/api/sessions/${adminSession.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ runtimeModelOverrides: { narrator: "fast" } }),
+    });
+    expect(allowed.status).toBe(200);
   });
 });
 

@@ -33,10 +33,13 @@ export function ShinyText({
   return (
     <span
       className={cn(
-        "inline-block bg-clip-text text-transparent bg-[length:200%_100%] transition-all",
+        "inline-block bg-clip-text bg-[length:200%_100%] transition-all",
         className,
       )}
       style={{
+        // Keep `color` inherited so `currentColor` in the gradient is opaque;
+        // make only the glyph fill transparent for background clipping.
+        WebkitTextFillColor: "transparent",
         backgroundImage: `linear-gradient(120deg, currentColor 0%, currentColor 38%, ${shineColor} 50%, currentColor 62%, currentColor 100%)`,
         animation: `shiny-text-sweep ${speed}s linear infinite`,
         ...style,

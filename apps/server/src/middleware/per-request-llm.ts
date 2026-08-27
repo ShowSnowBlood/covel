@@ -29,6 +29,7 @@
  */
 
 import type { MiddlewareHandler } from "hono";
+import { hasOperatorToken } from "../routes/api/session/session-guard.js";
 import {
   createGatewayAdapter,
   createPluginRuntimeGateway,
@@ -80,14 +81,19 @@ export function createPerRequestLlmMiddleware(
   opts: PerRequestLlmOptions,
 ): MiddlewareHandler {
   return async (c, next) => {
-    const browserKeys = parseProviderKeys(c.req.header("X-Provider-Keys"));
-    const parsedOverrides = parseSlotOverrides(c.req.header("X-Slot-Config"));
+    const principal = c.get("frostFoxPrincipal");
+    const canUseHostedModelOverrides =
+      !opts.frostFox || hasOperatorToken(c) || principal?.isAdmin === true;
+    const browserKeys = canUseHostedModelOverrides
+      ? parseProviderKeys(c.req.header("X-Provider-Keys"))
+      : null;
+    const parsedOverrides = canUseHostedModelOverrides
+      ? parseSlotOverrides(c.req.header("X-Slot-Config"))
+      : null;
     let frostFoxContext: FrostFoxAiContext | null = null;
     if (opts.frostFox) {
       try {
-        frostFoxContext = await opts.frostFox.prepareAiContext(
-          c.get("frostFoxPrincipal"),
-        );
+        frostFoxContext = await opts.frostFox.prepareAiContext(principal);
       } catch (error) {
         if (error instanceof FrostFoxServiceError) {
           return c.json(
@@ -138,16 +144,24 @@ export function createPerRequestLlmMiddleware(
       ((slotOverrides.customPresets?.length ?? 0) > 0 ||
         Object.keys(slotOverrides.parameterOverrides ?? {}).length > 0 ||
         Object.keys(slotOverrides.slotPresetOverrides ?? {}).length > 0);
+    const hasManagedPolicy = frostFoxContext?.managedModelPolicy !== undefined;
 
-    if (!hasRequestKeys && !hasOverrides) {
+    if (!hasRequestKeys && !hasOverrides && !hasManagedPolicy) {
       await next();
       return;
     }
 
-    const perRequestAdapter = createGatewayAdapter(opts.ai.gateway, {
+    const gatewayOptions = {
       apiKeys: requestKeys,
       envApiKeys: opts.envApiKeys,
+      ...(frostFoxContext?.managedModelPolicy
+        ? { managedModelPolicy: frostFoxContext.managedModelPolicy }
+        : {}),
       ...(slotOverrides ? { slotOverrides } : {}),
+      ...(frostFoxContext ? { allowProviderFallbackOnClientError: true } : {}),
+    };
+    const perRequestAdapter = createGatewayAdapter(opts.ai.gateway, {
+      ...gatewayOptions,
     });
 
     // Keep the function-runtime gateway in lock-step with the
@@ -157,9 +171,7 @@ export function createPerRequestLlmMiddleware(
     const perRequestPluginGateway = createPluginRuntimeGateway(
       opts.ai.gateway,
       {
-        apiKeys: requestKeys,
-        envApiKeys: opts.envApiKeys,
-        ...(slotOverrides ? { slotOverrides } : {}),
+        ...gatewayOptions,
       },
     );
 
@@ -209,17 +221,27 @@ export function mergeManagedSlotDefaults(
       ]),
   );
   const slotPresetOverrides = { ...defaultSlots, ...explicitSlots };
-  const managedPresetIds = new Set(
-    (defaults.customPresets ?? []).map((preset) => preset.id),
+  const managedPresetsById = new Map(
+    (defaults.customPresets ?? []).map((preset) => [preset.id, preset]),
   );
-  // Keep the trusted managed definition whenever any final slot points to it,
-  // including an explicit browser binding to the same managed id. Dropping it
-  // here would let a header reintroduce the preset without its image tag.
   const activeManagedPresetIds = new Set(
     Object.values(slotPresetOverrides).filter((presetId) =>
-      managedPresetIds.has(presetId),
+      managedPresetsById.has(presetId),
     ),
   );
+  const pendingManagedPresetIds = [...activeManagedPresetIds];
+  for (const presetId of pendingManagedPresetIds) {
+    const preset = managedPresetsById.get(presetId);
+    for (const fallbackId of preset?.fallbackPresetIds ?? []) {
+      if (
+        managedPresetsById.has(fallbackId) &&
+        !activeManagedPresetIds.has(fallbackId)
+      ) {
+        activeManagedPresetIds.add(fallbackId);
+        pendingManagedPresetIds.push(fallbackId);
+      }
+    }
+  }
   const customPresets = [
     ...(defaults.customPresets ?? []).filter((preset) =>
       activeManagedPresetIds.has(preset.id),

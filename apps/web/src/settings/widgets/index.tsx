@@ -17,29 +17,38 @@ function inferWidget(entry: SettingEntry): WidgetKind {
   return "custom";
 }
 
-export function SettingWidget({ entry }: { entry: SettingEntry }) {
+export function SettingWidget({
+  entry,
+  readOnly = false,
+}: {
+  entry: SettingEntry;
+  readOnly?: boolean;
+}) {
   const widget = inferWidget(entry);
-  switch (widget) {
-    case "toggle":
-      return <ToggleWidget entry={entry} />;
-    case "select":
-      return <SelectWidget entry={entry} />;
-    case "slider":
-      return <SliderWidget entry={entry} />;
-    case "number":
-      return <NumberWidget entry={entry} />;
-    case "secret":
-      return <SecretWidget entry={entry} />;
-    case "textarea":
-      return <TextareaWidget entry={entry} />;
-    case "text":
-      return <TextWidget entry={entry} />;
-    case "custom":
-      return <CustomWidgetPlaceholder entry={entry} />;
-    case "json":
-    default:
-      return <JsonWidget entry={entry} />;
-  }
+  const content = (() => {
+    switch (widget) {
+      case "toggle":
+        return <ToggleWidget entry={entry} />;
+      case "select":
+        return <SelectWidget entry={entry} />;
+      case "slider":
+        return <SliderWidget entry={entry} />;
+      case "number":
+        return <NumberWidget entry={entry} />;
+      case "secret":
+        return <SecretWidget entry={entry} />;
+      case "textarea":
+        return <TextareaWidget entry={entry} />;
+      case "text":
+        return <TextWidget entry={entry} />;
+      case "custom":
+        return <CustomWidgetPlaceholder entry={entry} />;
+      case "json":
+      default:
+        return <JsonWidget entry={entry} />;
+    }
+  })();
+  return <fieldset disabled={readOnly}>{content}</fieldset>;
 }
 
 function FieldShell({

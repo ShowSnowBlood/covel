@@ -14,7 +14,9 @@ export function bearerToken(c: Context): string | undefined {
  */
 export function makeDesktopRestTokenGuard(): MiddlewareHandler {
   return async (c: Context, next) => {
-    const expected = readRuntimeEnv().desktopRestToken;
+    const env = readRuntimeEnv();
+    if (isFrostFoxAdministrator(c, env)) return next();
+    const expected = env.desktopRestToken;
     if (!expected) return next();
     const provided = bearerToken(c);
     if (!provided || provided !== expected) {
@@ -39,6 +41,7 @@ export function makeDesktopRestTokenGuard(): MiddlewareHandler {
 export function makeInstallApiGuard(): MiddlewareHandler {
   return async (c: Context, next) => {
     const env = readRuntimeEnv();
+    if (isFrostFoxAdministrator(c, env)) return next();
     if (env.desktopRestToken) {
       const provided = bearerToken(c);
       if (!provided || provided !== env.desktopRestToken) {
@@ -63,4 +66,16 @@ export function makeInstallApiGuard(): MiddlewareHandler {
 
     return next();
   };
+}
+
+function isFrostFoxAdministrator(
+  c: Context,
+  env: ReturnType<typeof readRuntimeEnv>,
+): boolean {
+  if (env.deploymentTier !== "commercial" || !env.frostFoxSaasEnabled) {
+    return false;
+  }
+  const principal = c.get("frostFoxPrincipal") as
+    { isAdmin?: unknown } | null | undefined;
+  return principal?.isAdmin === true;
 }

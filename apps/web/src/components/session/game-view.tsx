@@ -1,7 +1,15 @@
 import { frostFoxLevelForWorld } from "@covel/shared";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { X } from "lucide-react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
+import type { NavEvent } from "@/lib/nav-events.js";
 import { usePanelCollapse } from "./game-view/use-panel-collapse.js";
 import { useNavTabActivation } from "./game-view/use-nav-tab-activation.js";
 import {
@@ -260,6 +268,11 @@ export function GameView({ session }: GameViewProps) {
     onSendMessage,
   });
   const [suspensionsOpen, setSuspensionsOpen] = useState(false);
+  const [mobileContextRequest, setMobileContextRequest] = useState<{
+    event: Extract<NavEvent, "open-images" | "open-database">;
+    sequence: number;
+  } | null>(null);
+  const mobileContextSequence = useRef(0);
 
   // Load session-scoped plugin list whenever the session changes.
   useEffect(() => {
@@ -281,6 +294,25 @@ export function GameView({ session }: GameViewProps) {
     toggleLeftPanel,
     toggleRightPanel,
   } = usePanelCollapse(isMobile, isTablet);
+  // Mobile rails are overlays; close them on Escape instead of leaving the
+  // player trapped behind a full-height surface.
+  useEffect(() => {
+    if (!isMobile || (isLeftCollapsed && isRightCollapsed)) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      if (!isLeftCollapsed) toggleLeftPanel();
+      else if (!isRightCollapsed) toggleRightPanel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    isMobile,
+    isLeftCollapsed,
+    isRightCollapsed,
+    toggleLeftPanel,
+    toggleRightPanel,
+  ]);
 
   // Immersive stage: collapse both rails on enter, restore prior expansion on
   // exit. On mobile/tablet the rails are already collapsed by usePanelCollapse,
@@ -448,18 +480,25 @@ export function GameView({ session }: GameViewProps) {
   useNavTabActivation({
     rightPanelRef,
     onOpenPlugins: () => settings.openWithKey("plugin"),
+    onOpenContext: isMobile
+      ? (event) => {
+          if (event !== "open-images" && event !== "open-database") return;
+          setMobileContextRequest({
+            event,
+            sequence: ++mobileContextSequence.current,
+          });
+          if (isRightCollapsed) toggleRightPanel();
+        }
+      : undefined,
   });
 
   const direction = isMobile ? "vertical" : "horizontal";
   const visual = worldVisual(world);
 
-  // Remember how the player left the rails — collapsed, or dragged to a
-  // particular width. Mobile and desktop keep separate layouts: the mobile
-  // group stacks vertically and renders the right rail in a different slot,
-  // so one layout cannot describe both. Until a layout is stored, each
-  // panel's own `defaultSize` applies.
+  // Remember wide-layout rail sizes. Mobile rails are full-height drawers and
+  // deliberately ignore the old stacked mobile layout key.
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: isMobile ? "covel:game-layout:mobile" : "covel:game-layout:desktop",
+    id: "covel:game-layout:desktop",
     storage: localStorage,
   });
 
@@ -477,7 +516,7 @@ export function GameView({ session }: GameViewProps) {
   // ── Layout ─────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full w-full overflow-hidden border-t border-border">
+    <div className="relative flex h-full w-full overflow-hidden border-t border-border">
       <SettingsDialog
         open={settings.open}
         onOpenChange={settings.onOpenChange}
@@ -503,79 +542,58 @@ export function GameView({ session }: GameViewProps) {
       <ResizablePanelGroup
         id="game-layout"
         orientation={direction}
-        defaultLayout={defaultLayout}
-        onLayoutChanged={onLayoutChanged}
+        defaultLayout={isMobile ? undefined : defaultLayout}
+        onLayoutChanged={isMobile ? undefined : onLayoutChanged}
         className="w-full h-full"
       >
-        {/* Left Panel */}
-        {/* Collapsed by default on every viewport: the rail holds studio
-            configuration (plugin toggles, model slots), not anything the
-            player acts on mid-story. The header toggle brings it back. */}
-        <ResizablePanel
-          id="left-panel"
-          panelRef={leftPanelRef}
-          defaultSize="0%"
-          minSize="15%"
-          maxSize={isMobile ? "80%" : "40%"}
-          collapsible={true}
-          collapsedSize="0%"
-          onResize={handleLeftResize}
-          className="ui-rail flex flex-col min-h-0 min-w-0"
-        >
-          <LeftPanel
-            session={session}
-            isLeftCollapsed={isLeftCollapsed}
-            showSessionList={showSessionList}
-            otherSessions={otherSessions}
-            enabledPackages={enabledPackages}
-            pluginLoadErrors={pluginLoadErrors}
-            sessionPlugins={sessionPlugins}
-            executing={executing}
-            resolvedSlots={resolvedSlots}
-            onToggleLeftPanel={toggleLeftPanel}
-            onToggleSessionList={handleToggleSessionList}
-            onSwitchSession={onSwitchSession}
-            onDeleteSession={onDeleteSession}
-            onCloseSessionList={() => setShowSessionList(false)}
-            onOpenSettings={() => settings.setOpen(true)}
-            onResetSession={onResetSession}
-            onTogglePlugin={onTogglePlugin}
-          />
-        </ResizablePanel>
-
-        <ResizableHandle
-          withHandle
-          orientation={direction}
-          className={isLeftCollapsed ? "hidden" : ""}
-        />
-
-        {/* Mobile: Right panel before center */}
-        {isMobile && (
+        {!isMobile && (
           <>
+            {/* Left studio rail — resizable only on wide layouts. */}
             <ResizablePanel
-              id="right-panel-mobile"
-              panelRef={rightPanelRef}
+              id="left-panel"
+              panelRef={leftPanelRef}
               defaultSize="0%"
-              minSize="20%"
-              maxSize="80%"
+              minSize="15%"
+              maxSize="40%"
               collapsible={true}
               collapsedSize="0%"
-              onResize={handleRightResize}
+              onResize={handleLeftResize}
               className="ui-rail flex flex-col min-h-0 min-w-0"
             >
-              <RightPanel
-                sessionId={session.id}
-                world={world}
-                statePatches={statePatches}
+              <LeftPanel
+                session={session}
+                isLeftCollapsed={isLeftCollapsed}
+                showSessionList={showSessionList}
+                otherSessions={otherSessions}
+                enabledPackages={enabledPackages}
+                pluginLoadErrors={pluginLoadErrors}
+                sessionPlugins={sessionPlugins}
+                executing={executing}
+                resolvedSlots={resolvedSlots}
+                onToggleLeftPanel={toggleLeftPanel}
+                onToggleSessionList={handleToggleSessionList}
+                onSwitchSession={onSwitchSession}
+                onDeleteSession={onDeleteSession}
+                onCloseSessionList={() => setShowSessionList(false)}
+                onOpenSettings={() => settings.setOpen(true)}
+                onResetSession={onResetSession}
+                onTogglePlugin={onTogglePlugin}
               />
             </ResizablePanel>
+
             <ResizableHandle
               withHandle
               orientation={direction}
-              className={isRightCollapsed ? "hidden" : ""}
+              className={isLeftCollapsed ? "hidden" : ""}
             />
           </>
         )}
+
+        {/* The center panel is the only in-flow panel on mobile. Side rails
+            render as overlays below, so their intrinsic content cannot steal
+            height from the story or paint through the next panel. */}
+
+        {/* Mobile rails are overlays; do not place them in the vertical group. */}
 
         {/* Center Panel */}
         <ResizablePanel
@@ -737,6 +755,52 @@ export function GameView({ session }: GameViewProps) {
           </>
         )}
       </ResizablePanelGroup>
+      {isMobile && (
+        <>
+          <MobileRailDrawer
+            open={!isLeftCollapsed}
+            side="left"
+            label={t("session.config", "Studio Config")}
+            closeLabel={t("common.close", "Close")}
+            onClose={toggleLeftPanel}
+          >
+            <LeftPanel
+              session={session}
+              isLeftCollapsed={isLeftCollapsed}
+              showSessionList={showSessionList}
+              otherSessions={otherSessions}
+              enabledPackages={enabledPackages}
+              pluginLoadErrors={pluginLoadErrors}
+              sessionPlugins={sessionPlugins}
+              executing={executing}
+              resolvedSlots={resolvedSlots}
+              onToggleLeftPanel={toggleLeftPanel}
+              onToggleSessionList={handleToggleSessionList}
+              onSwitchSession={onSwitchSession}
+              onDeleteSession={onDeleteSession}
+              onCloseSessionList={() => setShowSessionList(false)}
+              onOpenSettings={() => settings.setOpen(true)}
+              onResetSession={onResetSession}
+              onTogglePlugin={onTogglePlugin}
+            />
+          </MobileRailDrawer>
+
+          <MobileRailDrawer
+            open={!isRightCollapsed}
+            side="right"
+            label={t("session.toggleContextPanel", "State and world context")}
+            closeLabel={t("common.close", "Close")}
+            onClose={toggleRightPanel}
+          >
+            <RightPanel
+              sessionId={session.id}
+              world={world}
+              statePatches={statePatches}
+              requestedEvent={mobileContextRequest}
+            />
+          </MobileRailDrawer>
+        </>
+      )}
       {viewTransition && (
         <SceneLoadingTransition
           image={viewTransition.image}
@@ -746,6 +810,70 @@ export function GameView({ session }: GameViewProps) {
           onComplete={viewTransition.onComplete}
         />
       )}
+    </div>
+  );
+}
+
+interface MobileRailDrawerProps {
+  open: boolean;
+  side: "left" | "right";
+  label: string;
+  closeLabel: string;
+  onClose: () => void;
+  children: ReactNode;
+}
+
+/**
+ * Mobile rails are drawers, not rows in the story layout. Keeping the drawer
+ * mounted lets RightPanel receive global navigation events even while closed;
+ * `aria-hidden` and `inert` keep the inactive copy out of interaction.
+ */
+function MobileRailDrawer({
+  open,
+  side,
+  label,
+  closeLabel,
+  onClose,
+  children,
+}: MobileRailDrawerProps) {
+  const sideClass = side === "left" ? "left-0 border-r" : "right-0 border-l";
+  const slideClass = open
+    ? "translate-x-0"
+    : side === "left"
+      ? "-translate-x-full"
+      : "translate-x-full";
+
+  return (
+    <div
+      data-testid="mobile-rail-drawer"
+      data-side={side}
+      data-open={open ? "true" : "false"}
+      hidden={!open}
+      className={`absolute inset-0 z-40 transition-opacity duration-200 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+      aria-hidden={!open}
+      inert={!open ? true : undefined}
+    >
+      <button
+        type="button"
+        aria-label={closeLabel}
+        onClick={onClose}
+        className="absolute inset-0 z-0 cursor-default bg-black/45 backdrop-blur-[1px]"
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        className={`absolute inset-y-0 ${sideClass} z-10 flex w-full max-w-none min-w-0 flex-col overflow-hidden border-border/80 bg-[var(--surface-rail)] shadow-2xl transition-transform duration-200 ease-out [&_.ui-panel-header]:pr-12 ${slideClass}`}
+      >
+        <button
+          type="button"
+          aria-label={closeLabel}
+          onClick={onClose}
+          className="absolute right-2 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-background/85 text-muted-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+        {children}
+      </aside>
     </div>
   );
 }

@@ -39,6 +39,8 @@ export interface ProviderFormProps {
   managedCatalog?: FrostFoxModelCatalog | null;
   managedModelsLoading?: boolean;
   managedOnly?: boolean;
+  /** Non-admin hosted accounts view the policy but cannot choose a model. */
+  modelSelectionLocked?: boolean;
   slotName: SlotName;
 }
 

@@ -9,7 +9,7 @@ import { useSettingsStore } from "./use-settings.js";
  * Import / Export / Reset pane. Always visible, even when no entries exist
  * in the `data` group.
  */
-export function DataPane() {
+export function DataPane({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useTranslation();
   const store = useSettingsStore();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -84,7 +84,7 @@ export function DataPane() {
   }
 
   return (
-    <div className="space-y-5">
+    <fieldset disabled={readOnly} className="min-w-0 space-y-5">
       {toast && (
         <div className="text-xs px-3 py-2 rounded bg-primary/10 border border-primary/20 text-primary">
           {toast}
@@ -196,6 +196,6 @@ export function DataPane() {
           {t("settings.resetAll")}
         </Button>
       </section>
-    </div>
+    </fieldset>
   );
 }

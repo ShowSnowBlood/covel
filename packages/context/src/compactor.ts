@@ -26,7 +26,7 @@
  * `message-insertion.ts`), not the raw history.
  */
 
-import type { SimpleCompletionAdapter } from "@covel/shared";
+import type { LLMAdapter, SimpleCompletionAdapter } from "@covel/shared";
 import type {
   SessionContextStore,
   SessionSummaryRecord,
@@ -98,6 +98,13 @@ export interface CompactorRunner {
     locale?: string,
     /** Current turn's traceId, so the compaction trace joins the turn (L-8). */
     traceId?: string,
+    /**
+     * Request-scoped adapter for this turn. Hosted deployments use it to keep
+     * compaction on the same managed credential and model policy as the
+     * narrative call. Omitted by standalone callers, which use the runner's
+     * bootstrap adapter.
+     */
+    llm?: LLMAdapter,
   ): Promise<CompactorResult>;
 }
 

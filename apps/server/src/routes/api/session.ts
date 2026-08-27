@@ -55,6 +55,7 @@ import {
 import {
   hasOperatorToken,
   checkHostedOperator,
+  checkHostedModelAdmin,
   isOwnerAuthEnforced,
   mintSessionOwnerToken,
   resolveSessionParam,
@@ -531,6 +532,10 @@ sessionRoutes.patch("/:id", async (c) => {
   const parsed = await readJsonBody<Record<string, unknown>>(c);
   if (parsed instanceof Response) return parsed;
   const body = parsed.body;
+  if (body.runtimeModelOverrides !== undefined) {
+    const modelAdminDenied = checkHostedModelAdmin(c);
+    if (modelAdminDenied) return modelAdminDenied;
+  }
   const now = new Date().toISOString();
   const parsedPatch = buildSessionPatchUpdates(body, now);
   if (!parsedPatch.ok) {

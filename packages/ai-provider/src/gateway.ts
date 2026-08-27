@@ -111,8 +111,8 @@ export function createGateway(deps: GatewayDependencies) {
         fallbackTag: "text",
         resolveTargets: (presetId) =>
           deps.presetRegistry.resolveTextTargetChain({ presetId }),
-        execute: async (target, resolved) =>
-          resolved.adapter.generateText(
+        execute: async (target, resolved) => {
+          const result = await resolved.adapter.generateText(
             configWithSignal(resolved.config, options),
             {
               model: targetModel(target),
@@ -126,7 +126,17 @@ export function createGateway(deps: GatewayDependencies) {
               ),
             },
             { profile: target.profile, preset: target.preset, mode: "text" },
-          ),
+          );
+          if (!hasTextGenerationOutput(result)) {
+            throw new AiProviderError({
+              code: "PROVIDER_ERROR",
+              message: "Provider returned no content",
+              provider: targetProvider(target),
+              retriable: true,
+            });
+          }
+          return result;
+        },
         resolveUsage: (r) => r.usage,
       },
       options,
@@ -219,6 +229,7 @@ export function createGateway(deps: GatewayDependencies) {
       );
 
       let emittedDelta = false;
+      let emittedOutput = false;
       const startTime = Date.now();
 
       try {
@@ -231,6 +242,7 @@ export function createGateway(deps: GatewayDependencies) {
           options?.traceId,
         );
         let finalUsage: UsageSummary | null = null;
+        let finalEvent: Extract<StreamEvent, { type: "done" }> | null = null;
 
         for await (const event of resolved.adapter.streamText(
           configWithSignal(resolved.config, options),
@@ -247,17 +259,39 @@ export function createGateway(deps: GatewayDependencies) {
           },
           { profile: target.profile, preset: target.preset, mode: "stream" },
         )) {
+          if (event.type === "done") {
+            // Hold the terminal event until output is known. Emitting a
+            // primary `done` before trying its fallback would make consumers
+            // commit an incomplete turn, then receive a second terminal event.
+            finalEvent = event;
+            finalUsage = event.usage;
+            continue;
+          }
           if (
             (event.type === "text-delta" && event.textDelta.length > 0) ||
             (event.type === "reasoning-delta" &&
               event.reasoningDelta.length > 0)
           ) {
             emittedDelta = true;
+            emittedOutput = true;
+          } else if (event.type === "tool-call") {
+            // A tool call is useful provider output and is already partial
+            // state; retrying after it would duplicate the call.
+            emittedDelta = true;
+            emittedOutput = true;
           }
-          if (event.type === "done") finalUsage = event.usage;
           yield event;
         }
 
+        if (!emittedOutput) {
+          throw new AiProviderError({
+            code: "PROVIDER_ERROR",
+            message: "Provider returned no content",
+            provider,
+            retriable: true,
+          });
+        }
+        if (finalEvent) yield finalEvent;
         await notifySuccess(
           resolved.hooks,
           provider,
@@ -305,9 +339,13 @@ export function createGateway(deps: GatewayDependencies) {
       });
     }
 
+    const effectivePresetId = options?.managedModelPolicy
+      ? resolveSlotOrPassthrough(input.presetId, "embedding", options)
+      : input.presetId;
+
     return runOperation(
       {
-        presetId: input.presetId,
+        presetId: effectivePresetId,
         mode: "embed",
         fallbackTag: "embedding",
         resolveTargets: (presetId) => [
@@ -570,6 +608,18 @@ export function createGateway(deps: GatewayDependencies) {
   };
 
   // ── Internal helpers ─────────────────────────────────────────────
+
+  function hasTextGenerationOutput(result: {
+    text: string;
+    toolCalls?: readonly unknown[];
+    reasoningContent?: string;
+  }): boolean {
+    return (
+      result.text.trim().length > 0 ||
+      (result.toolCalls?.length ?? 0) > 0 ||
+      (result.reasoningContent?.trim().length ?? 0) > 0
+    );
+  }
 
   /** Merge abort signal from gateway options into provider config. */
   function configWithSignal(

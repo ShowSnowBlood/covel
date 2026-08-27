@@ -38,12 +38,13 @@ import { SettingsDialog } from "@/settings/SettingsDialog.js";
 
 const REFRESH_INTERVAL_MS = 60_000;
 
-interface FrostFoxAccountContextValue {
+export interface FrostFoxAccountContextValue {
   readonly status: FrostFoxAccountStatus | null;
   readonly catalog: FrostFoxModelCatalog | null;
   readonly loading: boolean;
   readonly error: boolean;
   readonly refresh: () => Promise<void>;
+  readonly refreshModels: () => Promise<void>;
 }
 
 const FrostFoxAccountContext =
@@ -61,54 +62,67 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
   const activeAccountId = useRef<string | null | undefined>(undefined);
   const hydratedAccountId = useRef<string | null | undefined>(undefined);
 
-  const refresh = useCallback(async () => {
-    const requestVersion = ++refreshVersion.current;
-    setLoading(true);
-    setError(false);
-    try {
-      const next = await fetchFrostFoxAccount(true);
-      if (!mounted.current || requestVersion !== refreshVersion.current) return;
-      const nextAccountId =
-        next.authenticated && next.account ? next.account.id : null;
-      const accountChanged = activeAccountId.current !== nextAccountId;
-      if (accountChanged && activeAccountId.current !== undefined) {
-        setManagedFrostFoxCatalog(null);
-        clearManagedFrostFoxSlots();
-        setCatalog(null);
-      }
-      if (accountChanged) hydratedAccountId.current = undefined;
-      activeAccountId.current = nextAccountId;
-      setStatus(next);
-
-      let hydratedCatalog = getManagedFrostFoxCatalog();
-      if (next.enabled && next.authenticated && next.account) {
-        // Model discovery is account-scoped. Balance/status refreshes may run
-        // periodically, but they must not re-read the model directory.
-        if (hydratedAccountId.current !== nextAccountId) {
-          hydratedCatalog = await hydrateManagedFrostFoxModels(next);
-          hydratedAccountId.current = nextAccountId;
+  const refresh = useCallback(
+    async ({ forceCatalog = false }: { forceCatalog?: boolean } = {}) => {
+      const requestVersion = ++refreshVersion.current;
+      if (forceCatalog) hydratedAccountId.current = undefined;
+      setLoading(true);
+      setError(false);
+      try {
+        const next = await fetchFrostFoxAccount(true);
+        if (!mounted.current || requestVersion !== refreshVersion.current)
+          return;
+        const nextAccountId =
+          next.authenticated && next.account ? next.account.id : null;
+        const accountChanged = activeAccountId.current !== nextAccountId;
+        if (accountChanged && activeAccountId.current !== undefined) {
+          setManagedFrostFoxCatalog(null);
+          clearManagedFrostFoxSlots();
+          setCatalog(null);
         }
-        reconcileManagedFrostFoxSlots();
-      } else {
-        hydratedAccountId.current = null;
-        if (hydratedCatalog !== null) setManagedFrostFoxCatalog(null);
-        clearManagedFrostFoxSlots();
-        hydratedCatalog = null;
+        if (accountChanged) hydratedAccountId.current = undefined;
+        activeAccountId.current = nextAccountId;
+        setStatus(next);
+
+        let hydratedCatalog = getManagedFrostFoxCatalog();
+        if (next.enabled && next.authenticated && next.account) {
+          // Model discovery is account-scoped. Balance/status refreshes may run
+          // periodically, but they must not re-read the model directory.
+          if (forceCatalog || hydratedAccountId.current !== nextAccountId) {
+            hydratedCatalog = await hydrateManagedFrostFoxModels(
+              next,
+              forceCatalog,
+            );
+            hydratedAccountId.current = nextAccountId;
+          }
+          reconcileManagedFrostFoxSlots();
+        } else {
+          hydratedAccountId.current = null;
+          if (hydratedCatalog !== null) setManagedFrostFoxCatalog(null);
+          clearManagedFrostFoxSlots();
+          hydratedCatalog = null;
+        }
+        if (!mounted.current || requestVersion !== refreshVersion.current)
+          return;
+        setCatalog(hydratedCatalog ?? getManagedFrostFoxCatalog());
+      } catch {
+        if (mounted.current && requestVersion === refreshVersion.current) {
+          // A transient account-status failure must not discard the catalog that
+          // was already loaded for this login.
+          setError(true);
+        }
+      } finally {
+        if (mounted.current && requestVersion === refreshVersion.current) {
+          setLoading(false);
+        }
       }
-      if (!mounted.current || requestVersion !== refreshVersion.current) return;
-      setCatalog(hydratedCatalog ?? getManagedFrostFoxCatalog());
-    } catch {
-      if (mounted.current && requestVersion === refreshVersion.current) {
-        // A transient account-status failure must not discard the catalog that
-        // was already loaded for this login.
-        setError(true);
-      }
-    } finally {
-      if (mounted.current && requestVersion === refreshVersion.current) {
-        setLoading(false);
-      }
-    }
-  }, []);
+    },
+    [],
+  );
+
+  const refreshModels = useCallback(async () => {
+    await refresh({ forceCatalog: true });
+  }, [refresh]);
 
   useEffect(() => {
     mounted.current = true;
@@ -125,7 +139,7 @@ export function FrostFoxAccountProvider({ children }: { children: ReactNode }) {
 
   return (
     <FrostFoxAccountContext.Provider
-      value={{ status, catalog, loading, error, refresh }}
+      value={{ status, catalog, loading, error, refresh, refreshModels }}
     >
       {children}
     </FrostFoxAccountContext.Provider>
@@ -138,6 +152,10 @@ export function useFrostFoxAccount(): FrostFoxAccountContextValue {
     throw new Error("useFrostFoxAccount requires FrostFoxAccountProvider");
   }
   return value;
+}
+
+export function useFrostFoxAccountOptional(): FrostFoxAccountContextValue | null {
+  return useContext(FrostFoxAccountContext);
 }
 export function FrostFoxAccountSummary({
   overlay = false,
@@ -222,6 +240,12 @@ export function FrostFoxAccountSummary({
     e.stopPropagation();
     setPopoverOpen(false);
     setSettingsOpen(true);
+  };
+
+  const handleSwitchAccount = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPopoverOpen(false);
+    window.location.assign("/auth/frostfox/start");
   };
 
   if (!status?.enabled) return null;
@@ -480,6 +504,20 @@ export function FrostFoxAccountSummary({
               </span>
               <span className="text-[10px] text-muted-foreground font-mono">
                 § SETTINGS
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSwitchAccount}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-zinc-900/70 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                {t("account.switchAccount", "Switch Account")}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                § SWITCH
               </span>
             </button>
 

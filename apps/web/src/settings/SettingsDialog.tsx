@@ -12,6 +12,7 @@ import {
   Database,
   Monitor,
   Key,
+  Lock,
 } from "lucide-react";
 import {
   Dialog,
@@ -40,6 +41,7 @@ import { PackagesPane } from "./panes/PackagesPane.js";
 import { AppearancePane } from "./panes/AppearancePane.js";
 import { OperatorAccessPane } from "./panes/OperatorAccessPane.js";
 import { FrostFoxAccountPane } from "./panes/FrostFoxAccountPane.js";
+import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
 import { cn } from "@/lib/utils.js";
 import { ShinyText } from "@/components/reactbits/index.js";
 
@@ -90,6 +92,14 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const store = useSettingsStore();
   const { t, i18n } = useTranslation();
+  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
+  const hostedPlayerModelLocked = Boolean(
+    frostFoxAccount?.status?.enabled &&
+    frostFoxAccount.status.authenticated &&
+    frostFoxAccount.status.account &&
+    frostFoxAccount.status.account.isAdmin !== true,
+  );
+  const adminSettingsReadOnly = hostedPlayerModelLocked;
   const [query, setQuery] = useState("");
   const desktop = isDesktopApp();
   const [storeRevision, setStoreRevision] = useState(0);
@@ -107,10 +117,14 @@ export function SettingsDialog({
       buildNavTree(store, { includeDesktop: desktop, locale: i18n.language }),
     [store, desktop, i18n.language, open, storeRevision],
   );
-  const visibleTree = useMemo(
-    () => (focusNode ? tree.filter((node) => node.id === focusNode) : tree),
-    [tree, focusNode],
-  );
+  const visibleTree = useMemo(() => {
+    const scoped = focusNode
+      ? tree.filter((node) => node.id === focusNode)
+      : tree;
+    return hostedPlayerModelLocked
+      ? scoped.filter((node) => !isLlmNode(node.id))
+      : scoped;
+  }, [tree, focusNode, hostedPlayerModelLocked]);
   const filtered = useMemo(
     () => filterNav(visibleTree, query, i18n.language),
     [visibleTree, query, i18n.language],
@@ -301,12 +315,46 @@ export function SettingsDialog({
             className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 ui-scroll bg-background/40"
           >
             <div className="max-w-2xl mx-auto animate-in fade-in-0 duration-300">
-              {renderPane(selectedNode, t)}
+              {hostedPlayerModelLocked && !focusNode && (
+                <ManagedModelNotice t={t} />
+              )}
+              {focusNode && hostedPlayerModelLocked && isLlmNode(focusNode) ? (
+                <ManagedModelNotice t={t} />
+              ) : (
+                renderPane(selectedNode, t, adminSettingsReadOnly)
+              )}
             </div>
           </section>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+function isLlmNode(id: string): boolean {
+  return id === "llm" || id.startsWith("llm.");
+}
+
+function ManagedModelNotice({
+  t,
+}: {
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  return (
+    <div
+      role="status"
+      data-testid="managed-model-settings-notice"
+      className="flex items-start gap-2 border border-primary/25 bg-primary/5 px-3 py-3 text-xs text-muted-foreground"
+    >
+      <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+      <div className="space-y-1">
+        <p className="font-medium text-foreground">
+          {t("settings.managedModelSettingsTitle")}
+        </p>
+        <p className="leading-relaxed">
+          {t("settings.managedModelSettingsDescription")}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -320,6 +368,7 @@ function isSelectable(node: NavNode): boolean {
 function renderPane(
   node: NavNode | null,
   t: (key: string, opts?: Record<string, unknown>) => string,
+  adminSettingsReadOnly: boolean,
 ) {
   if (!node) {
     return (
@@ -328,14 +377,22 @@ function renderPane(
       </div>
     );
   }
-  if (node.id === "llm.slots") return <LlmSlotsPane />;
-  if (node.id === "llm.advanced") return <LlmAdvancedPane />;
-  if (node.id === "data") return <DataPane />;
-  if (node.id === "desktop") return <DesktopPane />;
+  if (node.id === "llm.slots") {
+    return <LlmSlotsPane readOnly={adminSettingsReadOnly} />;
+  }
+  if (node.id === "llm.advanced") {
+    return <LlmAdvancedPane readOnly={adminSettingsReadOnly} />;
+  }
+  if (node.id === "data") return <DataPane readOnly={adminSettingsReadOnly} />;
+  if (node.id === "desktop") {
+    return <DesktopPane readOnly={adminSettingsReadOnly} />;
+  }
   if (node.id === APPEARANCE_NODE_ID) return <AppearancePane />;
   if (node.id === ACCOUNT_NODE_ID) return <FrostFoxAccountPane />;
   if (node.id === OPERATOR_ACCESS_NODE_ID) return <OperatorAccessPane />;
-  if (node.id === PACKAGES_NODE_ID) return <PackagesPane />;
+  if (node.id === PACKAGES_NODE_ID) {
+    return <PackagesPane readOnly={adminSettingsReadOnly} />;
+  }
 
   if (node.children.length === 0) {
     return (
@@ -347,7 +404,11 @@ function renderPane(
   return (
     <div className="space-y-4">
       {node.children.map((entry) => (
-        <SettingWidget key={entry.key} entry={entry} />
+        <SettingWidget
+          key={entry.key}
+          entry={entry}
+          readOnly={adminSettingsReadOnly}
+        />
       ))}
     </div>
   );

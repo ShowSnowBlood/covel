@@ -38,7 +38,7 @@ interface InstalledPlugin {
  * Uploads to POST /api/install/{plugin|world}. On success, prompts the user
  * that a server restart is required (plugins only — worlds reload on demand).
  */
-export function PackagesPane() {
+export function PackagesPane({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState<InstallKind | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -70,6 +70,7 @@ export function PackagesPane() {
   );
 
   async function uploadZip(kind: InstallKind, file: File) {
+    if (readOnly) return;
     if (!file.name.toLowerCase().endsWith(".zip")) {
       flash({ message: t("settings.packages.invalidFileType"), tone: "error" });
       return;
@@ -119,6 +120,7 @@ export function PackagesPane() {
   }
 
   async function uninstall(id: string) {
+    if (readOnly) return;
     setRemoving(id);
     try {
       const res = await fetch(`/api/plugins/${encodeURIComponent(id)}`, {
@@ -171,7 +173,7 @@ export function PackagesPane() {
   }
 
   return (
-    <div className="space-y-5">
+    <fieldset disabled={readOnly} className="min-w-0 space-y-5">
       <header className="space-y-1">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           <Package className="w-4 h-4" />
@@ -230,6 +232,7 @@ export function PackagesPane() {
         label={t("settings.packages.pluginLabel")}
         hint={t("settings.packages.pluginHint")}
         busy={busy === "plugin"}
+        disabled={readOnly}
         onFile={(f) => uploadZip("plugin", f)}
       />
 
@@ -239,6 +242,7 @@ export function PackagesPane() {
         label={t("settings.packages.worldLabel")}
         hint={t("settings.packages.worldHint")}
         busy={busy === "world"}
+        disabled={readOnly}
         onFile={(f) => uploadZip("world", f)}
       />
 
@@ -284,7 +288,7 @@ export function PackagesPane() {
           <div>kind: {lastResult.kind}</div>
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }
 
@@ -294,10 +298,19 @@ interface DropZoneProps {
   label: string;
   hint: string;
   busy: boolean;
+  disabled?: boolean;
   onFile: (file: File) => void;
 }
 
-function DropZone({ kind, icon, label, hint, busy, onFile }: DropZoneProps) {
+function DropZone({
+  kind,
+  icon,
+  label,
+  hint,
+  busy,
+  disabled = false,
+  onFile,
+}: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [active, setActive] = useState(false);
   const { t } = useTranslation();
@@ -309,7 +322,7 @@ function DropZone({ kind, icon, label, hint, busy, onFile }: DropZoneProps) {
         (active
           ? "border-primary bg-primary/5"
           : "border-border hover:border-primary/60 hover:bg-muted/30") +
-        (busy ? " pointer-events-none opacity-60" : "")
+        (busy || disabled ? " pointer-events-none opacity-60" : "")
       }
       onDragEnter={(e) => {
         e.preventDefault();
@@ -326,6 +339,7 @@ function DropZone({ kind, icon, label, hint, busy, onFile }: DropZoneProps) {
       onDrop={(e) => {
         e.preventDefault();
         setActive(false);
+        if (disabled) return;
         const file = e.dataTransfer.files?.[0];
         if (file) onFile(file);
       }}
@@ -339,10 +353,10 @@ function DropZone({ kind, icon, label, hint, busy, onFile }: DropZoneProps) {
         size="sm"
         variant="outline"
         type="button"
-        disabled={busy}
+        disabled={busy || disabled}
         onClick={(e) => {
           e.preventDefault();
-          inputRef.current?.click();
+          if (!disabled) inputRef.current?.click();
         }}
       >
         <Upload className="w-3 h-3 mr-1" />
@@ -353,6 +367,7 @@ function DropZone({ kind, icon, label, hint, busy, onFile }: DropZoneProps) {
       <input
         ref={inputRef}
         type="file"
+        disabled={disabled}
         accept=".zip,application/zip"
         className="hidden"
         onChange={(e) => {
