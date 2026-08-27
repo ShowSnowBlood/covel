@@ -66,6 +66,17 @@ export function clearNarrativeDeltaBuffer(
   deltaBufferRef.current.clear();
 }
 
+function clearNarrativeDeltaForRuntime(
+  deltaBufferRef: DeltaBufferRef,
+  turnId: string,
+  runtimeId: string,
+): void {
+  // Match queueNarrativeDelta's key. A queued frame may not have reached the
+  // external store yet, so clearing only the rendered text is insufficient.
+  deltaBufferRef.current.delete(`${turnId}_${runtimeId}`);
+  clearStreamingText(`stream_${turnId}_${runtimeId}`);
+}
+
 function queueNarrativeDelta(
   deps: Pick<
     SseEventHandlerDeps,
@@ -181,6 +192,22 @@ function toRuntimeCompletedStatus(rawStatus: unknown): ExecutionStep["status"] {
   if (rawStatus === "skipped") return "skipped";
   if (rawStatus === "failed") return "failed";
   return "completed";
+}
+
+/** Runtime failures caused by the player's Stop action are not errors. */
+function isPlayerAbortRuntimeFailure(
+  error: string | undefined,
+  payload: Record<string, unknown>,
+): boolean {
+  if (payload.abortReason === PLAYER_ABORT_REASON) return true;
+  const normalized = error?.toLowerCase();
+  return (
+    error === PLAYER_ABORT_REASON ||
+    normalized?.includes("turn aborted by player") === true ||
+    normalized?.includes("aborted by player") === true ||
+    normalized?.includes("operation was aborted") === true ||
+    normalized === "aborterror"
+  );
 }
 
 function toAssetProgressEvent(
@@ -419,6 +446,9 @@ export function createSseEventHandler(
         break;
       }
       case "runtime.failed": {
+        const runtimeId = (payload.runtimeId as string) ?? "unknown";
+        const rawError =
+          typeof payload.error === "string" ? payload.error : undefined;
         deps.dispatch({
           type: "UPSERT_EXECUTION_STEP",
           step: createExecutionStepUpdate({
@@ -427,6 +457,28 @@ export function createSseEventHandler(
             turnId,
           }),
         });
+        // A runtime failure is otherwise indistinguishable from a successful
+        // continuation that produced no text: execution.completed remains
+        // committed because the transaction itself succeeded, while StageView
+        // has no narrative to reveal. Keep the player out of that blank state.
+        // Player-initiated aborts are deliberately excluded; execution.completed
+        // handles those as a non-error terminal state.
+        if (!isPlayerAbortRuntimeFailure(rawError, payload)) {
+          deps.dispatch({
+            type: "SET_EXECUTION_ERROR",
+            error: rawError || "Runtime failed",
+          });
+        }
+        // Deltas from a failed runtime are never durable. Drop only its
+        // placeholder so another story runtime in the same turn is unaffected.
+        if (turnId) {
+          clearNarrativeDeltaForRuntime(deps.deltaBufferRef, turnId, runtimeId);
+          deps.dispatch({
+            type: "DISCARD_RUNTIME_STREAM",
+            turnId,
+            runtimeId,
+          });
+        }
         break;
       }
       case "runtime.skipped": {

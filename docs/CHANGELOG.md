@@ -39,6 +39,8 @@ This release rebuilds provider and model configuration around explicit connectio
 
 - **FrostFox 账号切换与退出登录恢复。** 重新授权会替换当前会话并为不同账号保留独立本地绑定；账号状态请求禁用缓存，避免继续显示旧账号。
 
+- **开场接力失败不再静默卡住舞台。** `runtime.failed` 现在会让客户端停止该 runtime 的未提交流式文本并显示可重试的执行错误；玩家主动中止仍保持无错误终态。
+
 ## [0.0.25] - 2026-08-11
 
 This release hardens the complete default game flow, from choosing a world and running setup plugins through narrative execution, post-turn plugins, persistence, and client recovery.

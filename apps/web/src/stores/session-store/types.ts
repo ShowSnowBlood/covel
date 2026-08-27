@@ -234,6 +234,9 @@ export type SessionAction =
   // message(s) — the server never commits partial narrative on abort, so
   // keeping them would show text that vanishes on refresh (audit A-04).
   | { type: "DISCARD_TURN_STREAMS"; turnId?: string }
+  // A failed runtime may have emitted partial narrative deltas that are not durable.
+  // Remove only that runtime's streaming placeholder; sibling runtimes keep running.
+  | { type: "DISCARD_RUNTIME_STREAM"; turnId: string; runtimeId: string }
   | {
       type: "ADD_STATE_PATCH";
       patch: {

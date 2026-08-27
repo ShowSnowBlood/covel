@@ -163,6 +163,93 @@ describe("sse-handler execution.completed abort terminal state", () => {
   });
 });
 
+describe("sse-handler runtime.failed terminal state", () => {
+  function makeFailureDeps(
+    dispatch: (action: SessionAction) => void,
+  ): SseEventHandlerDeps {
+    return {
+      dispatch,
+      ds: {} as SseEventHandlerDeps["ds"],
+      sessionIdRef: { current: "sess-1" },
+      stateRef: { current: initialState },
+      runtimeKindRef: { current: new Map() },
+      deltaBufferRef: { current: new Map() },
+      deltaRafRef: { current: null },
+      lastBackfilledTurnIdRef: { current: "opening-turn" },
+    };
+  }
+
+  function failedEnvelope(error?: string): SseEnvelope {
+    return {
+      type: "runtime.failed",
+      requestId: "req-1",
+      traceId: "trace-1",
+      sessionId: "sess-1",
+      turnId: "opening-turn",
+      flowId: "trace-1",
+      seq: 8,
+      timestamp: "2026-07-10T00:00:01Z",
+      payload: {
+        runtimeId: "narrator",
+        pluginId: "narrator",
+        status: "failed",
+        ...(error === undefined ? {} : { error }),
+      },
+    };
+  }
+
+  it("surfaces a failed continuation and removes its partial stream", () => {
+    let state: SessionState = { ...initialState, executing: true };
+    const dispatch = (action: SessionAction) => {
+      state = reducer(state, action);
+    };
+    const deps = makeFailureDeps(dispatch);
+    deps.deltaBufferRef.current.set("opening-turn_narrator", {
+      turnId: "opening-turn",
+      runtimeId: "narrator",
+      pluginId: "narrator",
+      text: "queued opening",
+      flushSessionId: "sess-1",
+    });
+    state = reducer(state, {
+      type: "APPEND_DELTA",
+      turnId: "opening-turn",
+      runtimeId: "narrator",
+      pluginId: "narrator",
+      delta: "partial opening",
+    });
+    const handle = createSseEventHandler(deps);
+
+    handle(failedEnvelope("provider returned 401"));
+
+    expect(deps.deltaBufferRef.current.size).toBe(0);
+    expect(state.executionError).toBe("provider returned 401");
+    expect(state.executionSteps).toEqual([
+      expect.objectContaining({
+        turnId: "opening-turn",
+        runtimeId: "narrator",
+        status: "failed",
+      }),
+    ]);
+    expect(state.messages).toHaveLength(0);
+  });
+
+  it("does not surface the player's Stop as a runtime error", () => {
+    let state: SessionState = { ...initialState, executing: true };
+    const dispatch = (action: SessionAction) => {
+      state = reducer(state, action);
+    };
+    const handle = createSseEventHandler(makeFailureDeps(dispatch));
+
+    handle(failedEnvelope("This operation was aborted"));
+
+    expect(state.executionError).toBeNull();
+    handle(failedEnvelope("turn aborted by player during narrator"));
+
+    expect(state.executionError).toBeNull();
+  });
+});
+
 describe("sse-handler abort clears the pending delta rAF (H1 race)", () => {
   function deltaEnvelope(): SseEnvelope {
     return {

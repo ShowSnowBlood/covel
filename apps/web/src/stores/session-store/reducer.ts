@@ -268,6 +268,17 @@ export function reducer(
         messages: state.messages.filter((m) => !dropStream(m.id, m.turnId)),
       };
     }
+    case "DISCARD_RUNTIME_STREAM": {
+      const streamId = `${STREAM_ID_PREFIX}${action.turnId}_${action.runtimeId}`;
+      if (!state.messages.some((message) => message.id === streamId)) {
+        return state;
+      }
+      return {
+        ...state,
+        messages: state.messages.filter((message) => message.id !== streamId),
+      };
+    }
+
     case "SET_EXECUTION_ERROR":
       return { ...state, executionError: action.error };
     case "ADD_STATE_PATCH": {
