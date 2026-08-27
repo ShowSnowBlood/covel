@@ -1,6 +1,6 @@
 import { useMemo, useReducer, type ReactNode } from "react";
 import { getDataService } from "@/services/data-service";
-import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
 import { useBuildSessionActions } from "./session-store/actions.js";
 import {
   SessionActionsContext,

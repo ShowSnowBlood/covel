@@ -12,7 +12,10 @@ import {
   recommendationReason,
   type PluginPack,
 } from "@/lib/session-plugin-selection.js";
-import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
 import { getSettings } from "@/settings/store.js";
 import { resolveProviderSlot } from "./model-slot-helpers.js";
 import type * as api from "@/services/api.js";
@@ -46,15 +49,9 @@ export function PluginPackageRow({
   onTogglePlugin,
 }: PluginPackageRowProps) {
   const { t, i18n } = useTranslation();
-  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
+  const frostFoxAccount = useFrostFoxAccountOptional();
   const hostedPlayerModelLocked =
-    modelControlsLocked ??
-    Boolean(
-      frostFoxAccount?.status?.enabled &&
-      frostFoxAccount.status.authenticated &&
-      frostFoxAccount.status.account &&
-      frostFoxAccount.status.account.isAdmin !== true,
-    );
+    modelControlsLocked ?? frostFoxModelControlsLocked(frostFoxAccount?.status);
   const displayName = text(pkg.displayName) || pkg.name;
   const description = text(pkg.description);
   const isSelected = selectedPluginIdSet.has(pkg.name);

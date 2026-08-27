@@ -35,7 +35,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/components/frostfox-account-summary.js", () => ({
+vi.mock("@/components/frostfox-account-context.js", () => ({
   useFrostFoxAccount: () => ({
     status: { enabled: false, authenticated: false, account: null },
     loading: false,

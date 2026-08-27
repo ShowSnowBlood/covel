@@ -38,3 +38,8 @@ export function normalizeLocale(value: unknown, fallback = "zh-CN"): string {
     ? value
     : fallback;
 }
+
+/** Narrow an unknown JSON value to a non-array object. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}

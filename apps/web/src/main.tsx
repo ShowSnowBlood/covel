@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ReloadOverlay } from "@/components/reload-overlay";
-import { FrostFoxAccountProvider } from "@/components/frostfox-account-summary";
+import { FrostFoxAccountProvider } from "@/components/frostfox-account-context.js";
 import { SessionProvider } from "@/stores/session-store";
 import {
   setStorageMode,

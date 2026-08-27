@@ -74,13 +74,6 @@ export function managedModelOptions(
   );
 }
 
-export function defaultManagedModelRef(
-  catalog: FrostFoxModelCatalog | null,
-  slotName: SlotName,
-): string {
-  return managedModelOptions(catalog, slotName)[0]?.ref ?? "";
-}
-
 export function managedModelOptionForRef(
   catalog: FrostFoxModelCatalog | null,
   slotName: SlotName,

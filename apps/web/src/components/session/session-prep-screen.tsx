@@ -45,7 +45,10 @@ import {
   isLockedCorePackage,
 } from "./session-prep/plugin-selection-helpers.js";
 import { ShinyText, Magnet, StarBorder } from "@/components/reactbits/index.js";
-import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { cn } from "@/lib/utils.js";
 import { ignoreError } from "@/lib/ignore-error.js";
@@ -81,12 +84,9 @@ export function SessionPrepScreen({
   settingsInitialKey,
 }: SessionPrepScreenProps) {
   const { t } = useTranslation();
-  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
-  const modelControlsLocked = Boolean(
-    frostFoxAccount?.status?.enabled &&
-    frostFoxAccount.status.authenticated &&
-    frostFoxAccount.status.account &&
-    frostFoxAccount.status.account.isAdmin !== true,
+  const frostFoxAccount = useFrostFoxAccountOptional();
+  const modelControlsLocked = frostFoxModelControlsLocked(
+    frostFoxAccount?.status,
   );
   const { resolvedSlots, refresh: refreshSlots } = useSlotConfig(
     presets,

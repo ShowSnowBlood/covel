@@ -30,7 +30,7 @@ vi.mock("@/services/api.js", () => ({
   disconnectFrostFox: api.disconnect,
 }));
 
-vi.mock("@/components/frostfox-account-summary.js", () => ({
+vi.mock("@/components/frostfox-account-context.js", () => ({
   useFrostFoxAccount: () => api.accountContext,
 }));
 

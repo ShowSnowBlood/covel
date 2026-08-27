@@ -12,7 +12,10 @@ import { Badge } from "@/components/ui/badge.js";
 import { resolveI18n } from "@/lib/catalog/helpers.js";
 import { stageLabel } from "@/lib/stage-label.js";
 import { useRuntimeModelSlotOverride } from "./runtime-model-slot-override.js";
-import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
 import { SetupRecovery } from "./setup-recovery.js";
 import {
   RUNTIME_TYPE_ICONS,
@@ -30,12 +33,9 @@ export function SessionPluginItem({
   setupRuntimes,
 }: SessionPluginItemProps) {
   const { t, i18n } = useTranslation();
-  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
-  const modelControlsLocked = Boolean(
-    frostFoxAccount?.status?.enabled &&
-    frostFoxAccount.status.authenticated &&
-    frostFoxAccount.status.account &&
-    frostFoxAccount.status.account.isAdmin !== true,
+  const frostFoxAccount = useFrostFoxAccountOptional();
+  const modelControlsLocked = frostFoxModelControlsLocked(
+    frostFoxAccount?.status,
   );
   const [expanded, setExpanded] = useState(false);
 

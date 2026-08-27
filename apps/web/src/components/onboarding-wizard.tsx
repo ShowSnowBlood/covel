@@ -6,7 +6,7 @@ import {
   listPresets,
   managedCatalogToPresetSummaries,
 } from "@/services/api.js";
-import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
 import { emitToast } from "@/lib/toast-channel.js";
 import { useLocalePreference } from "@/hooks/useLocalePreference";
 import { TOTAL_STEPS } from "./onboarding-wizard/constants.js";

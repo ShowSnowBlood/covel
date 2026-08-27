@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
 import { FrostFoxConnectDialog } from "@/components/frostfox-connect-dialog.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { Button } from "@/components/ui/button.js";

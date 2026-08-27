@@ -23,7 +23,7 @@ import {
   setManagedFrostFoxCatalog,
   signOutFrostFox,
 } from "@/services/api.js";
-import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
 export function FrostFoxAccountPane() {
   const { t, i18n } = useTranslation();
   const { status, catalog, loading, error, refresh } = useFrostFoxAccount();

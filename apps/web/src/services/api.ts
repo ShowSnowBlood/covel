@@ -27,7 +27,6 @@ export {
   frostFoxModelRef,
   getManagedFrostFoxCatalog,
   getManagedFrostFoxCatalogRevision,
-  getManagedFrostFoxPresetSummaries,
   getManagedFrostFoxPresets,
   hydrateManagedFrostFoxModels,
   isManagedFrostFoxModelRef,

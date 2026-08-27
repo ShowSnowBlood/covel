@@ -105,6 +105,7 @@ venv/
 target/
 vendor/
 tmp/
+downloaded_images/
 *.png
 !apps/web/public/icon.png
 !apps/desktop/resources/icon.png

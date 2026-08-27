@@ -1,9 +1,13 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import { errorBody, type ApiErrorResponse } from "../api-error.js";
-import { FrostFoxService, FrostFoxServiceError } from "../frostfox/service.js";
+import { errorBody } from "../api-error.js";
+import {
+  FrostFoxService,
+  FrostFoxServiceError,
+  type FrostFoxPrincipal,
+} from "../frostfox/service.js";
 
-export const FROSTFOX_SESSION_COOKIE = "covel_frostfox_session";
+const FROSTFOX_SESSION_COOKIE = "covel_frostfox_session";
 const FROSTFOX_TRANSACTION_COOKIE = "covel_frostfox_login";
 
 const SESSION_COOKIE_OPTIONS = {
@@ -35,8 +39,12 @@ export function createFrostFoxPrincipalMiddleware(
 export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   const app = new Hono();
 
-  app.get("/api/frostfox/account", async (c) => {
+  app.use("*", async (c, next) => {
     noStore(c);
+    await next();
+  });
+
+  app.get("/api/frostfox/account", async (c) => {
     if (!service) return c.json({ enabled: false, authenticated: false });
     let principal = c.get("frostFoxPrincipal");
     if (principal) {
@@ -67,12 +75,11 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.get("/auth/frostfox/start", async (c) => {
-    noStore(c);
     if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
+      return frostFoxError(
+        c,
+        "FrostFox account connection is not enabled",
+        "frostfox_saas_disabled",
         404,
       );
     }
@@ -85,7 +92,6 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.get("/auth/frostfox/callback", async (c) => {
-    noStore(c);
     if (!service) return c.redirect("/?frostfox=disabled", 302);
     const url = new URL(c.req.url);
     const codeValues = url.searchParams.getAll("code");
@@ -130,56 +136,24 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.get("/api/frostfox/models", async (c) => {
-    noStore(c);
-    if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
-        404,
-      );
-    }
-    const principal = c.get("frostFoxPrincipal");
-    if (!principal) {
-      return c.json(
-        errorBody("FrostFox account connection required", {
-          code: "frostfox_account_required",
-        }),
-        401,
-      );
-    }
+    const access = requireFrostFoxAccount(c, service);
+    if (!access.ok) return access.response;
     try {
-      return c.json(await service.listModels(principal));
+      return c.json(await access.service.listModels(access.principal));
     } catch (error) {
       return serviceError(c, error);
     }
   });
 
   app.get("/api/frostfox/model-schedule", async (c) => {
-    noStore(c);
-    if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
-        404,
-      );
-    }
-    const principal = c.get("frostFoxPrincipal");
-    if (!principal) {
-      return c.json(
-        errorBody("FrostFox account connection required", {
-          code: "frostfox_account_required",
-        }),
-        401,
-      );
-    }
+    const access = requireFrostFoxAccount(c, service);
+    if (!access.ok) return access.response;
     try {
-      const schedule = await service.getModelSchedule(principal);
+      const schedule = await access.service.getModelSchedule(access.principal);
       return c.json({
         story: schedule?.story ?? [],
         updatedAt: schedule?.updatedAt ?? null,
-        canEdit: principal.isAdmin === true,
+        canEdit: access.principal.isAdmin === true,
       });
     } catch (error) {
       return serviceError(c, error);
@@ -187,44 +161,23 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.put("/api/frostfox/model-schedule", async (c) => {
-    noStore(c);
-    if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
-        404,
-      );
-    }
-    if (!hasExpectedOrigin(c, service)) {
-      return c.json(
-        errorBody("Request origin is not allowed", {
-          code: "frostfox_origin_invalid",
-        }),
-        403,
-      );
-    }
-    const principal = c.get("frostFoxPrincipal");
-    if (!principal) {
-      return c.json(
-        errorBody("FrostFox account connection required", {
-          code: "frostfox_account_required",
-        }),
-        401,
-      );
-    }
+    const access = requireFrostFoxAccount(c, service, true);
+    if (!access.ok) return access.response;
     const body: unknown = await c.req.json().catch(() => null);
     const story = readScheduleStory(body);
     if (!story) {
-      return c.json(
-        errorBody("Model schedule is invalid", {
-          code: "frostfox_model_schedule_invalid",
-        }),
+      return frostFoxError(
+        c,
+        "Model schedule is invalid",
+        "frostfox_model_schedule_invalid",
         400,
       );
     }
     try {
-      const schedule = await service.setModelSchedule(principal, story);
+      const schedule = await access.service.setModelSchedule(
+        access.principal,
+        story,
+      );
       return c.json({ ...schedule, canEdit: true });
     } catch (error) {
       return serviceError(c, error);
@@ -232,78 +185,37 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.get("/api/frostfox/progression", async (c) => {
-    noStore(c);
-    if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
-        404,
-      );
-    }
-    const principal = c.get("frostFoxPrincipal");
-    if (!principal) {
-      return c.json(
-        errorBody("FrostFox account connection required", {
-          code: "frostfox_account_required",
-        }),
-        401,
-      );
-    }
+    const access = requireFrostFoxAccount(c, service);
+    if (!access.ok) return access.response;
     try {
-      return c.json(await service.getProgression(principal));
+      return c.json(await access.service.getProgression(access.principal));
     } catch (error) {
       return serviceError(c, error);
     }
   });
 
   app.post("/api/frostfox/progression/complete", async (c) => {
-    noStore(c);
-    if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
-        404,
-      );
-    }
-    if (!hasExpectedOrigin(c, service)) {
-      return c.json(
-        errorBody("Request origin is not allowed", {
-          code: "frostfox_origin_invalid",
-        }),
-        403,
-      );
-    }
-    const principal = c.get("frostFoxPrincipal");
-    if (!principal) {
-      return c.json(
-        errorBody("FrostFox account connection required", {
-          code: "frostfox_account_required",
-        }),
-        401,
-      );
-    }
+    const access = requireFrostFoxAccount(c, service, true);
+    if (!access.ok) return access.response;
     const body: unknown = await c.req.json().catch(() => null);
     if (
       !body ||
       typeof body !== "object" ||
       Array.isArray(body) ||
-      typeof (body as { worldId?: unknown }).worldId !== "string"
+      !("worldId" in body) ||
+      typeof body.worldId !== "string"
     ) {
-      return c.json(
-        errorBody("worldId is required", {
-          code: "frostfox_level_input_invalid",
-        }),
+      return frostFoxError(
+        c,
+        "worldId is required",
+        "frostfox_level_input_invalid",
         400,
       );
     }
+    const worldId = body.worldId;
     try {
       return c.json(
-        await service.completeLevel(
-          principal,
-          (body as { worldId: string }).worldId,
-        ),
+        await access.service.completeLevel(access.principal, worldId),
       );
     } catch (error) {
       return serviceError(c, error);
@@ -311,12 +223,11 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.post("/api/frostfox/logout", async (c) => {
-    noStore(c);
     if (service && !hasExpectedOrigin(c, service)) {
-      return c.json(
-        errorBody("Request origin is not allowed", {
-          code: "frostfox_origin_invalid",
-        }),
+      return frostFoxError(
+        c,
+        "Request origin is not allowed",
+        "frostfox_origin_invalid",
         403,
       );
     }
@@ -325,33 +236,9 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   });
 
   app.delete("/api/frostfox/account", async (c) => {
-    noStore(c);
-    if (!service) {
-      return c.json(
-        errorBody("FrostFox account connection is not enabled", {
-          code: "frostfox_saas_disabled",
-        }),
-        404,
-      );
-    }
-    if (!hasExpectedOrigin(c, service)) {
-      return c.json(
-        errorBody("Request origin is not allowed", {
-          code: "frostfox_origin_invalid",
-        }),
-        403,
-      );
-    }
-    const principal = c.get("frostFoxPrincipal");
-    if (!principal) {
-      return c.json(
-        errorBody("FrostFox account connection required", {
-          code: "frostfox_account_required",
-        }),
-        401,
-      );
-    }
-    await service.unbind(principal);
+    const access = requireFrostFoxAccount(c, service, true);
+    if (!access.ok) return access.response;
+    await access.service.unbind(access.principal);
     deleteCookie(c, FROSTFOX_SESSION_COOKIE, SESSION_COOKIE_OPTIONS);
     return c.json({ ok: true });
   });
@@ -359,7 +246,65 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
   return app;
 }
 
-function noStore(c: { header(name: string, value: string): void }): void {
+type FrostFoxAccountAccess =
+  | {
+      readonly ok: true;
+      readonly service: FrostFoxService;
+      readonly principal: FrostFoxPrincipal;
+    }
+  | { readonly ok: false; readonly response: Response };
+
+function requireFrostFoxAccount(
+  c: Context,
+  service: FrostFoxService | null,
+  requireOrigin = false,
+): FrostFoxAccountAccess {
+  if (!service) {
+    return {
+      ok: false,
+      response: frostFoxError(
+        c,
+        "FrostFox account connection is not enabled",
+        "frostfox_saas_disabled",
+        404,
+      ),
+    };
+  }
+  if (requireOrigin && !hasExpectedOrigin(c, service)) {
+    return {
+      ok: false,
+      response: frostFoxError(
+        c,
+        "Request origin is not allowed",
+        "frostfox_origin_invalid",
+        403,
+      ),
+    };
+  }
+  const principal = c.get("frostFoxPrincipal");
+  return principal
+    ? { ok: true, service, principal }
+    : {
+        ok: false,
+        response: frostFoxError(
+          c,
+          "FrostFox account connection required",
+          "frostfox_account_required",
+          401,
+        ),
+      };
+}
+
+function frostFoxError(
+  c: Context,
+  message: string,
+  code: string,
+  status: 400 | 401 | 403 | 404 | 409 | 502,
+): Response {
+  return c.json(errorBody(message, { code }), status);
+}
+
+function noStore(c: Context): void {
   c.header("Cache-Control", "no-store, max-age=0");
   c.header("Pragma", "no-cache");
   c.header("Vary", "Cookie");
@@ -368,38 +313,45 @@ function noStore(c: { header(name: string, value: string): void }): void {
 function readScheduleStory(
   value: unknown,
 ): Array<{ channelKey: string; modelId: string }> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const story = (value as { story?: unknown }).story;
-  if (!Array.isArray(story) || story.length > 8) return null;
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !("story" in value) ||
+    !Array.isArray(value.story) ||
+    value.story.length > 8
+  ) {
+    return null;
+  }
   const entries: Array<{ channelKey: string; modelId: string }> = [];
-  for (const item of story) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-    const entry = item as Record<string, unknown>;
+  for (const item of value.story) {
     if (
-      typeof entry.channelKey !== "string" ||
-      typeof entry.modelId !== "string"
+      item === null ||
+      typeof item !== "object" ||
+      Array.isArray(item) ||
+      !("channelKey" in item) ||
+      !("modelId" in item) ||
+      typeof item.channelKey !== "string" ||
+      typeof item.modelId !== "string"
     ) {
       return null;
     }
     entries.push({
-      channelKey: entry.channelKey,
-      modelId: entry.modelId,
+      channelKey: item.channelKey,
+      modelId: item.modelId,
     });
   }
   return entries;
 }
 
-function hasExpectedOrigin(
-  c: { req: { header(name: string): string | undefined } },
-  service: FrostFoxService,
-): boolean {
+function hasExpectedOrigin(c: Context, service: FrostFoxService): boolean {
   const origin = c.req.header("origin");
   return origin === new URL(service.runtimeConfig.callbackUrl).origin;
 }
 
 function redirectWithResult(
   service: FrostFoxService,
-  c: Parameters<typeof setCookie>[0],
+  c: Context,
   result: "connected" | "error",
   code?: string,
 ): Response {
@@ -409,12 +361,7 @@ function redirectWithResult(
   return c.redirect(target.toString(), 302);
 }
 
-function serviceError(
-  c: {
-    json(body: ApiErrorResponse, status: 400 | 401 | 403 | 409 | 502): Response;
-  },
-  error: unknown,
-): Response {
+function serviceError(c: Context, error: unknown): Response {
   if (error instanceof FrostFoxServiceError) {
     const status =
       error.status === 400 ||

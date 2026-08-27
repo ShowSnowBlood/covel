@@ -89,9 +89,9 @@ CREATE TABLE IF NOT EXISTS frostfox_account_progression (
 );
 `;
 
-export type FrostFoxCredentialState = "active" | "recovery_required";
+type FrostFoxCredentialState = "active" | "recovery_required";
 
-export interface FrostFoxLoginTransaction {
+interface FrostFoxLoginTransaction {
   readonly tokenHash: string;
   readonly state: string;
   readonly verifierCiphertext: string;
@@ -124,7 +124,7 @@ export interface FrostFoxModelSchedule {
   readonly updatedAt: string;
 }
 
-export interface FrostFoxProgression {
+interface FrostFoxProgression {
   readonly localUserId: string;
   readonly completedLevel: number;
   readonly updatedAt: string;

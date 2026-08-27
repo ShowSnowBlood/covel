@@ -22,6 +22,7 @@ import {
 } from "@covel/shared";
 
 import type { AiStack } from "../ai-setup.js";
+import { isRecord } from "../lib/validators.js";
 import {
   basicAuthorization,
   FrostFoxClientConfigManager,
@@ -72,7 +73,7 @@ export interface FrostFoxAuthorizationResult {
   readonly maxAgeSeconds: number;
 }
 
-export interface FrostFoxModelEntry {
+interface FrostFoxModelEntry {
   readonly id: string;
   readonly name: string;
   readonly capability: ModelCapability;
@@ -93,7 +94,7 @@ export interface FrostFoxModelCatalog {
   readonly configurationVersion: string;
   readonly channels: readonly FrostFoxModelChannel[];
 }
-export interface FrostFoxProgressionStatus {
+interface FrostFoxProgressionStatus {
   readonly completedLevel: number;
   readonly unlockedLevel: number;
   readonly totalLevels: number;
@@ -108,10 +109,14 @@ export interface FrostFoxAiContext {
   readonly managedModelPolicy?: ManagedModelPolicy;
 }
 
-interface RouterAccount {
+interface RouterAccountPayload {
   readonly id: string;
   readonly name: string;
   readonly balance: number;
+  readonly isAdmin?: boolean;
+}
+
+interface RouterAccount extends RouterAccountPayload {
   readonly isAdmin: boolean;
 }
 /**
@@ -332,8 +337,7 @@ export class FrostFoxService {
       createdAt,
       updatedAt: now,
     });
-    this.modelCache.delete(binding.localUserId);
-    this.modelRequests.delete(binding.localUserId);
+    this.invalidateModelCache(binding.localUserId);
 
     return {
       principal: principalFromBinding(binding),
@@ -366,8 +370,7 @@ export class FrostFoxService {
 
   async unbind(principal: FrostFoxPrincipal): Promise<void> {
     await this.store.deleteBinding(principal.localUserId);
-    this.modelCache.delete(principal.localUserId);
-    this.modelRequests.delete(principal.localUserId);
+    this.invalidateModelCache(principal.localUserId);
   }
   async getProgression(
     principal: FrostFoxPrincipal,
@@ -461,19 +464,7 @@ export class FrostFoxService {
   ): Promise<FrostFoxPrincipal> {
     const binding = await this.requiredBinding(principal.localUserId);
     const accountKey = this.openAccountKey(binding);
-    const response = await this.fetchImpl(
-      `${this.runtimeConfig.routerBaseUrl}/api/account/v1/me`,
-      {
-        method: "GET",
-        headers: {
-          authorization: `Bearer ${accountKey}`,
-          accept: "application/json",
-        },
-        cache: "no-store",
-        redirect: "manual",
-        signal: AbortSignal.timeout(ROUTER_REQUEST_TIMEOUT_MS),
-      },
-    );
+    const response = await this.fetchRouterAccount(accountKey);
     const now = new Date().toISOString();
     if (response.status === 401) {
       const updated = await this.store.upsertBinding({
@@ -481,28 +472,21 @@ export class FrostFoxService {
         credentialState: "recovery_required",
         updatedAt: now,
       });
-      this.modelCache.delete(binding.localUserId);
-      this.modelRequests.delete(binding.localUserId);
+      this.invalidateModelCache(binding.localUserId);
       return principalFromBinding(updated);
     }
     if (!response.ok) return principalFromBinding(binding);
 
-    const body: unknown = await response.json();
-    if (
-      !isRecord(body) ||
-      body.id !== binding.routerAccountId ||
-      typeof body.name !== "string" ||
-      typeof body.balance !== "number" ||
-      !Number.isFinite(body.balance) ||
-      (body.isAdmin !== undefined && typeof body.isAdmin !== "boolean")
-    ) {
+    const account = parseRouterAccount(await response.json());
+    if (!account || account.id !== binding.routerAccountId) {
       return principalFromBinding(binding);
     }
     const updated = await this.store.upsertBinding({
       ...binding,
-      accountName: body.name,
-      balance: body.balance,
-      isAdmin: body.isAdmin === undefined ? binding.isAdmin : body.isAdmin,
+      accountName: account.name,
+      balance: account.balance,
+      isAdmin:
+        account.isAdmin === undefined ? binding.isAdmin : account.isAdmin,
       credentialState: "active",
       lastVerifiedAt: now,
       updatedAt: now,
@@ -518,11 +502,7 @@ export class FrostFoxService {
       throw new FrostFoxServiceError("frostfox_reconnect_required", 401);
     }
     const binding = await this.requiredBinding(principal.localUserId);
-    const accountKey = this.openAccountKey(binding);
-    const gatewayKey = deriveFrostFoxGatewayKey(
-      accountKey,
-      this.runtimeConfig.clientId,
-    );
+    const gatewayKey = this.gatewayKeyFor(binding);
     this.clientConfig.ensureProvidersInstalled();
     const apiKeys = Object.fromEntries(
       this.clientConfig
@@ -618,11 +598,7 @@ export class FrostFoxService {
     if (pending?.key === cacheKey) return pending.promise;
     if (pending) this.modelRequests.delete(binding.localUserId);
 
-    const accountKey = this.openAccountKey(binding);
-    const gatewayKey = deriveFrostFoxGatewayKey(
-      accountKey,
-      this.runtimeConfig.clientId,
-    );
+    const gatewayKey = this.gatewayKeyFor(binding);
     const request = (async () => {
       const providers = new Map(
         this.clientConfig
@@ -764,8 +740,8 @@ export class FrostFoxService {
     return body.accountKey;
   }
 
-  private async readRouterAccount(accountKey: string): Promise<RouterAccount> {
-    const response = await this.fetchImpl(
+  private fetchRouterAccount(accountKey: string): Promise<Response> {
+    return this.fetchImpl(
       `${this.runtimeConfig.routerBaseUrl}/api/account/v1/me`,
       {
         method: "GET",
@@ -778,27 +754,20 @@ export class FrostFoxService {
         signal: AbortSignal.timeout(ROUTER_REQUEST_TIMEOUT_MS),
       },
     );
+  }
+
+  private async readRouterAccount(accountKey: string): Promise<RouterAccount> {
+    const response = await this.fetchRouterAccount(accountKey);
     if (!response.ok) {
       throw new FrostFoxServiceError("frostfox_account_unavailable", 401);
     }
-    const body: unknown = await response.json();
-    if (
-      !isRecord(body) ||
-      typeof body.id !== "string" ||
-      body.id.length === 0 ||
-      typeof body.name !== "string" ||
-      body.name.length === 0 ||
-      typeof body.balance !== "number" ||
-      !Number.isFinite(body.balance) ||
-      (body.isAdmin !== undefined && typeof body.isAdmin !== "boolean")
-    ) {
+    const account = parseRouterAccount(await response.json());
+    if (!account) {
       throw new FrostFoxServiceError("frostfox_account_response_invalid", 502);
     }
     return {
-      id: body.id,
-      name: body.name,
-      balance: body.balance,
-      isAdmin: body.isAdmin === true,
+      ...account,
+      isAdmin: account.isAdmin === true,
     };
   }
 
@@ -808,6 +777,18 @@ export class FrostFoxService {
       throw new FrostFoxServiceError("frostfox_session_invalid", 401);
     }
     return binding;
+  }
+
+  private invalidateModelCache(localUserId: string): void {
+    this.modelCache.delete(localUserId);
+    this.modelRequests.delete(localUserId);
+  }
+
+  private gatewayKeyFor(binding: FrostFoxBinding): string {
+    return deriveFrostFoxGatewayKey(
+      this.openAccountKey(binding),
+      this.runtimeConfig.clientId,
+    );
   }
 
   private openAccountKey(binding: FrostFoxBinding): string {
@@ -1313,6 +1294,27 @@ function readModalities(
     : (values as OutputModality[]);
 }
 
+function parseRouterAccount(value: unknown): RouterAccountPayload | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    value.id.length === 0 ||
+    typeof value.name !== "string" ||
+    value.name.length === 0 ||
+    typeof value.balance !== "number" ||
+    !Number.isFinite(value.balance) ||
+    (value.isAdmin !== undefined && typeof value.isAdmin !== "boolean")
+  ) {
+    return null;
+  }
+  return {
+    id: value.id,
+    name: value.name,
+    balance: value.balance,
+    ...(value.isAdmin === undefined ? {} : { isAdmin: value.isAdmin }),
+  };
+}
+
 async function readGatewayErrorCode(response: Response): Promise<string> {
   try {
     const body: unknown = await response.json();
@@ -1324,8 +1326,4 @@ async function readGatewayErrorCode(response: Response): Promise<string> {
     // The stable fallback below preserves the HTTP status without response text.
   }
   return `gateway_http_${response.status}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }

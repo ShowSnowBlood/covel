@@ -10,9 +10,9 @@ import type { FrostFoxModelCatalog } from "@/services/api.js";
 import i18n from "@/i18n";
 import {
   FrostFoxAccountProvider,
-  FrostFoxAccountSummary,
   useFrostFoxAccount,
-} from "../frostfox-account-summary.js";
+} from "../frostfox-account-context.js";
+import { FrostFoxAccountSummary } from "../frostfox-account-summary.js";
 
 const api = vi.hoisted(() => ({
   clearManagedFrostFoxSlots: vi.fn(),

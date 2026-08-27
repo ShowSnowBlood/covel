@@ -28,6 +28,13 @@ function publishManagedFrostFoxCatalog(
   for (const listener of managedCatalogListeners) listener();
 }
 
+function invalidateManagedHydration(): void {
+  managedHydrationVersion += 1;
+  managedHydrationPromise = null;
+  managedHydrationAccountId = null;
+  managedHydrationAttemptedAccountId = null;
+}
+
 export function subscribeManagedFrostFoxCatalog(
   listener: () => void,
 ): () => void {
@@ -42,10 +49,7 @@ export function getManagedFrostFoxCatalogRevision(): number {
 export function setManagedFrostFoxCatalog(
   catalog: FrostFoxModelCatalog | null,
 ): void {
-  managedHydrationVersion += 1;
-  managedHydrationPromise = null;
-  managedHydrationAccountId = null;
-  managedHydrationAttemptedAccountId = null;
+  invalidateManagedHydration();
   publishManagedFrostFoxCatalog(catalog);
 }
 
@@ -57,9 +61,9 @@ export function frostFoxModelRef(channelKey: string, modelId: string): string {
   return `${FROSTFOX_MODEL_REF_PREFIX}${encodeURIComponent(channelKey)}:${encodeURIComponent(modelId)}`;
 }
 
-export function getManagedFrostFoxPresets(): CustomPreset[] {
-  if (!managedCatalog) return [];
-  return managedCatalog.channels.flatMap((channel) =>
+function catalogPresets(catalog: FrostFoxModelCatalog | null): CustomPreset[] {
+  if (!catalog) return [];
+  return catalog.channels.flatMap((channel) =>
     channel.enabled && !channel.error
       ? channel.models.map((model) => ({
           id: frostFoxModelRef(channel.channelKey, model.id),
@@ -81,6 +85,10 @@ export function getManagedFrostFoxPresets(): CustomPreset[] {
   );
 }
 
+export function getManagedFrostFoxPresets(): CustomPreset[] {
+  return catalogPresets(managedCatalog);
+}
+
 export function isManagedFrostFoxModelRef(value: string): boolean {
   return (
     value.startsWith(FROSTFOX_MODEL_REF_PREFIX) ||
@@ -91,27 +99,18 @@ export function isManagedFrostFoxModelRef(value: string): boolean {
 export function managedCatalogToPresetSummaries(
   catalog: FrostFoxModelCatalog | null,
 ): PresetSummary[] {
-  if (!catalog) return [];
-  return catalog.channels.flatMap((channel) =>
-    channel.enabled && !channel.error
-      ? channel.models.map((model) => ({
-          id: frostFoxModelRef(channel.channelKey, model.id),
-          name: `${channel.displayName} · ${model.name}`,
-          provider: channel.providerId,
-          model: model.id,
-          enabled: true,
-          isDefault: false,
-          scope: "frostfox",
-          baseUrl: channel.baseUrl,
-          protocol: channel.protocol,
-          capability: model.capability,
-        }))
-      : [],
-  );
-}
-
-export function getManagedFrostFoxPresetSummaries(): PresetSummary[] {
-  return managedCatalogToPresetSummaries(managedCatalog);
+  return catalogPresets(catalog).map((preset) => ({
+    id: preset.id,
+    name: preset.name,
+    provider: preset.provider,
+    model: preset.model,
+    enabled: true,
+    isDefault: false,
+    scope: "frostfox",
+    baseUrl: preset.baseUrl,
+    protocol: preset.protocol,
+    capability: preset.capability,
+  }));
 }
 
 export async function hydrateManagedFrostFoxModels(
@@ -136,10 +135,7 @@ export async function hydrateManagedFrostFoxModels(
       managedHydrationPromise !== null ||
       managedHydrationAttemptedAccountId !== null;
     if (hadManagedState) {
-      managedHydrationVersion += 1;
-      managedHydrationPromise = null;
-      managedHydrationAccountId = null;
-      managedHydrationAttemptedAccountId = null;
+      invalidateManagedHydration();
       if (managedCatalog !== null || managedCatalogAccountId !== null) {
         publishManagedFrostFoxCatalog(null);
       }
@@ -162,10 +158,7 @@ export async function hydrateManagedFrostFoxModels(
   // any in-flight request from the previous account. The old promise may
   // still settle, but its version no longer permits it to publish.
   if (managedHydrationPromise) {
-    managedHydrationVersion += 1;
-    managedHydrationPromise = null;
-    managedHydrationAccountId = null;
-    managedHydrationAttemptedAccountId = null;
+    invalidateManagedHydration();
   }
   if (managedCatalog && managedCatalogAccountId !== accountId) {
     managedHydrationVersion += 1;

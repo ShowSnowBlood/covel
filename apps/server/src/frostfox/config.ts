@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import type { AiStack } from "../ai-setup.js";
+import { isRecord } from "../lib/validators.js";
 
 const CLIENT_ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
 const CHANNEL_KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -22,7 +23,7 @@ export interface FrostFoxRuntimeConfig {
   readonly credentialKey: Uint8Array;
 }
 
-export interface FrostFoxChannelMapping {
+interface FrostFoxChannelMapping {
   readonly channelKey: string;
   readonly routerChannelId: string;
   readonly routerChannelName: string;
@@ -361,8 +362,4 @@ function decodeCredentialKey(raw: string): Uint8Array {
     throw new Error("COVEL_FROSTFOX_CREDENTIAL_KEY must decode to 32 bytes");
   }
   return bytes;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }

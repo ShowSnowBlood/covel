@@ -13,7 +13,10 @@ import { Badge } from "@/components/ui/badge.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { stageLabel } from "@/lib/stage-label.js";
 import { formatSlotLabel } from "@/hooks/use-slot-config.js";
-import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
 import { useRuntimeModelSlotOverride } from "./runtime-model-slot-override.js";
 import { SetupRecovery } from "./setup-recovery.js";
 import { TRIGGER_LABELS, type PluginItemProps } from "./types.js";
@@ -28,12 +31,9 @@ export function PluginItem({
   runtimeModelOverrides,
   setupRuntimes,
 }: PluginItemProps) {
-  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
-  const modelControlsLocked = Boolean(
-    frostFoxAccount?.status?.enabled &&
-    frostFoxAccount.status.authenticated &&
-    frostFoxAccount.status.account &&
-    frostFoxAccount.status.account.isAdmin !== true,
+  const frostFoxAccount = useFrostFoxAccountOptional();
+  const modelControlsLocked = frostFoxModelControlsLocked(
+    frostFoxAccount?.status,
   );
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);

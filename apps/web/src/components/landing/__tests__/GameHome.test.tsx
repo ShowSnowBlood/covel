@@ -16,7 +16,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
-vi.mock("@/components/frostfox-account-summary.js", () => ({
+vi.mock("@/components/frostfox-account-context.js", () => ({
   useFrostFoxAccount: () => ({
     status: accountState.status,
     loading: false,

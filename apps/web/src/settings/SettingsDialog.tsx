@@ -41,7 +41,10 @@ import { PackagesPane } from "./panes/PackagesPane.js";
 import { AppearancePane } from "./panes/AppearancePane.js";
 import { OperatorAccessPane } from "./panes/OperatorAccessPane.js";
 import { FrostFoxAccountPane } from "./panes/FrostFoxAccountPane.js";
-import { useFrostFoxAccountOptional } from "@/components/frostfox-account-summary.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
 import { cn } from "@/lib/utils.js";
 import { ShinyText } from "@/components/reactbits/index.js";
 
@@ -92,12 +95,9 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const store = useSettingsStore();
   const { t, i18n } = useTranslation();
-  const frostFoxAccount = useFrostFoxAccountOptional?.() ?? null;
-  const hostedPlayerModelLocked = Boolean(
-    frostFoxAccount?.status?.enabled &&
-    frostFoxAccount.status.authenticated &&
-    frostFoxAccount.status.account &&
-    frostFoxAccount.status.account.isAdmin !== true,
+  const frostFoxAccount = useFrostFoxAccountOptional();
+  const hostedPlayerModelLocked = frostFoxModelControlsLocked(
+    frostFoxAccount?.status,
   );
   const adminSettingsReadOnly = hostedPlayerModelLocked;
   const [query, setQuery] = useState("");

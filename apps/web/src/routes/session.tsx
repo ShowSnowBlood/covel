@@ -14,7 +14,7 @@ import { WorldSelectScreen } from "@/components/session/world-select-screen.js";
 import { SessionPrepScreen } from "@/components/session/session-prep-screen.js";
 import { OnboardingWizard } from "@/components/onboarding-wizard.js";
 import { Button } from "@/components/ui/button.js";
-import { useFrostFoxAccount } from "@/components/frostfox-account-summary.js";
+import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
 
 // Lazy-load the in-game surface (chat + stage + json-render panels + plugin
 // UI) — the single heaviest component tree in the app, but only reachable once
