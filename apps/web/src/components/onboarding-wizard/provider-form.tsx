@@ -11,6 +11,7 @@ import {
   managedFormIsReady,
   managedModelOptions,
   modelOptionsForProvider,
+  preferredManagedModelOption,
 } from "./provider-state.js";
 import type {
   ModelSource,
@@ -41,6 +42,10 @@ export function ProviderForm({
     PROVIDERS.find((p) => p.id === state.selected) ?? PROVIDERS[0];
   const modelOptions = modelOptionsForProvider(presets, state.selected);
   const managedOptions = managedModelOptions(managedCatalog, slotName);
+  const defaultManagedOption = preferredManagedModelOption(managedOptions);
+  const selectedManagedOption =
+    managedOptions.find((option) => option.ref === state.managedModelRef) ??
+    defaultManagedOption;
   const effectiveSource: ModelSource = managedOnly
     ? "managed"
     : state.modelSource;
@@ -77,7 +82,7 @@ export function ProviderForm({
 
   const handleModelSourceSelect = (modelSource: ModelSource) => {
     clearCachedPing(slotName);
-    const nextRef = managedOptions[0]?.ref ?? state.managedModelRef;
+    const nextRef = defaultManagedOption?.ref ?? state.managedModelRef;
     onChange({
       ...state,
       modelSource,
@@ -118,7 +123,7 @@ export function ProviderForm({
                   )
                 : managedOptions.length > 0
                   ? t("onboarding.managedModelAssigned", {
-                      model: `${managedOptions.find((option) => option.ref === state.managedModelRef)?.channelName ?? managedOptions[0]!.channelName} · ${managedOptions.find((option) => option.ref === state.managedModelRef)?.name ?? managedOptions[0]!.name}`,
+                      model: `${selectedManagedOption?.channelName ?? ""} · ${selectedManagedOption?.name ?? ""}`,
                       defaultValue: "Active model: {{model}}",
                     })
                   : t(
@@ -224,7 +229,7 @@ export function ProviderForm({
             </Label>
             <select
               id={`onboarding-managed-model-${slotName}`}
-              value={state.managedModelRef || managedOptions[0]!.ref}
+              value={state.managedModelRef || defaultManagedOption?.ref || ""}
               onChange={(event) =>
                 updateField("managedModelRef", event.target.value)
               }

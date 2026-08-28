@@ -1,11 +1,10 @@
 /**
  * Plugin-local tool: generate-guide
  *
- * Generates a categorized action guide for the player.
- * Each category (safe/aggressive/creative/wild) provides
- * 1-3 concrete, actionable suggestions.
- *
- * Returns UI blocks that json-render renders as styled choice cards.
+ * Generates three fixed action styles with 1-3 concrete suggestions each.
+ * The flat input shape keeps tool arguments short and unambiguous for smaller
+ * function-calling models; the output remains the category array consumed by UI.
+ * Returns plugin-data state rendered as styled action choices.
  */
 
 import { makeProposal } from "@covel/plugin-handlers-utils";
@@ -15,53 +14,45 @@ const STYLE_CONFIG = {
   safe: { zh: "稳妥", en: "Safe", icon: "shield", color: "blue" },
   aggressive: { zh: "激进", en: "Aggressive", icon: "swords", color: "red" },
   creative: { zh: "创意", en: "Creative", icon: "lightbulb", color: "purple" },
-  wild: { zh: "疯狂", en: "Wild", icon: "flame", color: "amber" },
 };
 
+const STYLE_ORDER = ["safe", "aggressive", "creative"];
+
 export default function ({ tool, z }) {
-  const categorySchema = z.object({
-    style: z.enum(["safe", "aggressive", "creative", "wild"]),
-    label: z.string().optional(),
-    suggestions: z
-      .array(z.string().min(1))
-      .min(1)
-      .max(3)
-      .describe("1-3 concrete, actionable suggestions"),
-  });
+  const suggestionsSchema = z
+    .array(z.string().min(1))
+    .min(1)
+    .max(3)
+    .describe("1-3 concrete, actionable suggestions");
 
   return tool({
     name: "generate-guide",
     description:
-      "Generate a style-categorized action guide, offering the player choices in different styles (safe / aggressive / creative / wild).",
+      "Generate exactly three action styles: safe, aggressive, and creative.",
     parameters: z.object({
       topic: z
         .string()
         .min(1)
         .describe("A brief description of the current decision point"),
-      categories: z
-        .array(categorySchema)
-        // Capped at 3: the message block has exactly 3 strategy slots and the
-        // handler slices to 3, so a 4th category would be silently dropped.
-        .min(2)
-        .max(3)
-        .describe("2-3 style categories, each with 1-3 suggestions"),
+      safe: suggestionsSchema.describe("1-3 low-risk, cautious actions"),
+      aggressive: suggestionsSchema.describe(
+        "1-3 direct, confrontational actions",
+      ),
+      creative: suggestionsSchema.describe(
+        "1-3 unconventional, clever actions",
+      ),
     }),
     execute: async (params, context) => {
-      const { topic, categories } = params;
-
-      const resolvedCategories = categories.map((cat, index) => {
-        const config = STYLE_CONFIG[cat.style];
+      const { topic } = params;
+      const resolvedCategories = STYLE_ORDER.map((style, index) => {
+        const config = STYLE_CONFIG[style];
         return {
           slot: index + 1,
-          style: cat.style,
-          // Store an I18nText label so the block resolves it to the session
-          // locale. An LLM-supplied `cat.label` is a single string in the
-          // session language; otherwise fall back to the bilingual config
-          // (previously only the zh half was used → en players saw Chinese).
-          label: cat.label ?? { zh: config.zh, en: config.en },
+          style,
+          label: { zh: config.zh, en: config.en },
           icon: config.icon,
           color: config.color,
-          suggestions: cat.suggestions,
+          suggestions: params[style],
         };
       });
 
@@ -73,7 +64,7 @@ export default function ({ tool, z }) {
         { namespace: "message", key: "topic", value: topic },
       ];
 
-      for (const category of resolvedCategories.slice(0, 3)) {
+      for (const category of resolvedCategories) {
         items.push(
           {
             namespace: "message",

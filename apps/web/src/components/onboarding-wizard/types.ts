@@ -3,7 +3,8 @@ import type { SupportedLocale } from "@/hooks/useLocalePreference";
 
 export type OnboardingStep = 0 | 1 | 2 | 3;
 
-export type ProviderId = "deepseek" | "openai" | "anthropic" | "dashscope";
+export type ProviderId =
+  "xai" | "deepseek" | "openai" | "anthropic" | "dashscope";
 
 export type SlotName = "story" | "plugin";
 

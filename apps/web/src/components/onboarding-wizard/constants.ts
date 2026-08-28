@@ -12,6 +12,12 @@ export const TOTAL_STEPS = 4;
 
 export const PROVIDERS = [
   {
+    id: "xai",
+    name: "xAI",
+    placeholder: "xai-...",
+    keyEnv: "XAI_API_KEY",
+  },
+  {
     id: "deepseek",
     name: "DeepSeek",
     placeholder: "sk-...",

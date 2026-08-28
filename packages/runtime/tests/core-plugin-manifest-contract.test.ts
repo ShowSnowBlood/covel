@@ -181,6 +181,11 @@ describe("core plugin manifest contract", () => {
       "plugin",
       "plugin",
     ]);
+    expect(downstreams[0]).toMatchObject({
+      timeoutMs: 180_000,
+      callTimeoutMs: 90_000,
+      maxRetries: 1,
+    });
   });
 
   it("keeps manual Chat Mode utilities outside automatic scheduling", async () => {

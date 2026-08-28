@@ -32,13 +32,12 @@
 # ── Text Slots ──────────────────────────────────────────────────
 
 [covel.story]
-provider = "deepseek"
-model    = "deepseek-v4-flash"
-baseUrl  = "https://api.deepseek.com"
+provider = "xai"
+model    = "grok-4.6"
+baseUrl  = "https://api.x.ai/v1"
 protocol = "openai-chat-v1"
-# 可选：DeepSeek V4 支持 "high" / "max"；留空使用服务商默认值。
+# 可选：Grok 4.6 支持思考强度；留空使用服务商默认值。
 # reasoning_effort = "high"
-# thinking = { type = "enabled" }
 
 [covel.utility]
 provider = "dashscope"

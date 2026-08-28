@@ -44,7 +44,11 @@ afterEach(async () => {
 
 async function createBoundService(
   isAdmin: boolean,
-  options: { staleImageDefault?: boolean; imageCatalog?: boolean } = {},
+  options: {
+    staleImageDefault?: boolean;
+    imageCatalog?: boolean;
+    grokCatalog?: boolean;
+  } = {},
 ) {
   const store = createMemoryCredentialStore();
   const fetchImpl = vi.fn(async (input: string | URL | Request) => {
@@ -74,6 +78,7 @@ async function createBoundService(
         data: [
           { id: "story-primary", name: "Story Primary" },
           { id: "story-backup", name: "Story Backup" },
+          ...(options.grokCatalog ? [{ id: "grok-4.6", name: "Grok4.6" }] : []),
           ...(options.imageCatalog
             ? [
                 {
@@ -165,6 +170,28 @@ describe("FrostFox first-party SaaS", () => {
       status: 403,
     });
   });
+  it("uses Grok 4.6 as the managed text default", async () => {
+    const { service, principal } = await createBoundService(false, {
+      grokCatalog: true,
+    });
+
+    const context = await service.prepareAiContext(principal);
+    const defaults = context?.managedSlotDefaults;
+    const primaryId = defaults?.slotPresetOverrides?.story;
+
+    expect(primaryId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(defaults?.slotPresetOverrides).toMatchObject({
+      story: primaryId,
+      plugin: primaryId,
+      utility: primaryId,
+      default: primaryId,
+    });
+    expect(defaults?.customPresets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: primaryId, model: "grok-4.6" }),
+      ]),
+    );
+  });
 
   it("publishes the ordered story fallback chain for admins", async () => {
     const { service, principal } = await createBoundService(true);
@@ -183,6 +210,7 @@ describe("FrostFox first-party SaaS", () => {
       plugin: primaryId,
       default: primaryId,
     });
+    expect(defaults?.slotPresetOverrides?.utility).toBe(primaryId);
     expect(defaults?.customPresets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -240,10 +268,10 @@ describe("FrostFox first-party SaaS", () => {
             configurationVersion: "1970-01-01T00:00:00.0000001+00:00",
             channelMappings: [
               {
-                channelKey: "deepseek",
+                channelKey: "xai",
                 routerChannelId: CHANNEL_ID,
-                routerChannelName: "deepseek",
-                routerChannelDisplayName: "DeepSeek",
+                routerChannelName: "xai",
+                routerChannelDisplayName: "xAI",
                 enabled: true,
               },
               {
@@ -305,6 +333,7 @@ describe("FrostFox first-party SaaS", () => {
           return json({
             object: "list",
             data: [
+              { id: "grok-4.6", name: "Grok 4.6" },
               { id: "openai/gpt-5.6-sol", name: "GPT 5.6" },
               { id: "openai/gpt-5.6-sol", name: "duplicate" },
               {
@@ -383,7 +412,7 @@ describe("FrostFox first-party SaaS", () => {
     ]);
     const providers = service!.clientConfig.providers();
     const providerId = providers.find(
-      (provider) => provider.channelKey === "deepseek",
+      (provider) => provider.channelKey === "xai",
     )!.providerId;
     const imageProviderId = providers.find(
       (provider) => provider.channelKey === "image",
@@ -406,6 +435,7 @@ describe("FrostFox first-party SaaS", () => {
     expect(context?.managedSlotDefaults?.slotPresetOverrides).toEqual({
       story: managedPresetId,
       plugin: managedPresetId,
+      utility: managedPresetId,
       default: managedPresetId,
       image: managedImagePresetId,
     });
@@ -415,7 +445,7 @@ describe("FrostFox first-party SaaS", () => {
           id: managedPresetId,
           provider: providerId,
           baseUrl: "https://market.example/v1",
-          model: "deepseek-v4-flash",
+          model: "grok-4.6",
           protocol: "openai-chat-v1",
         }),
         expect.objectContaining({
@@ -437,17 +467,22 @@ describe("FrostFox first-party SaaS", () => {
       protocol: "openai-chat-v1",
       baseUrl: "https://market.example/v1",
       apiKey: deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel"),
-      model: "deepseek-v4-flash",
+      model: "grok-4.6",
       headers: { "X-FrostFox-Channel-Id": CHANNEL_ID },
     });
 
     expect(models.channels).toEqual([
       expect.objectContaining({
-        channelKey: "deepseek",
+        channelKey: "xai",
         models: [
           expect.objectContaining({
             id: "openai/gpt-5.6-sol",
             name: "GPT 5.6",
+            capability: expect.objectContaining({ output: ["text"] }),
+          }),
+          expect.objectContaining({
+            id: "grok-4.6",
+            name: "Grok 4.6",
             capability: expect.objectContaining({ output: ["text"] }),
           }),
           expect.objectContaining({

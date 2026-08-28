@@ -85,6 +85,13 @@ describe("reloadAiStack", () => {
     expect(result.slots).toEqual(["story"]);
     expect(ai.slotRegistry.resolveSlot("alpha")).toBeUndefined();
     expect(ai.slotRegistry.resolveSlot("story")).toBeTruthy();
+    expect(
+      ai.config.presets.find((preset) => preset.defaultSlot === "story"),
+    ).toMatchObject({
+      provider: "xai",
+      model: "grok-4.6",
+      baseUrl: "https://api.x.ai/v1",
+    });
   });
 
   it("clears lastLoadError once a subsequent reload parses cleanly", async () => {

@@ -63,7 +63,7 @@ export function DesktopPane({ readOnly = false }: { readOnly?: boolean }) {
   // where opening the file actually works; Web users can't edit the sidecar
   // config file anyway. `state.llmConfig.configured === false` means the
   // server booted without any `[covel.<slot>]` sections and is running on
-  // the built-in DeepSeek fallback — a state the user almost certainly
+  // the built-in xAI Grok 4.6 fallback — a state the user almost certainly
   // wants to know about before it silently consumes credits.
   const showLlmMissingBanner =
     isDesktopApp() && state.llmConfig?.configured === false;

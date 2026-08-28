@@ -24,21 +24,20 @@ import type {
 /**
  * Built-in fallback LLM config used when no llm.toml is present.
  *
- * The desktop app must boot even if the user has never touched Settings.
- * This defines a single `story` slot pointing at DeepSeek, which all
- * plugin runtimes (model: "story" and model: "plugin") will resolve to
- * via the gateway's first-slot fallback. Users override this by writing
+ * This defines a single `story` slot pointing at xAI Grok 4.6, which all
+ * plugin runtimes (model: "story" and model: "plugin") resolve to through
+ * the gateway's first-text-slot fallback. Users override this by writing
  * their own llm.toml via the Settings UI.
  *
- * Note: no API keys live here. The user still must provide
- * DEEPSEEK_API_KEY (via .env.llm or the Settings UI → X-Provider-Keys)
- * before the slot can actually be called.
+ * Note: no API keys live here. The user still must provide XAI_API_KEY
+ * (via .env.llm or the Settings UI → X-Provider-Keys) before the slot can
+ * actually be called.
  */
 const DEFAULT_LLM_TOML = `
 [covel.story]
-provider = "deepseek"
-model    = "deepseek-v4-flash"
-baseUrl  = "https://api.deepseek.com"
+provider = "xai"
+model    = "grok-4.6"
+baseUrl  = "https://api.x.ai/v1"
 protocol = "openai-chat-v1"
 `;
 
@@ -47,7 +46,7 @@ protocol = "openai-chat-v1"
  *
  * Resolution order:
  *   1. `llm.toml` (COVEL_LLM_TOML override, else ./llm.toml in cwd)
- *   2. Built-in DEFAULT_LLM_TOML — deepseek "story" slot, always available
+ *   2. Built-in DEFAULT_LLM_TOML — xAI Grok 4.6 "story" slot
  *
  * We never throw on missing config. The desktop app can boot with nothing
  * configured; persistent llm.toml edits stay user-managed in the desktop
@@ -69,7 +68,7 @@ interface LoadedAiConfig {
  *
  * Resolution order:
  *   1. `llm.toml` (COVEL_LLM_TOML override, else ./llm.toml in cwd)
- *   2. Built-in DEFAULT_LLM_TOML — deepseek "story" slot, always available
+ *   2. Built-in DEFAULT_LLM_TOML — xAI Grok 4.6 "story" slot
  *
  * Never throws. A parse failure of a present file is reported via `error`
  * so the UI can tell the user *why* their slots vanished instead of
@@ -109,7 +108,7 @@ function loadAiConfig(): LoadedAiConfig {
   }
 
   console.log(
-    `[ai-setup] Using built-in default LLM config (deepseek/story). ` +
+    `[ai-setup] Using built-in default LLM config (xAI Grok 4.6/story). ` +
       `Override by editing ${llmTomlPath}.`,
   );
   const fallback = parseLlmConfig(DEFAULT_LLM_TOML);

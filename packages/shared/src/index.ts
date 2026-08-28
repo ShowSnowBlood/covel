@@ -35,6 +35,7 @@ export {
   providerKeyToId,
   toApiKeyEnvMap,
 } from "./utils/provider-keys.js";
+export { isGrok46Model } from "./utils/model-preference.js";
 
 // ── Environment Registry ──────────────────────────────────────────
 export * from "./env/index.js";

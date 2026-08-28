@@ -75,7 +75,7 @@ pnpm commit:push -- "feat: 中文摘要"  # once, only after the whole requested
 Dev-time files (copied from `*.example`):
 
 - `.env` — infrastructure (`STORE_BACKEND`, `DATABASE_URL`, `SERVER_PORT`, `COVEL_WORLDS_DIR`, etc.)
-- `llm.toml` — slot routing (`[covel.<slot>]` sections). If missing, server falls back to built-in DeepSeek `story` slot and boots anyway.
+- `llm.toml` — slot routing (`[covel.<slot>]` sections). If missing, server falls back to the built-in xAI Grok 4.6 `story` slot and boots anyway.
 - `.env.llm` — provider API keys. Dev server (`tsx watch`) loads `.env` + `.env.llm` from repo root.
 
 Desktop-shell files under `<covelHome>/` (typically `~/.covel/`):

@@ -12,36 +12,38 @@ const CONTEXT = {
 describe("generate-guide tool", () => {
   const guideTool = createGenerateGuide({ tool, z });
 
-  it("returns resolved categories with bilingual fallback labels", async () => {
+  it("returns the three fixed categories with bilingual labels", async () => {
     const result = await guideTool.execute(
       {
         topic: "How to enter the harbor",
-        categories: [
-          { style: "safe", suggestions: ["Ask the guard"] },
-          { style: "wild", label: "全力一搏", suggestions: ["Jump the fence"] },
-        ],
+        safe: ["Ask the guard"],
+        aggressive: ["Challenge the blockade"],
+        creative: ["Pose as a dock worker"],
       },
       CONTEXT,
     );
 
     expect(result.topic).toBe("How to enter the harbor");
-    expect(result.categories).toHaveLength(2);
-    // No LLM label → bilingual I18nText from STYLE_CONFIG.
-    expect(result.categories[0].label).toEqual({ zh: "稳妥", en: "Safe" });
-    // LLM-supplied label passes through untouched.
-    expect(result.categories[1].label).toBe("全力一搏");
-    expect(result.categories[0].slot).toBe(1);
-    expect(result.categories[1].slot).toBe(2);
+    expect(result.categories).toHaveLength(3);
+    expect(result.categories.map((category) => category.style)).toEqual([
+      "safe",
+      "aggressive",
+      "creative",
+    ]);
+    expect(result.categories.map((category) => category.label)).toEqual([
+      { zh: "稳妥", en: "Safe" },
+      { zh: "激进", en: "Aggressive" },
+      { zh: "创意", en: "Creative" },
+    ]);
   });
 
   it("emits one plugin.data.batch proposal covering the full message block", async () => {
     const result = await guideTool.execute(
       {
         topic: "Decision point",
-        categories: [
-          { style: "safe", suggestions: ["a", "b"] },
-          { style: "creative", suggestions: ["c"] },
-        ],
+        safe: ["a", "b"],
+        aggressive: ["c"],
+        creative: ["d"],
       },
       CONTEXT,
     );
@@ -55,8 +57,8 @@ describe("generate-guide tool", () => {
     expect(proposal.source).toEqual({ pluginId: "guide", runtimeId: "guide" });
 
     const items = proposal.payload.items;
-    // 2 header keys + 2 categories × (3 meta + 3 suggestion slots).
-    expect(items).toHaveLength(2 + 2 * 6);
+    // 2 header keys + 3 categories × (3 meta + 3 suggestion slots).
+    expect(items).toHaveLength(2 + 3 * 6);
     for (const item of items) {
       expect(Object.keys(item).sort()).toEqual(["key", "namespace", "value"]);
       expect(item.namespace).toBe("message");
@@ -67,8 +69,8 @@ describe("generate-guide tool", () => {
     expect(byKey.get("topic")).toBe("Decision point");
     expect(byKey.get("category1Suggestion1")).toBe("a");
     expect(byKey.get("category1Suggestion2")).toBe("b");
-    // Unused suggestion slots are written as empty strings, not omitted.
     expect(byKey.get("category1Suggestion3")).toBe("");
     expect(byKey.get("category2Suggestion1")).toBe("c");
+    expect(byKey.get("category3Suggestion1")).toBe("d");
   });
 });

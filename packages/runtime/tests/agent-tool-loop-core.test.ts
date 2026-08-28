@@ -175,6 +175,66 @@ describe("runAgentToolLoop core", () => {
     expect(messages[3]!.content).toContain("marked:alpha");
   });
 
+  it("automatically retries malformed tool arguments outside the step budget", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const seenRequests: string[] = [];
+    let calls = 0;
+    const responses: LLMResponse[] = [
+      {
+        content: null,
+        toolCalls: [
+          {
+            id: "tc-invalid",
+            name: "mark",
+            arguments: '{"note":"broken",}',
+          },
+        ],
+        finishReason: "tool_calls",
+        usage: { inputTokens: 1, outputTokens: 1 },
+      },
+      toolCall("mark", { note: "fixed" }, "tc-fixed"),
+      prose("after retry"),
+    ];
+    const llm: LLMAdapter = {
+      async generate(params) {
+        seenRequests.push(JSON.stringify(params.messages));
+        return responses[Math.min(calls++, responses.length - 1)]!;
+      },
+    };
+
+    try {
+      const result = await run({
+        llm,
+        manifest: manifest({ requireToolUse: true, maxSteps: 2 }),
+      });
+
+      expect(calls).toBe(3);
+      expect(result.finalContent).toBe("after retry");
+      expect(
+        result.collectedToolCalls.some((call) => {
+          if (
+            call.toolName !== "mark" ||
+            !call.input ||
+            typeof call.input !== "object" ||
+            !("note" in call.input)
+          ) {
+            return false;
+          }
+          return call.input.note === "fixed";
+        }),
+      ).toBe(true);
+      expect(seenRequests[1]).toContain("not valid JSON");
+      expect(seenRequests[1]).not.toContain("tc-invalid");
+      expect(
+        warn.mock.calls.some((call) =>
+          String(call[0]).includes("reason=invalid-tool-arguments"),
+        ),
+      ).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("runtime-done sentinel: early exit, sentinel stripped from business calls", async () => {
     const doneTool = tool({
       name: "runtime-done",

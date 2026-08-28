@@ -35,8 +35,7 @@ export function saveKeysEnv(
 ): void {
   const envKeys = toApiKeyEnvMap(keys);
   const body =
-    `# FrostFox Game provider API keys. One KEY=VALUE per line.\n` +
-    `# Example:\n#   DEEPSEEK_API_KEY=sk-xxx\n#   OPENAI_API_KEY=sk-xxx\n\n` +
+    `# Example:\n#   XAI_API_KEY=xai-xxx\n#   DEEPSEEK_API_KEY=sk-xxx\n#   OPENAI_API_KEY=sk-xxx\n\n` +
     Object.entries(envKeys)
       // audit M2: reject values with CR/LF — a newline would inject extra
       // `KEY=VALUE` lines and poison other providers' key parsing.

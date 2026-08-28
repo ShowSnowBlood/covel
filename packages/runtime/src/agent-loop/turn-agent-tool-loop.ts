@@ -218,6 +218,9 @@ export async function runAgentToolLoop({
   // finish back into the loop. Capped at one correction so a model that keeps
   // refusing to call its tool is released instead of burning maxSteps.
   let noToolCallCorrections = 0;
+  // Malformed JSON has not reached a business tool, so one corrective LLM
+  // call is safe to grant outside the normal step budget.
+  let invalidToolArgumentCorrections = 0;
   // Prose captured from steps that were extended by late steering (see the
   // late-steering drain below). Joined into finalContent at the final break
   // so the persisted narrative keeps both pre- and post-interjection text.
@@ -283,6 +286,9 @@ export async function runAgentToolLoop({
     response = await runPostLLMResponseHook(hookOpts, response);
 
     if (response.toolCalls.length > 0) {
+      const roundTranscriptStart = messages.length;
+      let invalidToolArgumentsThisRound = false;
+      let successfulToolCallThisRound = false;
       // LLM requested tool calls — execute them and feed results back.
       // Capture any narrative text produced alongside tool calls.
       if (response.content) {
@@ -412,6 +418,12 @@ export async function runAgentToolLoop({
               result,
             );
 
+          if (toolResult.success) {
+            successfulToolCallThisRound = true;
+          } else if (toolResult.errorCode === "INVALID_ARGS") {
+            invalidToolArgumentsThisRound = true;
+          }
+
           if (!toolResult.success) {
             failedToolCalls.push({
               toolName: effectiveTc.name,
@@ -521,6 +533,35 @@ export async function runAgentToolLoop({
         } else {
           messages.push(buildToolExecutionUnavailableMessage(tc.id));
         }
+      }
+
+      // A requireToolUse runtime cannot complete after a syntactically invalid
+      // call. Do not feed that malformed assistant tool-call back to an
+      // OpenAI-compatible provider: many reject the transcript before the model
+      // can see the tool error. Remove only this side-effect-free failed round,
+      // add a targeted correction, and grant one bounded extra attempt.
+      if (
+        requireToolUse &&
+        invalidToolArgumentsThisRound &&
+        !successfulToolCallThisRound &&
+        !terminatedByHook
+      ) {
+        messages.splice(roundTranscriptStart);
+        finalContent = null;
+        if (invalidToolArgumentCorrections === 0) {
+          invalidToolArgumentCorrections++;
+          steps--;
+          console.warn(
+            `[covel:warn] [runtime-retry] ${manifest.name} attempt=1 reason=invalid-tool-arguments cause=tool arguments were not valid JSON`,
+          );
+        }
+        messages.push({
+          role: "system",
+          content: input.locale?.toLowerCase().startsWith("zh")
+            ? "上一次工具调用的 arguments 不是有效 JSON。请立即重新调用该工具，只提交符合工具 schema 的 JSON 对象；键和值使用双引号，不要使用 Markdown 代码块或尾随逗号。"
+            : "The previous tool-call arguments were not valid JSON. Call the tool again now with only a JSON object that matches its schema; use double quotes and no Markdown fences or trailing commas.",
+        });
+        continue;
       }
 
       // Runtime-done early exit. If any tool call in this round was the

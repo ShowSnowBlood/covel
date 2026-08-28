@@ -18,6 +18,7 @@ import {
 import {
   FROSTFOX_LEVEL_COUNT,
   frostFoxLevelForWorld,
+  isGrok46Model,
   type DeploymentTier,
 } from "@covel/shared";
 
@@ -877,19 +878,36 @@ function normalizeScheduleEntries(
   return normalized;
 }
 
+/** Explicit administrator order wins; otherwise prefer catalog Grok 4.6. */
 function withManagedStorySchedule(
   defaults: SlotOverridesInput | undefined,
   schedule: FrostFoxModelSchedule | null,
   catalog: FrostFoxModelCatalog,
 ): SlotOverridesInput | undefined {
-  if (!schedule || schedule.story.length === 0) return defaults;
+  let scheduledEntries = schedule?.story;
+  if (!scheduledEntries || scheduledEntries.length === 0) {
+    let preferredEntry: FrostFoxModelScheduleEntry | undefined;
+    for (const channel of catalog.channels) {
+      if (!channel.enabled || channel.error) continue;
+      const model = channel.models.find(
+        (item) =>
+          item.capability.output.includes("text") &&
+          isGrok46Model(item.id, item.name),
+      );
+      if (!model) continue;
+      preferredEntry = { channelKey: channel.channelKey, modelId: model.id };
+      break;
+    }
+    if (!preferredEntry) return defaults;
+    scheduledEntries = [preferredEntry];
+  }
 
   const candidates: Array<{
     channel: FrostFoxModelChannel;
     model: FrostFoxModelEntry;
   }> = [];
   const seen = new Set<string>();
-  for (const entry of schedule.story) {
+  for (const entry of scheduledEntries) {
     const channel = catalog.channels.find(
       (item) =>
         item.channelKey === entry.channelKey && item.enabled && !item.error,
@@ -941,6 +959,12 @@ function withManagedStorySchedule(
     slotPresetOverrides.plugin === previousStory
   ) {
     slotPresetOverrides.plugin = primary;
+  }
+  if (
+    !slotPresetOverrides.utility ||
+    slotPresetOverrides.utility === previousStory
+  ) {
+    slotPresetOverrides.utility = primary;
   }
 
   return {

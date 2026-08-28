@@ -699,7 +699,7 @@
     "scheduleLoadFailed": "Could not load the shared model schedule.",
     "scheduleSaveFailed": "Could not save the shared model schedule.",
     "scheduleAdminOnly": "Only a FrostFox administrator can change this schedule.",
-    "scheduleEmpty": "No shared fallback schedule. The server llm.toml defaults are active.",
+    "scheduleEmpty": "No shared fallback schedule. Grok 4.6 is preferred when available; otherwise the server model defaults apply.",
     "scheduleModelLabel": "Story fallback model {{index}}",
     "scheduleUnavailableModel": "Unavailable model: {{model}}",
     "scheduleMoveUp": "Move model up",

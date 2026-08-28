@@ -1,3 +1,4 @@
+import { isGrok46Model } from "@covel/shared";
 import type { FrostFoxModelCatalog, PresetSummary } from "@/services/api.js";
 import { frostFoxModelRef } from "@/services/api.js";
 import { PROVIDERS } from "./constants.js";
@@ -48,6 +49,15 @@ export interface ManagedModelOption {
   name: string;
   channelName: string;
   model: string;
+}
+
+export function preferredManagedModelOption(
+  options: readonly ManagedModelOption[],
+): ManagedModelOption | undefined {
+  const preferred = options.find((option) =>
+    isGrok46Model(option.model, option.name),
+  );
+  return preferred ?? options[0];
 }
 
 export function managedModelOptions(
@@ -106,7 +116,8 @@ export function defaultManagedFormState(
   const selected = options.find(
     (option) => option.ref === form.managedModelRef,
   );
-  const option = selected ?? options[0]!;
+  const option = selected ?? preferredManagedModelOption(options);
+  if (!option) return form;
   if (selected && !form.apiKey) return form;
   return { ...form, managedModelRef: option.ref, apiKey: "" };
 }

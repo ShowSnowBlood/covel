@@ -698,7 +698,7 @@
     "scheduleLoadFailed": "共享模型计划加载失败。",
     "scheduleSaveFailed": "共享模型计划保存失败。",
     "scheduleAdminOnly": "只有 FrostFox 管理员可以修改此计划。",
-    "scheduleEmpty": "尚未设置共享故障转移计划，当前使用服务端 llm.toml 默认值。",
+    "scheduleEmpty": "尚未设置共享故障转移计划；Grok 4.6 可用时优先使用，否则使用服务端模型默认值。",
     "scheduleModelLabel": "故事故障转移模型 {{index}}",
     "scheduleUnavailableModel": "模型不可用：{{model}}",
     "scheduleMoveUp": "上移模型",

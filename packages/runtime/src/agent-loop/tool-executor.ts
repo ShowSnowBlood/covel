@@ -25,7 +25,7 @@ import type { ApprovalStatus, Proposal } from "@covel/shared";
 
 // ── Structured tool error shape (returned to LLM) ────────────────
 
-type ToolErrorCode =
+export type ToolErrorCode =
   | "NOT_FOUND"
   | "DENIED"
   | "UNAUTHORIZED"
@@ -89,6 +89,8 @@ export interface ToolCallResult {
   /** Successful business tool completed the runtime; no terminator LLM call. */
   readonly terminal?: boolean;
   readonly success: boolean;
+  /** Structured failure classification; absent for successful calls. */
+  readonly errorCode?: ToolErrorCode;
   readonly approvalStatus?: ApprovalStatus;
 }
 
@@ -272,6 +274,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
           result: errorResult,
           parsedResult: null,
           success: false,
+          errorCode: "UNAUTHORIZED",
           approvalStatus: "auto-allowed" as const,
         };
       }
@@ -307,6 +310,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
           result: errorResult,
           parsedResult: null,
           success: false,
+          errorCode: "NOT_FOUND",
           approvalStatus: "auto-allowed" as const,
         };
       }
@@ -369,6 +373,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
               result: denyResult,
               parsedResult: null,
               success: false,
+              errorCode: "DENIED",
               approvalStatus,
             };
           }
@@ -408,6 +413,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
           result: errorResult,
           parsedResult: null,
           success: false,
+          errorCode: "INVALID_ARGS",
           approvalStatus,
         };
       }
@@ -549,6 +555,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
           result: errorResult,
           parsedResult: null,
           success: false,
+          errorCode: code,
           approvalStatus,
         };
       }

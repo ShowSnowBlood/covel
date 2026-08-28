@@ -58,6 +58,7 @@ max_files   = 10
 
 ```env
 # 一行一个 KEY=VALUE，# 开头是注释
+XAI_API_KEY=xai-xxxxxxxxxxxx
 DEEPSEEK_API_KEY=sk-xxxxxxxxxxxx
 OPENAI_API_KEY=sk-xxxxxxxxxxxx
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
@@ -67,7 +68,7 @@ server 会按 `*_API_KEY` 扫描所有条目注入 provider 运行时。Key 名 
 
 ## `~/.covel/llm.toml`
 
-见仓库根 [`llm.toml.example`](../../llm.toml.example) 示例；每个模型用途对应一个服务商 / 模型组合。应用自带的兜底 `story` 用途指向 `deepseek-v4-flash`，填好 `keys.env` 的 `DEEPSEEK_API_KEY` 即可运行。
+见仓库根 [`llm.toml.example`](../../llm.toml.example) 示例；每个模型用途对应一个服务商 / 模型组合。应用自带的兜底 `story` 用途指向 xAI `grok-4.6`，填好 `keys.env` 的 `XAI_API_KEY` 即可运行。
 
 设置界面的模型部分分为“用途分配”“服务商与模型”“生成参数”。“服务商与模型”采用服务商列表 + 详情结构，一个服务商只需配置一次 API 地址、协议、密钥和价格倍率，并可批量添加多个模型 ID；`openai/gpt-5.6-sol` 等带 `/` 的 ID 会按原样发送。随后在“用途分配”中分别选择服务商和模型，无需再创建自定义 Preset。价格倍率默认 `1`，调试成本面板会用模型参考价乘以该倍率估算结算金额。
 

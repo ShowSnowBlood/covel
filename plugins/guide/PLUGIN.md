@@ -17,10 +17,10 @@ stage: post-turn
 # another text slot without crossing into image/audio roles.
 model: utility
 outputKind: system
-timeoutMs: 90000
-callTimeoutMs: 45000
+timeoutMs: 180000
+callTimeoutMs: 90000
 firstTokenTimeoutMs: 20000
-maxRetries: 0
+maxRetries: 1
 maxSteps: 2
 requireToolUse: true
 tags:
@@ -89,5 +89,6 @@ postHistory:
 - 每个分类包含 1-3 个具体可执行的建议，不要泛泛而谈
 - 建议必须与当前叙事情境直接相关
 - 固定提供 3 个分类：safe / aggressive / creative
+- `generate-guide` 参数固定为 `topic`、`safe`、`aggressive`、`creative`；后三项都是字符串数组。只通过工具调用提交参数，不要输出 JSON 文本或 Markdown 代码块
 - **每轮都必须调用 `generate-guide`，没有例外**。“平静”/“已结束”/“没有悬念”都不是理由——即使玩家只是在散步或整理物品，也给出“继续前进 / 留在原地观察 / 换一条路试试”这类低烈度建议
 - `generate-guide` 成功后 runtime 自动结束，不要输出任何额外文本，也不要再次调用工具
