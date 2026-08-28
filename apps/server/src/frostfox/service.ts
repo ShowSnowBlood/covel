@@ -419,9 +419,10 @@ export class FrostFoxService {
   async setModelSchedule(
     principal: FrostFoxPrincipal,
     story: readonly FrostFoxModelScheduleEntry[],
+    options: { readonly operatorAuthorized?: boolean } = {},
   ): Promise<FrostFoxModelSchedule> {
     const binding = await this.requiredBinding(principal.localUserId);
-    if (!binding.isAdmin) {
+    if (!options.operatorAuthorized && !binding.isAdmin) {
       throw new FrostFoxServiceError("frostfox_admin_required", 403);
     }
     if (binding.credentialState !== "active") {

@@ -70,6 +70,7 @@ export function FrostFoxModelScheduleCard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canEditModels, setCanEditModels] = useState(false);
 
   useEffect(() => {
     const refreshCatalog = () => setCatalog(getManagedFrostFoxCatalog());
@@ -82,7 +83,14 @@ export function FrostFoxModelScheduleCard() {
     setLoading(true);
     void fetchFrostFoxAccount(true)
       .then((next) => {
-        if (active) setAccount(next);
+        if (active) {
+          setAccount(next);
+          setCanEditModels(
+            next.canEditModels === true ||
+              next.operatorAuthorized === true ||
+              next.account?.isAdmin === true,
+          );
+        }
         return next;
       })
       .then((next) => {
@@ -94,6 +102,7 @@ export function FrostFoxModelScheduleCard() {
       .then((next) => {
         if (!active || !next) return;
         setSchedule(next);
+        setCanEditModels((current) => current || next.canEdit === true);
         setDraft(next.story.map((entry) => ({ ...entry })));
       })
       .catch(() => {
@@ -115,7 +124,7 @@ export function FrostFoxModelScheduleCard() {
   const isHostedAccount = Boolean(
     account?.enabled && account.authenticated && account.account,
   );
-  const isAdmin = account?.account?.isAdmin === true;
+  const isAdmin = canEditModels;
 
   if (!isHostedAccount) return null;
 

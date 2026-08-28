@@ -170,6 +170,19 @@ describe("FrostFox first-party SaaS", () => {
       status: 403,
     });
   });
+  it("allows an operator-authorized model schedule write", async () => {
+    const { service, principal } = await createBoundService(false);
+
+    await expect(
+      service.setModelSchedule(
+        principal,
+        [{ channelKey: "story", modelId: "story-primary" }],
+        { operatorAuthorized: true },
+      ),
+    ).resolves.toMatchObject({
+      story: [{ channelKey: "story", modelId: "story-primary" }],
+    });
+  });
   it("rejects runtime policy writes for non-admin accounts", async () => {
     const { service, principal } = await createBoundService(false);
 

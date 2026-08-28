@@ -24,6 +24,8 @@ export interface FrostFoxAccountStatus {
   readonly routerBaseUrl?: string;
   /** True when the stored operator credential passed the server gate. */
   readonly operatorAuthorized?: boolean;
+  /** Server-authoritative permission to edit shared model routing. */
+  readonly canEditModels?: boolean;
   readonly account?: FrostFoxAccountView;
 }
 
@@ -123,6 +125,7 @@ export async function fetchFrostFoxModelSchedule(
 ): Promise<FrostFoxModelSchedule> {
   return request<FrostFoxModelSchedule>("/api/frostfox/model-schedule", {
     ...FROSTFOX_REQUEST_OPTIONS,
+    operatorAuth: true,
     silentErrors,
   });
 }
@@ -132,6 +135,7 @@ export async function saveFrostFoxModelSchedule(
 ): Promise<FrostFoxModelSchedule> {
   return request<FrostFoxModelSchedule>("/api/frostfox/model-schedule", {
     ...FROSTFOX_REQUEST_OPTIONS,
+    operatorAuth: true,
     method: "PUT",
     body: JSON.stringify({ story }),
   });

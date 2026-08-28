@@ -11,6 +11,7 @@
  * mapping) come in through {@link ImageGenerationPluginConfig}.
  */
 
+import type { JobStatusRecord } from "@covel/shared";
 import { optionalString } from "./index.js";
 
 /** The slice of FunctionHandlerContext this trunk reads. */
@@ -28,6 +29,14 @@ export interface ImageGenerationHandlerContext {
   };
   readonly pluginData?: {
     set(namespace: string, key: string, value: unknown): Promise<void>;
+  };
+  readonly progress?: {
+    report(
+      effect: Omit<
+        JobStatusRecord,
+        "sessionId" | "progressScopeId" | "pluginId" | "runtimeId" | "createdAt"
+      >,
+    ): Promise<void>;
   };
   readonly logger?: {
     info?(event: string, data?: Record<string, unknown>): Promise<void> | void;
@@ -132,6 +141,20 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+async function reportProgress(
+  ctx: ImageGenerationHandlerContext,
+  effect: Parameters<
+    NonNullable<ImageGenerationHandlerContext["progress"]>["report"]
+  >[0],
+): Promise<void> {
+  try {
+    await ctx.progress?.report(effect);
+  } catch {
+    // Progress is observability-only. A reporting outage must not turn a paid
+    // provider result into a failed image generation.
+  }
+}
+
 /**
  * Uniform failure path: gallery record + logger entry + handler return value,
  * so every error lands as a visible `failed` card instead of a missing entry.
@@ -141,6 +164,13 @@ async function failureRecord(
   baseRecord: Record<string, unknown> & { imageId: string },
   message: string,
 ): Promise<Record<string, unknown>> {
+  await reportProgress(ctx, {
+    jobId: baseRecord.imageId,
+    state: "failed",
+    sequence: 1,
+    message,
+    data: { modality: "image" },
+  });
   const record = {
     ...baseRecord,
     status: "failed",
@@ -230,6 +260,14 @@ export async function runImageGeneration(
     ...(plan.quality !== undefined ? { quality: plan.quality } : {}),
   });
 
+  await reportProgress(ctx, {
+    jobId: imageId,
+    state: "running",
+    progress: 5,
+    sequence: 0,
+    data: { modality: "image" },
+  });
+
   try {
     const { refs, warnings, cached } = await ctx.images.generate({
       presetId: plan.presetId,
@@ -294,6 +332,14 @@ export async function runImageGeneration(
       imageCount: refs.length,
       cached,
       ...(warnings.length > 0 ? { warnings } : {}),
+    });
+
+    await reportProgress(ctx, {
+      jobId: imageId,
+      state: "succeeded",
+      progress: 100,
+      sequence: 1,
+      data: { modality: "image" },
     });
 
     return {

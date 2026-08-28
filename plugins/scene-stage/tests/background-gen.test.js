@@ -296,7 +296,7 @@ describe("scene-stage background-gen progress reporting", () => {
     expect(report.mock.calls[1][0]).toMatchObject({
       jobId: "scene-background:gen-abcd1234:day",
       state: "succeeded",
-      progress: 1,
+      progress: 100,
       sequence: 2,
     });
   });

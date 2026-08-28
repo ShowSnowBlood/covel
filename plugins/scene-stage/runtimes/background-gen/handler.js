@@ -100,6 +100,7 @@ export default async function handler(ctx) {
     state: "running",
     sequence: (progressSequence += 1),
     message: `Generating ${variant} background`,
+    data: { modality: "image", kind: SCENE_KIND, sceneId, variant },
   });
   try {
     const { refs } = await ctx.images.generate({
@@ -125,6 +126,7 @@ export default async function handler(ctx) {
       state: "failed",
       sequence: (progressSequence += 1),
       message,
+      data: { modality: "image", kind: SCENE_KIND, sceneId, variant },
     });
     return { outcome: "failed", error: message };
   }
@@ -154,8 +156,9 @@ export default async function handler(ctx) {
   await reportProgress(ctx, {
     jobId,
     state: "succeeded",
-    progress: 1,
+    progress: 100,
     sequence: (progressSequence += 1),
+    data: { modality: "image", kind: SCENE_KIND, sceneId, variant },
   });
 
   // assetGenerations is a domain effect; the kernel projects it back to the

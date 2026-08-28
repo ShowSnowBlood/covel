@@ -107,9 +107,10 @@ export function SettingsDialog({
   const hostedServiceEnabled = status?.enabled === true;
   const hostedAdmin = Boolean(
     hostedServiceEnabled &&
-    (status.operatorAuthorized || status.account?.isAdmin === true),
+    (status?.canEditModels === true ||
+      status?.operatorAuthorized === true ||
+      status?.account?.isAdmin === true),
   );
-  const adminSettingsReadOnly = false;
   const [query, setQuery] = useState("");
   const [storeRevision, setStoreRevision] = useState(0);
 
@@ -345,7 +346,7 @@ export function SettingsDialog({
               {focusNode && hostedPlayerModelLocked && isLlmNode(focusNode) ? (
                 <ManagedModelNotice t={t} />
               ) : (
-                renderPane(selectedNode, t, adminSettingsReadOnly)
+                renderPane(selectedNode, t, false)
               )}
             </div>
           </section>

@@ -10,6 +10,7 @@ import type { FrostFoxModelCatalog } from "@/services/api.js";
 import i18n from "@/i18n";
 import {
   FrostFoxAccountProvider,
+  frostFoxModelControlsLocked,
   useFrostFoxAccount,
 } from "../frostfox-account-context.js";
 import { FrostFoxAccountSummary } from "../frostfox-account-summary.js";
@@ -83,6 +84,42 @@ describe("FrostFoxAccountSummary", () => {
     await i18n.changeLanguage("en-US");
   });
 
+  it("allows an operator-authorized hosted account to edit models", () => {
+    expect(
+      frostFoxModelControlsLocked({
+        enabled: true,
+        authenticated: true,
+        operatorAuthorized: true,
+        account: {
+          id: "ff-operator",
+          name: "operator",
+          balance: 1,
+          isAdmin: false,
+          credentialState: "active",
+          lastVerifiedAt: "2026-08-28T00:00:00.000Z",
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps ordinary hosted accounts on the managed model policy", () => {
+    expect(
+      frostFoxModelControlsLocked({
+        enabled: true,
+        authenticated: true,
+        operatorAuthorized: false,
+        account: {
+          id: "ff-player",
+          name: "player",
+          balance: 1,
+          isAdmin: false,
+          credentialState: "active",
+          lastVerifiedAt: "2026-08-28T00:00:00.000Z",
+        },
+      }),
+    ).toBe(true);
+  });
+
   it("renders connect button when unauthenticated", async () => {
     api.fetchAccount.mockResolvedValue({
       enabled: true,
@@ -143,7 +180,6 @@ describe("FrostFoxAccountSummary", () => {
     expect(screen.queryByText("Account Settings")).toBeNull();
     expect(screen.getByText("Sign Out")).toBeTruthy();
     expect(screen.getByText("Switch Account")).toBeTruthy();
-
   });
 
   it("shows account settings only to an administrator", async () => {

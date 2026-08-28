@@ -175,7 +175,7 @@ export function FrostFoxAccountPane() {
               />
             </div>
             <div className="min-w-0 space-y-0.5">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-bold tracking-tight text-foreground truncate">
                   {account.name}
                 </h3>
@@ -196,6 +196,15 @@ export function FrostFoxAccountPane() {
                     ? t("settings.frostfox.reconnectRequired")
                     : t("settings.frostfox.connected")}
                 </Badge>
+                {(account.isAdmin || status.operatorAuthorized) && (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-primary/30 bg-primary/10 text-[10px] text-primary"
+                  >
+                    <ShieldCheck className="h-3 w-3" />
+                    {t("settings.frostfox.modelAdmin")}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
                 <span className="truncate max-w-[200px]" title={account.id}>

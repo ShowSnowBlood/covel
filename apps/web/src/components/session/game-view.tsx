@@ -60,6 +60,7 @@ import {
 } from "./game-view/game-view-header.js";
 import { MessageComposer } from "./game-view/message-composer.js";
 import { PendingDraftsBar } from "./game-view/pending-drafts-bar.js";
+import { IllustrationGenerationDialog } from "./game-view/illustration-generation-dialog.js";
 import { useGameViewComposer } from "./game-view/use-game-view-composer.js";
 import { isDesktopApp } from "@/lib/desktop-bridge.js";
 import { worldVisual } from "@/lib/world-visuals.js";
@@ -107,6 +108,7 @@ export function GameView({ session }: GameViewProps) {
     llmConfig,
     statePatches,
     executionSteps,
+    jobStatuses,
     worldSessions,
     submittedBlockIds,
     submittedBlockValues,
@@ -534,6 +536,10 @@ export function GameView({ session }: GameViewProps) {
           initialKey={settings.initialKey}
         />
       )}
+      <IllustrationGenerationDialog
+        jobStatuses={jobStatuses ?? []}
+        sessionPlugins={sessionPlugins}
+      />
 
       <Dialog open={suspensionsOpen} onOpenChange={setSuspensionsOpen}>
         <DialogContent className="max-w-xl">

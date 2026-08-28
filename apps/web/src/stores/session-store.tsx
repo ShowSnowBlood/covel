@@ -1,6 +1,9 @@
 import { useMemo, useReducer, type ReactNode } from "react";
 import { getDataService } from "@/services/data-service";
-import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccount,
+} from "@/components/frostfox-account-context.js";
 import { useBuildSessionActions } from "./session-store/actions.js";
 import {
   SessionActionsContext,
@@ -63,12 +66,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ds,
     refs,
     handleSseEvent,
-    allowModelOverrides: !(
-      frostFoxStatus?.enabled &&
-      frostFoxStatus.authenticated &&
-      frostFoxStatus.account &&
-      frostFoxStatus.account.isAdmin !== true
-    ),
+    allowModelOverrides: !frostFoxModelControlsLocked(frostFoxStatus),
   });
 
   useBootEffect(

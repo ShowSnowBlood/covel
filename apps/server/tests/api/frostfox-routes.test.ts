@@ -44,15 +44,21 @@ function createApp(principal: FrostFoxPrincipal | null) {
       story: [{ channelKey: "story", modelId: "primary" }],
       updatedAt: "2026-08-27T00:00:00.000Z",
     })),
-    setModelSchedule: vi.fn(async (value: FrostFoxPrincipal) => {
-      if (!value.isAdmin) {
-        throw new FrostFoxServiceError("frostfox_admin_required", 403);
-      }
-      return {
-        story: [{ channelKey: "story", modelId: "primary" }],
-        updatedAt: "2026-08-27T00:00:00.000Z",
-      };
-    }),
+    setModelSchedule: vi.fn(
+      async (
+        value: FrostFoxPrincipal,
+        _story: unknown,
+        options?: { readonly operatorAuthorized?: boolean },
+      ) => {
+        if (!options?.operatorAuthorized && !value.isAdmin) {
+          throw new FrostFoxServiceError("frostfox_admin_required", 403);
+        }
+        return {
+          story: [{ channelKey: "story", modelId: "primary" }],
+          updatedAt: "2026-08-27T00:00:00.000Z",
+        };
+      },
+    ),
     getRuntimePolicy: vi.fn(async () => ({
       policy: { timeoutMs: 180_000, maxRetries: 1 },
       updatedAt: "2026-08-27T00:00:00.000Z",
@@ -116,12 +122,37 @@ describe("FrostFox auth session routes", () => {
         cookie: "covel_frostfox_session=old-session",
       },
     });
-
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toMatch(
       /covel_frostfox_session=; Max-Age=0; Path=\//,
     );
     expect(response.headers.get("vary")).toBe("Cookie");
+  });
+});
+
+describe("FrostFox account permission response", () => {
+  it("returns the server-confirmed model edit capability", async () => {
+    const { app } = createApp(admin);
+    const response = await app.request("/api/frostfox/account");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      authenticated: true,
+      canEditModels: true,
+      account: { isAdmin: true },
+    });
+  });
+
+  it("does not grant model edit capability to a player", async () => {
+    const { app } = createApp(player);
+    const response = await app.request("/api/frostfox/account");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      authenticated: true,
+      canEditModels: false,
+      account: { isAdmin: false },
+    });
   });
 });
 
@@ -175,9 +206,51 @@ describe("FrostFox model schedule routes", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ canEdit: true });
-    expect(service.setModelSchedule).toHaveBeenCalledWith(admin, [
-      { channelKey: "story", modelId: "primary" },
-    ]);
+    expect(service.setModelSchedule).toHaveBeenCalledWith(
+      admin,
+      [{ channelKey: "story", modelId: "primary" }],
+      { operatorAuthorized: false },
+    );
+  });
+
+  it("allows the hosted operator to save the shared schedule", async () => {
+    const originalToken = process.env.COVEL_DESKTOP_REST_TOKEN;
+    process.env.COVEL_DESKTOP_REST_TOKEN = "operator-secret";
+    try {
+      const { app, service } = createApp(player);
+      const headers = {
+        authorization: "Bearer operator-secret",
+        origin: "https://covel.example",
+        "content-type": "application/json",
+      };
+      const readResponse = await app.request("/api/frostfox/model-schedule", {
+        headers,
+      });
+      expect(readResponse.status).toBe(200);
+      await expect(readResponse.json()).resolves.toMatchObject({
+        canEdit: true,
+      });
+
+      const writeResponse = await app.request("/api/frostfox/model-schedule", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          story: [{ channelKey: "story", modelId: "primary" }],
+        }),
+      });
+      expect(writeResponse.status).toBe(200);
+      expect(service.setModelSchedule).toHaveBeenCalledWith(
+        player,
+        [{ channelKey: "story", modelId: "primary" }],
+        { operatorAuthorized: true },
+      );
+    } finally {
+      if (originalToken === undefined) {
+        delete process.env.COVEL_DESKTOP_REST_TOKEN;
+      } else {
+        process.env.COVEL_DESKTOP_REST_TOKEN = originalToken;
+      }
+    }
   });
 });
 

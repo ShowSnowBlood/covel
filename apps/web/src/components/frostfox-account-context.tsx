@@ -144,15 +144,16 @@ export function useFrostFoxAccountOptional(): FrostFoxAccountContextValue | null
   return useContext(FrostFoxAccountContext);
 }
 
-/** Hosted non-admin accounts use the administrator's model policy. */
+/** Hosted accounts without server-confirmed model-admin access are locked. */
 export function frostFoxModelControlsLocked(
   status: FrostFoxAccountStatus | null | undefined,
 ): boolean {
+  const canEditModels =
+    status?.canEditModels === true ||
+    status?.operatorAuthorized === true ||
+    status?.account?.isAdmin === true;
   return Boolean(
-    status?.enabled &&
-    status.authenticated &&
-    status.account &&
-    status.account.isAdmin !== true,
+    status?.enabled && status.authenticated && status.account && !canEditModels,
   );
 }
 
@@ -170,7 +171,8 @@ export function frostFoxSettingsAvailable(
   if (!status) return false;
   if (!status.enabled) return true;
   return Boolean(
-    status.operatorAuthorized ||
+    status.canEditModels === true ||
+    status.operatorAuthorized === true ||
     (status.authenticated && status.account?.isAdmin === true),
   );
 }

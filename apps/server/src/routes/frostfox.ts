@@ -55,12 +55,14 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
         // Account status remains useful during a transient Router outage.
       }
     }
+    const operatorAuthorized = hasOperatorToken(c);
     return c.json({
       enabled: true,
       authenticated: !!principal,
       clientId: service.runtimeConfig.clientId,
       routerBaseUrl: service.runtimeConfig.routerBaseUrl,
-      operatorAuthorized: hasOperatorToken(c),
+      operatorAuthorized,
+      canEditModels: Boolean(operatorAuthorized || principal?.isAdmin === true),
       ...(principal
         ? {
             account: {
@@ -155,7 +157,7 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
       return c.json({
         story: schedule?.story ?? [],
         updatedAt: schedule?.updatedAt ?? null,
-        canEdit: access.principal.isAdmin === true,
+        canEdit: hasOperatorToken(c) || access.principal.isAdmin === true,
       });
     } catch (error) {
       return serviceError(c, error);
@@ -179,6 +181,7 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
       const schedule = await access.service.setModelSchedule(
         access.principal,
         story,
+        { operatorAuthorized: hasOperatorToken(c) },
       );
       return c.json({ ...schedule, canEdit: true });
     } catch (error) {

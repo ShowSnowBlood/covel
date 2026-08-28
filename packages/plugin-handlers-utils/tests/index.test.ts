@@ -118,12 +118,14 @@ describe("runImageGeneration", () => {
       { id: "b".repeat(64), mime: "image/png", size: 456 },
     ];
     const set = vi.fn(async () => undefined);
+    const report = vi.fn(async () => undefined);
 
     const result = await runImageGeneration(
       {
         turnId: "turn-1",
         manualPayload: { prompt: "draw the harbour" },
         pluginData: { set },
+        progress: { report },
         images: {
           generate: vi.fn(async () => ({ refs, warnings: [], cached: false })),
         },
@@ -162,5 +164,59 @@ describe("runImageGeneration", () => {
       status: "done",
       ref: refs[1],
     });
+    expect(report).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        state: "running",
+        progress: 5,
+        sequence: 0,
+        data: { modality: "image" },
+      }),
+    );
+    expect(report).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        state: "succeeded",
+        progress: 100,
+        sequence: 1,
+        data: { modality: "image" },
+      }),
+    );
+  });
+
+  it("reports a terminal failure without hiding the gallery error", async () => {
+    const report = vi.fn(async () => undefined);
+    const result = await runImageGeneration(
+      {
+        turnId: "turn-2",
+        manualPayload: { prompt: "draw the ruins" },
+        progress: { report },
+        images: {
+          generate: vi.fn(async () => {
+            throw new Error("provider unavailable");
+          }),
+        },
+      },
+      {
+        source: "image-test",
+        triggerTopic: "image.generate.requested",
+        planRequest: (_settings, { prompt }) => ({
+          prompt,
+          presetId: "image",
+          size: "1024x1024",
+          n: 1,
+          requestTimeoutMs: 1_000,
+        }),
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error: "provider unavailable",
+    });
+    expect(report.mock.calls.map(([effect]) => effect.state)).toEqual([
+      "running",
+      "failed",
+    ]);
   });
 });

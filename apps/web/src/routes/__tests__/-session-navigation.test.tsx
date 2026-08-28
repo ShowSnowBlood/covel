@@ -42,6 +42,7 @@ vi.mock("@/components/frostfox-account-context.js", () => ({
     error: null,
     refresh: vi.fn(),
   }),
+  frostFoxSettingsAvailable: () => true,
 }));
 
 vi.mock("@/stores/session-store.js", () => ({
@@ -76,6 +77,7 @@ vi.mock("@/hooks/use-settings-dialog.js", () => ({
 
 vi.mock("@/lib/desktop-bridge.js", () => ({
   initDesktopBridge: () => () => {},
+  isDesktopApp: () => false,
 }));
 
 vi.mock("@/services/data-service.js", () => ({

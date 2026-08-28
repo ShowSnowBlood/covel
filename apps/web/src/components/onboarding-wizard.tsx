@@ -6,7 +6,10 @@ import {
   listPresets,
   managedCatalogToPresetSummaries,
 } from "@/services/api.js";
-import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
+import {
+  frostFoxModelControlsLocked,
+  useFrostFoxAccount,
+} from "@/components/frostfox-account-context.js";
 import { emitToast } from "@/lib/toast-channel.js";
 import { useLocalePreference } from "@/hooks/useLocalePreference";
 import { TOTAL_STEPS } from "./onboarding-wizard/constants.js";
@@ -143,8 +146,7 @@ export function OnboardingWizard() {
   const managedOnly = Boolean(
     status?.enabled && status.authenticated && status.account,
   );
-  const isAdmin = status?.account?.isAdmin === true;
-  const modelSelectionLocked = managedOnly && !isAdmin;
+  const modelSelectionLocked = frostFoxModelControlsLocked(status);
   const managedModelsLoading = managedOnly && managedLoading;
   const dismissing = useRef(false);
   const [step, setStep] = useState<OnboardingStep>(0);
