@@ -43,6 +43,8 @@ export interface MediaProps {
   readonly maxHeight?: string;
   /** Override mime sniff (rare; e.g. force <audio> for octet-stream). */
   readonly as?: "image" | "audio" | "video" | "auto";
+  /** Use a transparent placeholder during loading (prevents grey flash on sprites). */
+  readonly transparentPlaceholder?: boolean;
 }
 
 type RenderKind = "image" | "audio" | "video" | "file";
@@ -92,12 +94,18 @@ export function Media(props: MediaProps): ReactElement {
     className,
     maxHeight,
     as = "auto",
+    transparentPlaceholder,
   } = props;
 
   const refForResolve = isMediaRef(src) ? src : null;
   const refMime = refForResolve?.mime ?? "";
 
   const [state, setState] = useState<ResolvedState>(INITIAL_STATE);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [state.url]);
 
   // Track last revoke target so we don't revoke the URL for the next render.
   const revokeRef = useRef<string | null>(null);
@@ -150,12 +158,18 @@ export function Media(props: MediaProps): ReactElement {
   // In maxHeight mode the placeholders keep the aspect ratio but never exceed
   // the bound, so a tall portrait's loading/error tile doesn't overflow either.
   const baseStyle = maxHeight ? { aspectRatio, maxHeight } : { aspectRatio };
+  const isTransparent = Boolean(
+    transparentPlaceholder || rounded === "none" || fit === "contain",
+  );
 
   if (state.status === "loading") {
     return (
       <div
         className={clsx(
-          "bg-muted border border-border flex items-center justify-center w-full",
+          isTransparent
+            ? "bg-transparent border-transparent"
+            : "bg-muted border border-border",
+          "flex items-center justify-center w-full",
           radius,
           className,
         )}
@@ -194,8 +208,10 @@ export function Media(props: MediaProps): ReactElement {
         <img
           src={state.url}
           alt={alt}
+          onLoad={() => setImgLoaded(true)}
           className={clsx(
-            "block mx-auto max-w-full object-contain",
+            "block mx-auto max-w-full object-contain transition-opacity duration-300 ease-out",
+            imgLoaded ? "opacity-100" : "opacity-0",
             radius,
             className,
           )}
@@ -208,8 +224,10 @@ export function Media(props: MediaProps): ReactElement {
         src={state.url}
         alt={alt}
         loading="lazy"
+        onLoad={() => setImgLoaded(true)}
         className={clsx(
-          "w-full block",
+          "w-full block transition-opacity duration-300 ease-out",
+          imgLoaded ? "opacity-100" : "opacity-0",
           radius,
           fit === "contain" ? "object-contain" : "object-cover",
           className,
@@ -218,7 +236,6 @@ export function Media(props: MediaProps): ReactElement {
       />
     );
   }
-
   if (kind === "audio") {
     return (
       <audio

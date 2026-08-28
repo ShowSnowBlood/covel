@@ -1277,10 +1277,19 @@ html[data-theme].dark {
    stage-width percent, see computeSpriteLanes) rather than a translateX(-50%)
    center anchor, so the keyframe owns `transform` outright — no static
    offset to preserve across the animation's fill-forward. */
+@keyframes ui-progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @keyframes ui-stage-rise-in {
   from {
     opacity: 0;
-    transform: translateY(2%);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -1293,28 +1302,29 @@ html[data-theme].dark {
 }
 
 .ui-stage-sprite {
-  animation: ui-stage-rise-in 300ms ease-out both;
+  animation: ui-stage-rise-in 450ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Active/inactive treatment lives on the sprite's *inner* element (never
    the animated outer wrapper above) so it doesn't fight the entrance
    animation for control of `transform`. */
 .ui-stage-sprite-active {
-  transform: scale(1.05);
+  transform: scale(1.04);
   transform-origin: bottom center;
   filter: drop-shadow(
-    0 0 28px color-mix(in oklab, var(--accent-primary) 55%, transparent)
+    0 0 24px color-mix(in oklab, var(--accent-primary) 45%, transparent)
   );
+  opacity: 1;
 }
 
-/* Inactive sprites scale *down* with feet planted (bottom origin): with
-   `object-contain` lanes a tall inactive sprite can out-height a wide active
-   one, so the down-scale keeps the speaker the dominant figure regardless of
-   image aspect ratios. */
+/* Inactive sprites keep visual clarity with high opacity and gentle brightness
+   so character portraits remain vibrant and clearly visible while giving
+   the active speaker subtle focus. */
 .ui-stage-sprite-inactive {
-  transform: scale(0.93);
+  transform: scale(0.96);
   transform-origin: bottom center;
-  filter: brightness(0.55) saturate(0.6);
+  filter: brightness(0.85) saturate(0.92);
+  opacity: 0.9;
 }
 
 /* Silhouette standee for a speaking character with no sprite/avatar yet — a

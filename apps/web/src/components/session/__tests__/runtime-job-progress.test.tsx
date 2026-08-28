@@ -79,4 +79,39 @@ describe("RuntimeJobProgress", () => {
     expect(screen.getByText("current")).toBeTruthy();
     expect(screen.getByText("background")).toBeTruthy();
   });
+
+  it("renders instant turn dispatching state when executing is true without active jobs", () => {
+    renderWithState({
+      ...initialState,
+      executing: true,
+      jobStatuses: [],
+    });
+
+    expect(screen.getByTestId("runtime-job-progress")).toBeTruthy();
+    expect(screen.getByText("turn")).toBeTruthy();
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+  });
+
+  it("renders instant dispatching state when executing is true and only completed jobs exist", () => {
+    renderWithState({
+      ...initialState,
+      executing: true,
+      jobStatuses: [
+        job({ jobId: "previous-complete", state: "succeeded" }),
+      ],
+    });
+
+    expect(screen.getByTestId("runtime-job-progress")).toBeTruthy();
+    expect(screen.getByText("turn")).toBeTruthy();
+  });
+
+  it("returns null when not executing and jobStatuses is empty", () => {
+    renderWithState({
+      ...initialState,
+      executing: false,
+      jobStatuses: [],
+    });
+
+    expect(screen.queryByTestId("runtime-job-progress")).toBeNull();
+  });
 });

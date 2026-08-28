@@ -227,6 +227,8 @@
     "jobStatusFailed": "Failed",
     "jobStatusCancelled": "Cancelled",
     "jobStatusActive": "Active",
+    "turnDispatching": "Processing turn",
+    "turnDispatchingDesc": "Dispatching plugins and narrative tasks...",
     "illustrationProgress": {
       "generatingTitle": "Generating this turn's illustration",
       "completeTitle": "This turn's illustration is ready",

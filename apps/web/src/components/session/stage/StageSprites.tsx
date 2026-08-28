@@ -61,10 +61,8 @@ export function StageSprites({
   return (
     <div
       className={clsx(
-        // Dim is brightness-only: opacity made sprites see-through against
-        // the backdrop for the whole idle wait, which read as a rendering bug.
-        "pointer-events-none absolute inset-x-0 top-0 bottom-[26%] transition-[filter] duration-300",
-        dimmed && "brightness-[.6]",
+        "pointer-events-none absolute inset-x-0 top-0 bottom-[26%] transition-[filter,opacity] duration-500 ease-out",
+        dimmed ? "brightness-[.88] opacity-90" : "brightness-100 opacity-100",
       )}
       data-testid="stage-sprites"
     >
@@ -88,7 +86,7 @@ export function StageSprites({
         >
           <div
             className={clsx(
-              "flex h-full w-full items-end justify-center transition-[filter,transform] duration-300 ease-out",
+              "flex h-full w-full items-end justify-center transition-[filter,transform,opacity] duration-400 ease-out",
               slot.active
                 ? "ui-stage-sprite-active"
                 : "ui-stage-sprite-inactive",
@@ -102,6 +100,7 @@ export function StageSprites({
                 fit="contain"
                 rounded="none"
                 maxHeight="100%"
+                transparentPlaceholder
               />
             ) : (
               // No authored stage sprite yet — a name-initial standee keeps

@@ -226,6 +226,8 @@
     "jobStatusFailed": "失败",
     "jobStatusCancelled": "已取消",
     "jobStatusActive": "进行中",
+    "turnDispatching": "正在推进回合",
+    "turnDispatchingDesc": "正在调度插件与剧情任务...",
     "illustrationProgress": {
       "generatingTitle": "正在生成本回合插画",
       "completeTitle": "本回合插画已完成",
