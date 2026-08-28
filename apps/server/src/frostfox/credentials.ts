@@ -516,7 +516,9 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
       return row ? mapBindingRow(row) : null;
     },
     async upsertBinding(record) {
-      const row = upsertBinding.get(...bindingParams(record));
+      const row = upsertBinding.get(
+        ...bindingParams(record, record.isAdmin ? 1 : 0),
+      );
       if (!row) throw new Error("failed to upsert FrostFox binding");
       return mapBindingRow(row);
     },
@@ -638,7 +640,7 @@ async function createPostgresCredentialStore(
            last_verified_at = excluded.last_verified_at,
            updated_at = excluded.updated_at
          RETURNING *`,
-        bindingParams(record),
+        bindingParams(record, record.isAdmin),
       );
       if (!rows[0]) throw new Error("failed to upsert FrostFox binding");
       return mapBindingRow(rows[0]);
@@ -726,14 +728,22 @@ async function createPostgresCredentialStore(
   };
 }
 
-function bindingParams(record: FrostFoxBinding): Array<string | number> {
+/**
+ * SQLite's native driver cannot bind booleans, while postgres.js serializes
+ * values inferred as BOOLEAN with `value === true`; keep each backend's
+ * parameter representation explicit.
+ */
+function bindingParams(
+  record: FrostFoxBinding,
+  isAdminValue: number | boolean,
+): Array<string | number | boolean> {
   return [
     record.localUserId,
     record.issuer,
     record.routerAccountId,
     record.accountName,
     record.balance,
-    record.isAdmin ? 1 : 0,
+    isAdminValue,
     record.accountKeyCiphertext,
     record.credentialState,
     record.credentialGenerationUpdatedAt,
