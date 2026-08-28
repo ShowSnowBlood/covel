@@ -13,10 +13,11 @@ import {
   type ReactElement,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Send } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
+import { Magnet } from "@/components/reactbits/Magnet.js";
+import { cn } from "@/lib/utils.js";
 import { useTypewriter } from "./use-typewriter.js";
-
 export interface StageDialogProps {
   readonly turnId?: string;
   readonly storyText: string;
@@ -101,7 +102,11 @@ export function StageDialog({
     >
       <div className="ui-stage-panel pointer-events-auto relative w-full max-w-3xl rounded-2xl border border-border/80 bg-card/90 shadow-2xl backdrop-blur-2xl">
         {inputMode ? (
-          <div className="flex flex-col gap-2 p-3.5 sm:p-4">
+          <div className="flex flex-col gap-2.5 p-3.5 sm:p-4.5">
+            <div className="flex items-center gap-1.5 text-xs text-primary/80">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="font-medium">{t("stage.inputModeTitle", "自由输入 / Free Action")}</span>
+            </div>
             <textarea
               autoFocus
               rows={2}
@@ -109,20 +114,27 @@ export function StageDialog({
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleTextareaKeyDown}
               placeholder={t("stage.inputPlaceholder")}
-              className="resize-none bg-transparent text-sm sm:text-base outline-none placeholder:text-muted-foreground text-foreground"
+              className="resize-none rounded-xl border border-border/60 bg-background/50 p-2.5 text-sm sm:text-base outline-none transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background/80 focus:ring-2 focus:ring-primary/20 text-foreground"
             />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground/80">
                 {t("stage.inputSendHint")}
               </span>
-              <Button
-                size="sm"
-                onClick={submitDraft}
-                disabled={!draft.trim()}
-                className="rounded-xl shadow-xs hover:scale-105 active:scale-95 transition-all"
-              >
-                <Send className="h-3.5 w-3.5" />
-              </Button>
+              <Magnet padding={30} magnetStrength={3} disabled={!draft.trim()}>
+                <Button
+                  size="sm"
+                  onClick={submitDraft}
+                  disabled={!draft.trim()}
+                  className={cn(
+                    "rounded-xl shadow-xs transition-all duration-200",
+                    draft.trim()
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:scale-105 active:scale-95"
+                      : "opacity-50",
+                  )}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </Magnet>
             </div>
           </div>
         ) : (
