@@ -48,8 +48,8 @@ export interface RequestLLMResponseOptions {
   readonly reportRetry: (info: RetryInfo) => void;
   /** Forwards LLM-slot queue waits so the tool loop can extend its deadline. */
   readonly onQueueWait?: (waitedMs: number) => void;
-  /** Called once per forwarded text delta; the DeltaForwarder owns the count. */
-  readonly onStreamDelta: (textDelta: string) => Promise<void>;
+  /** Called for player-visible story text deltas; omitted for private plugins. */
+  readonly onStreamDelta?: (textDelta: string) => Promise<void>;
 }
 
 /**
@@ -109,15 +109,15 @@ type CallParams = Parameters<typeof callLLMWithRetry>[0];
 async function requestStreaming(
   opts: RequestLLMResponseOptions,
   callParams: CallParams,
-  onStreamDelta: (textDelta: string) => Promise<void>,
+  onStreamDelta?: (textDelta: string) => Promise<void>,
 ): Promise<LLMResponse> {
   const { manifest, toolDefs } = opts;
   let response: LLMResponse;
 
-  // Streaming path: helper enforces per-attempt call-timeout + first-token
-  // (TTFB) guard, retries on transient failures, and forwards text deltas to
-  // the caller on the first attempt. If streaming exhausts its retries with a
-  // transient failure, fall back to a single non-stream call.
+  // Streaming path: helper enforces the first-byte guard and renews the
+  // call-timeout inactivity window on every response byte. The absolute
+  // runtime deadline remains hard; text deltas are forwarded only for story
+  // runtimes. If streaming exhausts its retries, fall back to one generate().
   try {
     const streamed = await streamLLMWithRetry({
       ...callParams,

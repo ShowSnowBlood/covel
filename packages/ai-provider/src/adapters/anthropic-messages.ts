@@ -375,7 +375,10 @@ export function createAnthropicMessagesAdapter(): ModelProviderAdapter {
         { id: string; name: string; json: string }
       >();
 
-      for await (const payload of iterateSsePayloads(response)) {
+      for await (const payload of iterateSsePayloads(
+        response,
+        config.onStreamActivity,
+      )) {
         const delta = payload.delta as Record<string, unknown> | undefined;
         if (
           payload.type === "content_block_delta" &&

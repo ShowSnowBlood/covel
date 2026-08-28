@@ -38,20 +38,22 @@ const FIELD_DEFINITIONS: readonly PolicyFieldDefinition[] = [
   {
     field: "callTimeoutMs",
     labelKey: "settings.runtimePolicy.callTimeoutMs",
-    fallbackLabel: "Provider call timeout",
+    fallbackLabel: "Provider call / stream idle timeout",
     descriptionKey: "settings.runtimePolicy.callTimeoutMsHint",
     fallbackDescription:
-      "Maximum time for one provider call. Blank derives a budget from the runtime timeout and retry count.",
+      "Maximum time for one non-stream provider call, or silence between response bytes while streaming. Activity renews it; blank derives a budget from the runtime timeout and retry count.",
+
     unitKey: "settings.runtimePolicy.milliseconds",
     fallbackUnit: "ms",
   },
   {
     field: "firstTokenTimeoutMs",
     labelKey: "settings.runtimePolicy.firstTokenTimeoutMs",
-    fallbackLabel: "First-token timeout",
+    fallbackLabel: "First-response-byte timeout",
     descriptionKey: "settings.runtimePolicy.firstTokenTimeoutMsHint",
     fallbackDescription:
-      "Maximum time a streaming call may wait before its first token.",
+      "Maximum initial silence before any response byte on a streaming call.",
+
     unitKey: "settings.runtimePolicy.milliseconds",
     fallbackUnit: "ms",
   },

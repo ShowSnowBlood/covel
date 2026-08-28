@@ -279,7 +279,10 @@ export function createOpenAiChatAdapter(): ModelProviderAdapter {
         { id: string | null; name: string | null; arguments: string }
       >();
 
-      for await (const payload of iterateSsePayloads(response)) {
+      for await (const payload of iterateSsePayloads(
+        response,
+        config.onStreamActivity,
+      )) {
         const reasoningDelta = readOpenAiChatStreamReasoningDelta(payload);
         if (reasoningDelta) {
           reasoningAcc += reasoningDelta;

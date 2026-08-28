@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -350,9 +350,17 @@ export function StageView(props: StageViewProps): ReactElement {
           <div className="ui-stage-panel flex items-center gap-2.5 rounded-full border border-primary/30 bg-card/90 px-4 py-2 text-xs shadow-lg backdrop-blur-xl">
             <div className="relative flex h-3 w-3 items-center justify-center">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-70" />
-              <Loader2 className="relative z-10 h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
+              <Loader2
+                className="relative z-10 h-3.5 w-3.5 animate-spin text-primary"
+                aria-hidden="true"
+              />
             </div>
-            <ShinyText text={t("stage.thinkingLabel")} speed={3} className="text-xs font-medium text-foreground" />
+            <ShinyText
+              speed={3}
+              className="text-xs font-medium text-foreground"
+            >
+              {t("stage.thinkingLabel")}
+            </ShinyText>
           </div>
         </div>
       )}

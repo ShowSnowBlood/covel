@@ -44,11 +44,12 @@ export interface AgentLoopPolicy {
    */
   readonly runtimeModelOverride: string | undefined;
   /**
-   * Stream only for story-output runtimes. Plugin runtimes' raw LLM text is
-   * reasoning chatter that feeds into structured tool calls — it should never
-   * reach the user's narrative feed. Story runtimes that also declare tools
-   * still stream; the request layer falls back to generate() when the
-   * provider cannot parse tool calls out of stream chunks.
+   * Use the provider stream for every agent runtime that has no structured
+   * output schema. Only story runtimes forward text deltas to the player;
+   * plugin/system runtimes still stream privately so reasoning and tool-call
+   * bytes keep the liveness guard alive without leaking internal chatter.
+   * Schema runtimes stay on generate() because the stream contract has no
+   * responseFormat channel.
    */
   readonly useStreaming: boolean;
   /**
@@ -129,11 +130,7 @@ export function buildAgentLoopPolicy({
       ? { type: "json_schema" as const, schema: loaded.outputSchema }
       : undefined,
     runtimeModelOverride,
-    useStreaming: !!(
-      deps.onDelta &&
-      deps.llm.stream &&
-      manifest.outputKind === "story"
-    ),
+    useStreaming: !!(deps.llm.stream && !loaded.outputSchema),
     effectiveMaxSteps:
       deps.runtimePolicy?.maxSteps ?? manifest.maxSteps ?? maxSteps,
     retryPolicy: buildRetryPolicy({

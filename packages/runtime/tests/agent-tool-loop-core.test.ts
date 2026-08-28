@@ -411,18 +411,30 @@ describe("runAgentToolLoop core", () => {
     expect(result.finalContent).toBe("Once upon");
   });
 
-  it("does NOT stream for plugin-output runtimes even when onDelta is wired", async () => {
-    const streamSpy = vi.fn();
+  it("streams plugin-output runtimes privately without forwarding chatter", async () => {
+    let streamCalls = 0;
+    let forwarded = 0;
     const llm: LLMAdapter = {
-      generate: async () => prose("plugin chatter"),
-      stream: streamSpy as never,
+      generate: async () => prose("non-stream fallback"),
+      async *stream(params): AsyncIterable<LLMStreamEvent> {
+        streamCalls++;
+        params.onActivity?.(12);
+        yield { type: "text-delta", textDelta: "plugin chatter" };
+        yield { type: "done", finishReason: "stop" };
+      },
     };
     const result = await run({
       llm,
-      deps: { toolExecutor: undefined, onDelta: async () => {} },
+      deps: {
+        toolExecutor: undefined,
+        onDelta: async () => {
+          forwarded++;
+        },
+      },
     });
 
-    expect(streamSpy).not.toHaveBeenCalled();
+    expect(streamCalls).toBe(1);
+    expect(forwarded).toBe(0);
     expect(result.streamDeltaCount).toBe(0);
     expect(result.finalContent).toBe("plugin chatter");
   });

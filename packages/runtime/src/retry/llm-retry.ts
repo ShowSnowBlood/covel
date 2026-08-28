@@ -2,18 +2,18 @@
  * Smart LLM retry helpers used by turn-executor.
  *
  * Failures that burn an entire runtime budget in one shot — hung HTTP
- * requests, streaming connections that never emit a first token, providers
+ * requests, streaming connections that never emit response bytes, providers
  * complicating into 5xx / rate-limit — are retried here in a bounded loop
  * that respects the outer runtime deadline. The retry strategy adds a tiny
  * perturbation to the messages on each attempt so that any provider-side KV
  * cache cannot trivially reproduce the same hang.
  *
  * Four retry triggers:
- *   - first-token-timeout: streaming call produced no text/tool event before
- *     `firstTokenTimeoutMs` (default 30s) — provider socket alive but model
- *     stuck.
- *   - call-timeout: whole call exceeded `callTimeoutMs` (derived from the
- *     runtime budget + retry count) — uses AbortSignal.timeout.
+ *   - first-token-timeout: streaming call produced no response bytes before
+ *     `firstTokenTimeoutMs` (default 30s) — provider socket stayed silent.
+ *   - call-timeout: a streaming response stayed silent for `callTimeoutMs`,
+ *     or the absolute runtime deadline was reached. Each response byte
+ *     renews the inactivity window; the runtime deadline remains hard.
  *   - transient-error: AbortError / timeout / network / 5xx / RATE_LIMITED /
  *     PROVIDER_ERROR bubbling from the adapter.
  *   - tool-loop-detected: the caller reports `N` consecutive tool calls with
@@ -406,29 +406,82 @@ export async function streamLLMWithRetry(
         message: "Runtime deadline reached before LLM call could be attempted",
       });
     }
-    // Compose three abort sources into one per-attempt signal:
-    //   1. overall call budget (per-attempt)
-    //   2. first-token (TTFB) guard — armed on attempt start, disarmed on first event
-    //   3. player turn abort — forwarded from params.abortSignal below
+    // Compose four abort sources into one per-attempt signal:
+    //   1. streaming inactivity timeout — renewed on every response byte
+    //   2. absolute runtime deadline — never extended by provider activity
+    //   3. first-byte guard — armed on attempt start, disarmed on activity
+    //   4. player turn abort — forwarded from params.abortSignal below
     const callAborter = new AbortController();
+    let firstActivitySeen = false;
+    let callTimeoutHandle: NodeJS.Timeout | undefined;
+    let ttfbHandle: NodeJS.Timeout | undefined;
+    let attemptLive = true;
+
+    const abortWithTimeout = (message: string): void => {
+      if (!callAborter.signal.aborted) {
+        callAborter.abort(new DOMException(message, "TimeoutError"));
+      }
+    };
+
+    const armCallTimeout = (): void => {
+      if (!attemptLive || callAborter.signal.aborted) return;
+      clearTimeout(callTimeoutHandle);
+
+      // `effectiveDeadline` was fixed after queue accounting above. Provider
+      // activity may renew the idle window, but it must never move this hard
+      // runtime ceiling.
+      const remainingMs = effectiveDeadline - Date.now();
+      if (remainingMs <= 0) {
+        abortWithTimeout("call timeout");
+        return;
+      }
+      callTimeoutHandle = setTimeout(
+        () => abortWithTimeout("call timeout"),
+        Math.min(policy.callTimeoutMs, remainingMs),
+      );
+    };
+
+    // The provider adapter invokes this for every non-empty response-body
+    // chunk, including bytes that only complete a partial SSE frame. Custom
+    // adapters that do not expose the callback still get event-level activity
+    // below, so the retry contract remains backward compatible.
+    const markActivity = (byteCount: number): void => {
+      if (!Number.isFinite(byteCount) || byteCount <= 0) return;
+      firstActivitySeen = true;
+      if (ttfbHandle !== undefined) {
+        clearTimeout(ttfbHandle);
+        ttfbHandle = undefined;
+      }
+      armCallTimeout();
+    };
+
     const onExternalAbort = (): void => {
       callAborter.abort(new DOMException("turn aborted", "AbortError"));
     };
     params.abortSignal?.addEventListener("abort", onExternalAbort, {
       once: true,
     });
-    const callTimeoutHandle = setTimeout(() => {
-      callAborter.abort(new DOMException("call timeout", "TimeoutError"));
-    }, budget);
-    const ttfbHandle = setTimeout(() => {
-      if (!firstTokenSeen) {
-        callAborter.abort(
-          new DOMException("first-token timeout", "TimeoutError"),
-        );
+
+    ttfbHandle = setTimeout(() => {
+      if (!firstActivitySeen) {
+        abortWithTimeout("first-token timeout");
       }
     }, policy.firstTokenTimeoutMs);
+    armCallTimeout();
 
-    let firstTokenSeen = false;
+    const cleanupAttempt = (): void => {
+      attemptLive = false;
+      if (callTimeoutHandle !== undefined) {
+        clearTimeout(callTimeoutHandle);
+        callTimeoutHandle = undefined;
+      }
+      if (ttfbHandle !== undefined) {
+        clearTimeout(ttfbHandle);
+        ttfbHandle = undefined;
+      }
+      params.abortSignal?.removeEventListener("abort", onExternalAbort);
+    };
+
     const streamedToolCalls: LLMToolCall[] = [];
     let streamedContent = "";
     let streamedReasoningContent = "";
@@ -456,13 +509,15 @@ export async function streamLLMWithRetry(
         messages: attemptMessages,
         tools,
         signal: callAborter.signal,
+        onActivity: markActivity,
       })) {
+        // Backward-compatible custom adapters may not report raw bytes. An
+        // emitted event is still a useful liveness signal for those adapters.
+        markActivity(1);
         if (event.type === "text-delta") {
-          firstTokenSeen = true;
           streamedContent += event.textDelta;
           if (forwardDeltas) await onDelta?.(event.textDelta);
         } else if (event.type === "tool-call") {
-          firstTokenSeen = true;
           streamedToolCalls.push({
             id: event.id,
             name: event.name,
@@ -477,9 +532,7 @@ export async function streamLLMWithRetry(
         }
       }
 
-      clearTimeout(callTimeoutHandle);
-      clearTimeout(ttfbHandle);
-      params.abortSignal?.removeEventListener("abort", onExternalAbort);
+      cleanupAttempt();
 
       const finalResponse: LLMResponse = {
         content: streamedContent || null,
@@ -503,11 +556,13 @@ export async function streamLLMWithRetry(
         attempt,
       };
     } catch (err) {
-      clearTimeout(callTimeoutHandle);
-      clearTimeout(ttfbHandle);
-      params.abortSignal?.removeEventListener("abort", onExternalAbort);
+      cleanupAttempt();
       lastError = err;
-      lastReason = classifyStreamError(err, callAborter.signal, firstTokenSeen);
+      lastReason = classifyStreamError(
+        err,
+        callAborter.signal,
+        firstActivitySeen,
+      );
 
       // Pair every `llm.calling` with an `llm.responded` on the error path.
       // Without this, a streamed turn that fails mid-flight leaves a dangling
@@ -589,7 +644,7 @@ export async function streamLLMWithRetry(
 function classifyStreamError(
   err: unknown,
   signal: AbortSignal,
-  firstTokenSeen: boolean,
+  firstActivitySeen: boolean,
 ): RetryReason {
   if (signal.aborted) {
     const reason = (signal as AbortSignal & { reason?: unknown }).reason;
@@ -597,7 +652,7 @@ function classifyStreamError(
     const lower = msg.toLowerCase();
     if (lower.includes("first-token")) return "first-token-timeout";
     if (lower.includes("timeout"))
-      return !firstTokenSeen ? "first-token-timeout" : "call-timeout";
+      return !firstActivitySeen ? "first-token-timeout" : "call-timeout";
   }
   if (isTransientError(err)) return "transient-error";
   return "unknown";

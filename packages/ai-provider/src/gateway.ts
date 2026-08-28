@@ -626,6 +626,13 @@ export function createGateway(deps: GatewayDependencies) {
     config: ProviderConfig,
     options?: GatewayOptions,
   ): ProviderConfig {
-    return options?.signal ? { ...config, signal: options.signal } : config;
+    if (!options?.signal && !options?.onStreamActivity) return config;
+    return {
+      ...config,
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.onStreamActivity
+        ? { onStreamActivity: options.onStreamActivity }
+        : {}),
+    };
   }
 }

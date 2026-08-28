@@ -136,6 +136,11 @@ export interface ProviderConfig {
   /** Abort signal for request cancellation. */
   signal?: AbortSignal;
   /**
+   * Internal response-body liveness hook used by streaming timeout guards.
+   * Adapters call it for every non-empty byte chunk before parsing SSE.
+   */
+  onStreamActivity?: (byteCount: number) => void;
+  /**
    * Prompt cache strategy for this provider.
    *
    * Filled in by the provider registry based on the resolved protocol;

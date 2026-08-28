@@ -12,9 +12,13 @@ export interface RuntimeExecutionPolicy {
   readonly maxSteps?: number;
   /** Number of transient LLM retries after the first attempt. */
   readonly maxRetries?: number;
-  /** Wall-clock budget for one provider call, in milliseconds. */
+  /**
+   * Wall-clock budget for one non-stream provider call, or the response-byte
+   * inactivity window for a stream. Streaming activity renews the window;
+   * `timeoutMs` remains the hard runtime ceiling.
+   */
   readonly callTimeoutMs?: number;
-  /** Maximum wait for the first streaming token, in milliseconds. */
+  /** Maximum initial silence before the first streaming response byte. */
   readonly firstTokenTimeoutMs?: number;
   /** Identical consecutive tool calls before the loop is retried. */
   readonly loopDetectionThreshold?: number;

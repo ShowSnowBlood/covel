@@ -120,6 +120,7 @@ export interface GatewayLike {
       signal?: AbortSignal;
       slotOverrides?: SlotOverridesInput;
       allowProviderFallbackOnClientError?: boolean;
+      onStreamActivity?: (byteCount: number) => void;
     },
   ): AsyncIterable<{
     type: string;
@@ -240,6 +241,7 @@ export function createGatewayAdapter(
           ...(config?.allowProviderFallbackOnClientError
             ? { allowProviderFallbackOnClientError: true }
             : {}),
+          ...(params.onActivity ? { onStreamActivity: params.onActivity } : {}),
           ...(params.signal ? { signal: params.signal } : {}),
         },
       )) {

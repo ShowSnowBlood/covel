@@ -685,16 +685,16 @@ export interface RuntimeManifest extends PluginScopedManifestFields {
    */
   readonly maxRetries?: number;
   /**
-   * Per-LLM-call total timeout in ms. Caps a single provider call so a hung
-   * request cannot consume the whole `timeoutMs` budget. Defaults to
-   * `min(60000, floor(timeoutMs / (maxRetries + 1)))` so every retry attempt
-   * fits inside the runtime deadline.
+   * Per-LLM-call timeout in ms for non-streaming calls. For streaming calls
+   * this is an inactivity window renewed by each response byte; the runtime's
+   * `timeoutMs` remains the hard wall-clock ceiling. Defaults to
+   * `min(60000, floor(timeoutMs / (maxRetries + 1)))` so retries fit the
+   * runtime budget.
    */
   readonly callTimeoutMs?: number;
   /**
-   * Streaming first-token (TTFB) timeout in ms. Fires when a streaming LLM
-   * call is established but emits no text/tool-call event before the
-   * threshold — typical symptom of a hung provider with a live TCP socket.
+   * Initial streaming silence timeout in ms. Fires when no response byte has
+   * arrived; later byte activity uses `callTimeoutMs` as the idle window.
    * Default 30000. Ignored for non-streaming calls.
    */
   readonly firstTokenTimeoutMs?: number;

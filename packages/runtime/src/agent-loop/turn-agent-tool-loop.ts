@@ -278,7 +278,9 @@ export async function runAgentToolLoop({
       },
       useStreaming,
       reportRetry,
-      onStreamDelta: delta.forward,
+      ...(manifest.outputKind === "story"
+        ? { onStreamDelta: delta.forward }
+        : {}),
     });
 
     // ── PostLLMResponse hook ─────────────────────────────────────

@@ -668,6 +668,39 @@ describe("streamLLMWithRetry", () => {
     expect(onRetry.mock.calls[0]![0]!.reason).toBe("first-token-timeout");
   });
 
+  it("renews the call timeout while response bytes remain active", async () => {
+    const llm: LLMAdapter = {
+      async generate(): Promise<LLMResponse> {
+        return okResponse("fallback");
+      },
+      async *stream(params): AsyncIterable<LLMStreamEvent> {
+        // The stream stays quiet at the event layer, but the provider reports
+        // response bytes twice. Both a 30ms first-byte guard and a 30ms idle
+        // window must survive the two 20ms gaps and reach the terminal event.
+        params.onActivity?.(4);
+        await waitWithSignal(20, params.signal);
+        params.onActivity?.(4);
+        await waitWithSignal(20, params.signal);
+        yield { type: "text-delta", textDelta: "active" };
+        yield { type: "done", finishReason: "stop" };
+      },
+    };
+
+    const result = await streamLLMWithRetry({
+      llm,
+      messages: baseMessages,
+      policy: {
+        maxRetries: 0,
+        callTimeoutMs: 30,
+        firstTokenTimeoutMs: 30,
+        loopDetectionThreshold: 3,
+      },
+      deadline: Date.now() + 500,
+    });
+
+    expect(result.response.content).toBe("active");
+  });
+
   it("does not forward deltas on retry attempts (avoid duplicate UX)", async () => {
     const llm = createScriptedStreamLLM([
       { events: [], throwAtEnd: new Error("rate limit") },

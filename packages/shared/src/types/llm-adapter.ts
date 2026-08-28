@@ -154,5 +154,12 @@ export interface LLMAdapter {
     readonly tools?: readonly LLMToolDefinition[];
     /** @see generate.signal */
     readonly signal?: AbortSignal;
+    /**
+     * Called synchronously whenever the underlying response receives bytes.
+     * This is a liveness signal, not user-visible output; retry guards use it
+     * to renew the streaming inactivity window while a provider is still
+     * generating reasoning or tool arguments.
+     */
+    readonly onActivity?: (byteCount: number) => void;
   }): AsyncIterable<LLMStreamEvent>;
 }

@@ -68,6 +68,12 @@ export interface GatewayOptions {
   /** Abort signal for cancellation (e.g. budget timeout). */
   signal?: AbortSignal;
   /**
+   * Synchronous response-byte liveness hook for streaming calls. It is never
+   * serialized or sent to the provider; adapters use it to renew their
+   * inactivity guard.
+   */
+  onStreamActivity?: (byteCount: number) => void;
+  /**
    * Per-request overlay that transiently extends the gateway's preset /
    * provider / slot view.
    */

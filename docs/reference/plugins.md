@@ -1461,7 +1461,7 @@ relations:
 
 ### 超时与智能重试
 
-Agent runtime 在调用 LLM 时会受到两个方向的约束：**单次调用时长**（`callTimeoutMs` / `firstTokenTimeoutMs`）和**运行总时长**（`timeoutMs`）。框架会自动在 transient 错误、call-timeout、first-token-timeout、tool-call 循环四种情形下重试，并在每次重试时向 prompt 追加一条短 system 提示打破 KV-cache 命中。
+Agent runtime 在调用 LLM 时会受到两个方向的约束：**单次调用时长**（`callTimeoutMs` / `firstTokenTimeoutMs`）和**运行总时长**（`timeoutMs`）。没有 `output.schema` 的 agent 默认走 provider 流式接口；只有 `story` runtime 的文本增量进入玩家叙事流，插件/系统 runtime 的流仅用于保持可观测的 provider 活跃度。框架会自动在 transient 错误、call-timeout、first-token-timeout、tool-call 循环四种情形下重试，并在每次重试时向 prompt 追加一条短 system 提示打破 KV-cache 命中。
 
 **LLM 并发闸门**：进程内所有 LLM 调用共享一个 FIFO 并发上限（`COVEL_LLM_MAX_CONCURRENT`，默认 2，`0` 关闭）——post-turn 阶段多个 agent 并行时不再裸并发打满 provider。排队等槽的时间**顺延**该 runtime 的 deadline（排队是框架的成本，不占 runtime 预算），流式调用在整个流消费期间持有槽位。实现见 `packages/runtime/src/retry/llm-slots.ts`。
 
@@ -1473,18 +1473,16 @@ Agent runtime 在调用 LLM 时会受到两个方向的约束：**单次调用�
 | ------------------------ | --------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `timeoutMs`              | `number`  | 60000                                             | 运行总时长硬上限。任何情况下都不会超过此值                                                                                                                                                                               |
 | `maxRetries`             | `number`  | `1`                                               | transient 错误/超时/循环时的重试次数（不含首次尝试）。`0` 禁用重试。上限 5                                                                                                                                               |
-| `callTimeoutMs`          | `number`  | `min(60000, floor(timeoutMs / (maxRetries + 1)))` | 单次 LLM 调用的总时长。防止一个挂死请求吃掉整轮预算                                                                                                                                                                      |
-| `firstTokenTimeoutMs`    | `number`  | `30000`                                           | 流式 runtime 的首 token（TTFB）上限；非流式忽略                                                                                                                                                                          |
+| `callTimeoutMs`          | `number`  | `min(60000, floor(timeoutMs / (maxRetries + 1)))` | 非流式调用的总时长；流式调用的响应字节空闲窗口。每收到一个非空响应字节块就续期，但 `timeoutMs` 仍是绝对上限                                                                                                              |
+| `firstTokenTimeoutMs`    | `number`  | `30000`                                           | 流式调用收到首个响应字节前的静默上限；收到活跃字节后改用 `callTimeoutMs` 空闲窗口。非流式忽略                                                                                                                            |
 | `loopDetectionThreshold` | `number`  | `3`                                               | 连续重复相同 `(tool name + JSON arguments)` 的次数；命中则注入扰动继续。`0` 关闭                                                                                                                                         |
 | `requireToolUse`         | `boolean` | `false`                                           | 仅 agent runtime。循环在“零成功工具调用”下收场（LLM 只回散文）时，注入一条纠正 system 消息并重试一次；第二次仍零工具则放行并 `console.warn`（`maxSteps` 仍兜底）。适合唯一职责就是调某工具、却会漂移成续写正文的 runtime |
-
-**`requireToolUse` 判定**：仅当本轮 loop 从未有任何工具**成功**执行、且 LLM 本次回复无 tool call 时触发；已经成功干过活再收尾的 runtime 不受影响。纠正消息按 `input.locale` 分支（zh 前缀 → 中文“你没有调用任何工具就结束了……”，其余含无 locale → 英文），记一条 `[runtime-retry] <name> ... reason=no-tool-call`。内置的 `scene-prompts`（每回合必须调用 `generate-scene-prompts`）已启用。
 
 **四类重试触发条件：**
 
 - `transient-error`：AbortError / network / 5xx / `RATE_LIMITED` / `PROVIDER_ERROR`
-- `call-timeout`：单次调用超过 `callTimeoutMs`
-- `first-token-timeout`（仅流式）：超过 `firstTokenTimeoutMs` 仍无任何 text/tool event
+- `call-timeout`：非流式调用超过 `callTimeoutMs`，或流式响应在该空闲窗口内没有新字节
+- `first-token-timeout`（仅流式）：超过 `firstTokenTimeoutMs` 仍没有任何响应字节
 - `tool-loop-detected`：外层 tool loop 连续命中相同调用 `loopDetectionThreshold` 次
 
 **扰动策略**：重试时框架在 messages 末尾追加一条 `[retry N] ...` system 消息，并随 `N` 递增加入空格 padding，确保 prompt 字节串不同，避免 provider 端 KV-cache 复读同一回应。
@@ -1496,8 +1494,8 @@ Agent runtime 在调用 LLM 时会受到两个方向的约束：**单次调用�
 ```yaml
 timeoutMs: 120000
 maxRetries: 2 # 更保守，最多 3 次尝试
-callTimeoutMs: 40000 # 每次调用 40s，足够 qwen-flash 但留重试余量
-firstTokenTimeoutMs: 20000 # 20s 无首 token 即判定卡死
+callTimeoutMs: 40000 # 非流式为总时长；流式为响应字节空闲窗口
+firstTokenTimeoutMs: 20000 # 20s 无首个响应字节即判定卡死
 loopDetectionThreshold: 3 # 默认即可
 ```
 

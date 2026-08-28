@@ -17,9 +17,9 @@ import type { LLMMessage } from "../llm/llm-adapter.js";
 export interface RetryPolicy {
   /** Total retries (not including the first attempt). */
   readonly maxRetries: number;
-  /** Per-call total timeout in ms. */
+  /** Per-call total timeout for non-streaming; stream inactivity window. */
   readonly callTimeoutMs: number;
-  /** Streaming first-token timeout in ms. */
+  /** Initial streaming silence timeout before the first response byte. */
   readonly firstTokenTimeoutMs: number;
   /** Tool-loop threshold (0 disables detection). */
   readonly loopDetectionThreshold: number;
@@ -65,8 +65,9 @@ function clamp(n: number, lo: number, hi: number): number {
 /**
  * Derive a retry policy from manifest fields. The defaults split the
  * runtime budget across (maxRetries + 1) attempts, capped at
- * {@link DEFAULT_CALL_TIMEOUT_CAP_MS} so a single attempt never monopolises
- * a very large budget.
+ * {@link DEFAULT_CALL_TIMEOUT_CAP_MS} so a silent attempt never monopolises
+ * a very large budget. For streaming calls, callTimeoutMs is an inactivity
+ * window renewed by response bytes; the runtime deadline remains absolute.
  */
 export function buildRetryPolicy(input: {
   maxRetries?: number;

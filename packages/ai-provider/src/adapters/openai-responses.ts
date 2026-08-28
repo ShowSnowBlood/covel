@@ -277,7 +277,10 @@ export function createOpenAiResponsesAdapter(): ModelProviderAdapter {
         { callId: string | null; name: string | null; arguments: string }
       >();
 
-      for await (const payload of iterateSsePayloads(response)) {
+      for await (const payload of iterateSsePayloads(
+        response,
+        config.onStreamActivity,
+      )) {
         if (
           payload.type === "response.output_text.delta" &&
           typeof payload.delta === "string"

@@ -90,18 +90,20 @@ trigger:
 | `timeoutMs`              | 否   | number                        | Runtime 总时长硬上限，默认 60000                                                                                                       |
 | `maxSteps`               | 否   | number                        | 单次 attempt 内的 tool-call 步数上限，默认 10                                                                                          |
 | `maxRetries`             | 否   | number                        | LLM 调用失败/超时/工具循环时的重试次数，默认 1                                                                                         |
-| `callTimeoutMs`          | 否   | number                        | 单次 LLM 调用时长（ms），默认从 `timeoutMs` + `maxRetries` 推算                                                                        |
-| `firstTokenTimeoutMs`    | 否   | number                        | 流式首 token 超时（ms），默认 30000                                                                                                    |
+| `callTimeoutMs`          | 否   | number                        | 非流式调用的总时长；流式调用的响应字节空闲窗口。收到新字节会续期，`timeoutMs` 仍是绝对上限                                             |
+| `firstTokenTimeoutMs`    | 否   | number                        | 流式首个响应字节前的静默上限，默认 30000；收到活跃字节后改用 `callTimeoutMs` 空闲窗口                                                  |
 | `loopDetectionThreshold` | 否   | number                        | 连续相同 tool call 的判定阈值，默认 3；0 关闭                                                                                          |
+
+没有 `output.schema` 的 agent runtime 默认使用 provider 流式接口。只有 `story` 的文本增量会发送到玩家叙事流；插件/系统 runtime 的流保持内部，用于接收工具参数并让超时保护感知 provider 活跃度。
 
 **智能重试说明（默认已启用）：**
 
 - Runtime 会在以下四种情况自动重试一次并向 prompt 追加 `[retry N]` 扰动消息：
   1. provider 返回 transient 错误（5xx / 网络错误 / rate limit）
-  2. 单次调用超过 `callTimeoutMs`（默认 `min(60s, timeoutMs / 2)`)
-  3. 流式调用 `firstTokenTimeoutMs` 内未收到任何 token
+  2. 非流式调用超过 `callTimeoutMs`，或流式响应在该空闲窗口内没有新字节
+  3. 流式调用 `firstTokenTimeoutMs` 内没有任何响应字节
   4. 外层连续 3 次相同 `(tool name + args)` 调用
-- 重试总数不会让整个 runtime 超过 `timeoutMs`。
+- 流式字节活跃度只续期 `callTimeoutMs` 空闲窗口，不会突破 `timeoutMs` 的运行总时长硬上限。
 - `llm.toml` 中的 `fallback = "story"` 仍然生效：同 preset 重试完再沿 gateway fallback chain 尝试。
 
 **调度阶段（stage，kernel 强制）：**

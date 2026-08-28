@@ -249,8 +249,13 @@ describe("providerRequestMetadata cannot override critical fields", () => {
     );
 
     const adapter = createOpenAiChatAdapter();
+    const activity: number[] = [];
     const gen = adapter.streamText(
-      { baseUrl: "https://api.openai.com/v1", apiKey: "sk-test" },
+      {
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "sk-test",
+        onStreamActivity: (bytes) => activity.push(bytes),
+      },
       {
         model: "gpt-4o",
         messages: [{ role: "user", content: "hi", toolCalls: undefined }],
@@ -262,6 +267,8 @@ describe("providerRequestMetadata cannot override critical fields", () => {
       // drain
     }
 
+    expect(activity.length).toBeGreaterThan(0);
+    expect(activity.every((bytes) => bytes > 0)).toBe(true);
     const body = JSON.parse(
       (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string,
     ) as Record<string, unknown>;
@@ -623,5 +630,30 @@ describe("SSE response framing", () => {
     }
 
     expect(payloads).toEqual([{ choices: [{ delta: { content: "ok" } }] }]);
+  });
+
+  it("reports response-byte activity before parsing split SSE frames", async () => {
+    const encoder = new TextEncoder();
+    const first = encoder.encode('data: {"value":');
+    const second = encoder.encode('"ok"}\n\n');
+    const activity: number[] = [];
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(first);
+          controller.enqueue(second);
+          controller.close();
+        },
+      }),
+    );
+    const payloads: Record<string, unknown>[] = [];
+    for await (const payload of iterateSsePayloads(response, (bytes) => {
+      activity.push(bytes);
+    })) {
+      payloads.push(payload);
+    }
+
+    expect(activity).toEqual([first.byteLength, second.byteLength]);
+    expect(payloads).toEqual([{ value: "ok" }]);
   });
 });

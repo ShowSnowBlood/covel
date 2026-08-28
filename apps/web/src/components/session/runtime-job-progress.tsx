@@ -129,7 +129,8 @@ export function RuntimeJobProgress({
   // If a turn is actively executing but no active job status has arrived yet
   // (e.g. initial turn preparation / SSE handshake latency), render an instant
   // responsive feedback card so player actions feel immediate.
-  const showInstantDispatching = executing && (!hasActiveJobs || visible.length === 0);
+  const showInstantDispatching =
+    executing && (!hasActiveJobs || visible.length === 0);
 
   if (!showInstantDispatching && visible.length === 0) return null;
 
@@ -155,11 +156,16 @@ export function RuntimeJobProgress({
                 />
               </div>
               <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                <ShinyText text={t("session.turnDispatching", "正在推进回合")} speed={3} className="font-medium" />
+                <ShinyText speed={3} className="font-medium">
+                  {t("session.turnDispatching", "正在推进回合")}
+                </ShinyText>
               </span>
             </div>
             <span className="inline-flex shrink-0 items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" />
+              <Loader2
+                className="mr-1 h-3 w-3 animate-spin"
+                aria-hidden="true"
+              />
               {t("session.jobStatusRunning", "运行中")}
             </span>
           </div>

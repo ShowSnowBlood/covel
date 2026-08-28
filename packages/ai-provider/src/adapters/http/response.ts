@@ -35,8 +35,14 @@ function parseSseFrame(frame: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Parse provider SSE payloads while reporting raw response-body activity.
+ * The callback fires before frame parsing, so split/incomplete frames still
+ * renew a caller's liveness window.
+ */
 export async function* iterateSsePayloads(
   response: Response,
+  onActivity?: (byteCount: number) => void,
 ): AsyncIterable<Record<string, unknown>> {
   if (!response.body) return;
 
@@ -47,8 +53,12 @@ export async function* iterateSsePayloads(
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (value && value.byteLength > 0) onActivity?.(value.byteLength);
       if (done) break;
 
+      // Notify before frame parsing: a provider can send a large reasoning
+      // token or a split SSE frame that contains no complete JSON payload yet.
+      // The retry layer must treat those bytes as proof of life.
       buffer += decoder.decode(value, { stream: true });
 
       while (true) {

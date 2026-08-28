@@ -79,8 +79,8 @@ handler 里读：`ctx.inputs.narrative?.value`（`cardinality: all` 时是 `.ite
 | `timeoutMs` | int | 60000 | 运行总时长硬上限 |
 | `maxSteps` | int | 10 | 工具循环单轮最多调几次。1–2 适合单步插件 |
 | `maxRetries` | int | 1 | transient 错误/超时/循环时重试次数。`0` 禁用,最多 5 |
-| `callTimeoutMs` | int | `min(60000, floor(timeoutMs/(maxRetries+1)))` | 单次 LLM 调用超时 |
-| `firstTokenTimeoutMs` | int | 30000 | 流式首 token (TTFB) 上限 |
+| `callTimeoutMs` | int | `min(60000, floor(timeoutMs/(maxRetries+1)))` | 非流式调用总时长；流式调用的响应字节空闲窗口，收到新字节会续期 |
+| `firstTokenTimeoutMs` | int | 30000 | 流式首个响应字节前的静默上限 |
 | `loopDetectionThreshold` | int | 3 | 连续相同工具调用次数,命中则扰动。`0` 关 |
 
 ## `trigger`
