@@ -68,6 +68,19 @@ import { ignoreError } from "@/lib/ignore-error.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { text } from "@/components/world/editor-helpers.js";
 
+const EPHEMERAL_LAYOUT_STORAGE: Pick<Storage, "getItem" | "setItem"> = {
+  getItem: () => null,
+  setItem: () => {},
+};
+
+function getGameLayoutStorage(): Pick<Storage, "getItem" | "setItem"> {
+  try {
+    return window.localStorage ?? EPHEMERAL_LAYOUT_STORAGE;
+  } catch {
+    return EPHEMERAL_LAYOUT_STORAGE;
+  }
+}
+
 // ── Extracted Panel Components (see left-panel.tsx, right-panel.tsx) ──
 
 // ── Main Component ──────────────────────────────────────────────
@@ -511,7 +524,7 @@ export function GameView({ session }: GameViewProps) {
   // deliberately ignore the old stacked mobile layout key.
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "covel:game-layout:desktop",
-    storage: window.localStorage,
+    storage: getGameLayoutStorage(),
   });
 
   // ── Left Panel ─────────────────────────────────────────────────

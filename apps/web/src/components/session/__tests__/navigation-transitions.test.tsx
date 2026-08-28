@@ -196,6 +196,33 @@ describe("Navigation loading progress transitions", () => {
     mockResetSession.mockClear();
   });
 
+  it("renders when layout persistence is unavailable", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: undefined,
+    });
+    try {
+      render(
+        <GameView
+          session={{
+            id: "sess_no_storage",
+            worldId: "fog-port",
+            status: "active",
+            turnCount: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "选择世界" })).toBeTruthy();
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(window, "localStorage", descriptor);
+      }
+    }
+  });
+
   it("shows scene loading progress when clicking '选择世界' in GameView breadcrumb", () => {
     const session: SessionRecord = {
       id: "sess_1",
