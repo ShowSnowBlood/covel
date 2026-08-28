@@ -421,9 +421,17 @@ export function StageView(props: StageViewProps): ReactElement {
           }
         }}
       >
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
-          <DialogHeader className="sr-only">
-            <DialogTitle>{t("stage.formTitle")}</DialogTitle>
+        <DialogContent
+          className="max-w-lg rounded-3xl border border-border/80 bg-card/95 p-6 shadow-2xl backdrop-blur-2xl"
+          aria-describedby={undefined}
+        >
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-2 font-semibold text-primary">
+              <Sparkles className="h-4 w-4" />
+              <DialogTitle className="text-base text-foreground">
+                {t("stage.formTitle", "行动选项 / Action Details")}
+              </DialogTitle>
+            </div>
           </DialogHeader>
           {activeForm && (
             <MessageBlockRenderer
