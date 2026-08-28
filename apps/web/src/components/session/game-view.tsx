@@ -511,7 +511,7 @@ export function GameView({ session }: GameViewProps) {
   // deliberately ignore the old stacked mobile layout key.
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "covel:game-layout:desktop",
-    storage: localStorage,
+    storage: window.localStorage,
   });
 
   // ── Left Panel ─────────────────────────────────────────────────
