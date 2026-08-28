@@ -10,7 +10,10 @@ import { dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 import Database from "better-sqlite3";
 import postgres from "postgres";
-
+import {
+  normalizeRuntimeExecutionPolicy,
+  type RuntimeExecutionPolicy,
+} from "@covel/shared";
 const SQLITE_DDL = `
 CREATE TABLE IF NOT EXISTS frostfox_login_transactions (
   token_hash TEXT PRIMARY KEY,
@@ -41,6 +44,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS frostfox_account_bindings_subject_uq
 CREATE TABLE IF NOT EXISTS frostfox_model_schedule (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   schedule_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS frostfox_runtime_policy (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  policy_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS frostfox_account_progression (
@@ -80,6 +88,11 @@ CREATE TABLE IF NOT EXISTS frostfox_account_bindings (
 CREATE TABLE IF NOT EXISTS frostfox_model_schedule (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   schedule_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS frostfox_runtime_policy (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  policy_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS frostfox_account_progression (
@@ -123,6 +136,10 @@ export interface FrostFoxModelSchedule {
   readonly story: readonly FrostFoxModelScheduleEntry[];
   readonly updatedAt: string;
 }
+export interface FrostFoxRuntimePolicyRecord {
+  readonly policy: RuntimeExecutionPolicy;
+  readonly updatedAt: string;
+}
 
 interface FrostFoxProgression {
   readonly localUserId: string;
@@ -147,6 +164,10 @@ export interface FrostFoxCredentialStore {
   setModelSchedule(
     story: readonly FrostFoxModelScheduleEntry[],
   ): Promise<FrostFoxModelSchedule>;
+  getRuntimePolicy(): Promise<FrostFoxRuntimePolicyRecord | null>;
+  setRuntimePolicy(
+    policy: RuntimeExecutionPolicy,
+  ): Promise<FrostFoxRuntimePolicyRecord>;
   getProgression(localUserId: string): Promise<FrostFoxProgression>;
   setCompletedLevel(
     localUserId: string,
@@ -270,6 +291,7 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
   const bindings = new Map<string, FrostFoxBinding>();
   const progressions = new Map<string, FrostFoxProgression>();
   let modelSchedule: FrostFoxModelSchedule | null = null;
+  let runtimePolicy: FrostFoxRuntimePolicyRecord | null = null;
 
   return {
     async createLoginTransaction(record) {
@@ -323,6 +345,16 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
       };
       return modelSchedule;
     },
+    async getRuntimePolicy() {
+      return runtimePolicy;
+    },
+    async setRuntimePolicy(policy) {
+      runtimePolicy = {
+        policy: { ...policy },
+        updatedAt: new Date().toISOString(),
+      };
+      return runtimePolicy;
+    },
     async getProgression(localUserId) {
       return (
         progressions.get(localUserId) ?? {
@@ -360,6 +392,7 @@ export function createMemoryCredentialStore(): FrostFoxCredentialStore {
       bindings.clear();
       progressions.clear();
       modelSchedule = null;
+      runtimePolicy = null;
     },
   };
 }
@@ -393,6 +426,17 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
       schedule_json = excluded.schedule_json,
       updated_at = excluded.updated_at
     RETURNING schedule_json, updated_at
+  `);
+  const runtimePolicyById = db.prepare(
+    "SELECT policy_json, updated_at FROM frostfox_runtime_policy WHERE id = 1",
+  );
+  const upsertRuntimePolicy = db.prepare(`
+    INSERT INTO frostfox_runtime_policy (id, policy_json, updated_at)
+    VALUES (1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      policy_json = excluded.policy_json,
+      updated_at = excluded.updated_at
+    RETURNING policy_json, updated_at
   `);
 
   const insertTransaction = db.prepare(`
@@ -487,6 +531,18 @@ function createSqliteCredentialStore(dbPath: string): FrostFoxCredentialStore {
       );
       if (!row) throw new Error("failed to upsert FrostFox model schedule");
       return mapScheduleRow(row);
+    },
+    async getRuntimePolicy() {
+      const row = runtimePolicyById.get();
+      return row ? mapRuntimePolicyRow(row) : null;
+    },
+    async setRuntimePolicy(policy) {
+      const row = upsertRuntimePolicy.get(
+        JSON.stringify(policy),
+        new Date().toISOString(),
+      );
+      if (!row) throw new Error("failed to upsert FrostFox runtime policy");
+      return mapRuntimePolicyRow(row);
     },
     async getProgression(localUserId) {
       const row = progressionByLocalUser.get(localUserId);
@@ -606,6 +662,25 @@ async function createPostgresCredentialStore(
       if (!rows[0]) throw new Error("failed to upsert FrostFox model schedule");
       return mapScheduleRow(rows[0]);
     },
+    async getRuntimePolicy() {
+      const rows = await sql.unsafe(
+        "SELECT policy_json, updated_at FROM frostfox_runtime_policy WHERE id = 1",
+      );
+      return rows[0] ? mapRuntimePolicyRow(rows[0]) : null;
+    },
+    async setRuntimePolicy(policy) {
+      const rows = await sql.unsafe(
+        `INSERT INTO frostfox_runtime_policy (id, policy_json, updated_at)
+         VALUES (1, $1, $2)
+         ON CONFLICT(id) DO UPDATE SET
+           policy_json = excluded.policy_json,
+           updated_at = excluded.updated_at
+         RETURNING policy_json, updated_at`,
+        [JSON.stringify(policy), new Date().toISOString()],
+      );
+      if (!rows[0]) throw new Error("failed to upsert FrostFox runtime policy");
+      return mapRuntimePolicyRow(rows[0]);
+    },
     async getProgression(localUserId) {
       const rows = await sql.unsafe(
         "SELECT * FROM frostfox_account_progression WHERE local_user_id = $1",
@@ -722,6 +797,20 @@ function mapScheduleRow(row: unknown): FrostFoxModelSchedule {
           modelId: entry.modelId,
         }))
       : [],
+    updatedAt: String(value.updated_at),
+  };
+}
+
+function mapRuntimePolicyRow(row: unknown): FrostFoxRuntimePolicyRecord {
+  const value = asRow(row);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(value.policy_json));
+  } catch {
+    parsed = {};
+  }
+  return {
+    policy: normalizeRuntimeExecutionPolicy(parsed) ?? {},
     updatedAt: String(value.updated_at),
   };
 }

@@ -1,4 +1,9 @@
-import type { RuntimeManifest, Stage, TurnInput } from "@covel/shared";
+import type {
+  RuntimeExecutionPolicy,
+  RuntimeManifest,
+  Stage,
+  TurnInput,
+} from "@covel/shared";
 import type {
   LoadedRuntime,
   PluginRuntimeGateway,
@@ -27,16 +32,17 @@ import type { MediaStoreLike } from "../function-runtime/runtime-media-context.j
  * execution + observability fields. Orchestration concerns — context
  * assembly, compaction, memory, capability-provider ids, plugin loading —
  * live on `TurnExecutorDeps` and are intentionally invisible here, so the
- * core loop cannot reach into them.
- *
- * `TurnExecutorDeps extends AgentLoopDeps`, so the fully-wired deps object is
- * still assignable wherever `AgentLoopDeps` is expected.
  */
 export interface AgentLoopDeps {
   /** LLM adapter for making model calls. */
   readonly llm: LLMAdapter;
   /** Optional tool executor for handling LLM tool calls. */
   readonly toolExecutor?: ToolExecutor;
+  /**
+   * Server-owned execution policy. When present it overrides manifest retry
+   * and budget fields for this request; clients cannot supply this value.
+   */
+  readonly runtimePolicy?: RuntimeExecutionPolicy;
   /**
    * Resolve the effective model for a runtime.
    * Priority: API modelOverride > plugin llm.toml default > manifest.model > undefined (system default).

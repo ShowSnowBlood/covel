@@ -170,6 +170,48 @@ describe("FrostFox first-party SaaS", () => {
       status: 403,
     });
   });
+  it("rejects runtime policy writes for non-admin accounts", async () => {
+    const { service, principal } = await createBoundService(false);
+
+    await expect(
+      service.setRuntimePolicy(principal, { maxRetries: 2 }),
+    ).rejects.toMatchObject({
+      code: "frostfox_admin_required",
+      status: 403,
+    });
+  });
+
+  it("persists an administrator runtime policy into AI requests", async () => {
+    const { service, principal } = await createBoundService(true);
+    const policy = {
+      timeoutMs: 240_000,
+      callTimeoutMs: 90_000,
+      firstTokenTimeoutMs: 20_000,
+      maxRetries: 2,
+      maxSteps: 4,
+      loopDetectionThreshold: 3,
+    };
+
+    await expect(
+      service.setRuntimePolicy(principal, policy),
+    ).resolves.toMatchObject({
+      policy,
+    });
+    await expect(service.prepareAiContext(principal)).resolves.toMatchObject({
+      runtimePolicy: policy,
+    });
+  });
+
+  it("rejects an out-of-range runtime policy", async () => {
+    const { service, principal } = await createBoundService(true);
+
+    await expect(
+      service.setRuntimePolicy(principal, { maxRetries: 6 }),
+    ).rejects.toMatchObject({
+      code: "frostfox_runtime_policy_invalid",
+      status: 400,
+    });
+  });
   it("uses Grok 4.6 as the managed text default", async () => {
     const { service, principal } = await createBoundService(false, {
       grokCatalog: true,

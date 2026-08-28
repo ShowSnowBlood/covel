@@ -37,6 +37,16 @@ export {
 } from "./utils/provider-keys.js";
 export { isGrok46Model } from "./utils/model-preference.js";
 
+export {
+  normalizeRuntimeExecutionPolicy,
+  RUNTIME_EXECUTION_POLICY_DEFAULTS,
+  RUNTIME_EXECUTION_POLICY_FIELDS,
+  RUNTIME_EXECUTION_POLICY_LIMITS,
+} from "./runtime-policy.js";
+export type {
+  RuntimeExecutionPolicy,
+  RuntimeExecutionPolicyField,
+} from "./runtime-policy.js";
 // ── Environment Registry ──────────────────────────────────────────
 export * from "./env/index.js";
 

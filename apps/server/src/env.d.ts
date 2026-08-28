@@ -16,7 +16,7 @@ import type {
   HookPipeline,
 } from "@covel/runtime";
 import type { RpcApprovalGate } from "@covel/approval";
-import type { RuntimeManifest } from "@covel/shared";
+import type { RuntimeExecutionPolicy, RuntimeManifest } from "@covel/shared";
 import type { BudgetOptions, CompactorRunner } from "@covel/context";
 import type { SessionLock } from "./lib/session-lock.js";
 import type { EventDirectory } from "./routes/api/bootstrap/event-directory.js";
@@ -58,6 +58,8 @@ declare module "hono" {
     eventBus: EventBus;
     pluginRegistry: PluginRegistry;
     llmAdapter: LLMAdapter;
+    /** Server-owned runtime limits resolved for the authenticated request. */
+    runtimeExecutionPolicy?: RuntimeExecutionPolicy;
     /** Authenticated first-party SaaS account, or null when not connected. */
     frostFoxPrincipal: FrostFoxPrincipal | null;
     /**

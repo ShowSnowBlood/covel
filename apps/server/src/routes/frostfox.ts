@@ -1,6 +1,7 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { errorBody } from "../api-error.js";
+import { hasOperatorToken } from "./api/session/session-guard.js";
 import {
   FrostFoxService,
   FrostFoxServiceError,
@@ -59,6 +60,7 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
       authenticated: !!principal,
       clientId: service.runtimeConfig.clientId,
       routerBaseUrl: service.runtimeConfig.routerBaseUrl,
+      operatorAuthorized: hasOperatorToken(c),
       ...(principal
         ? {
             account: {
@@ -184,6 +186,42 @@ export function createFrostFoxRoutes(service: FrostFoxService | null): Hono {
     }
   });
 
+  app.get("/api/frostfox/runtime-policy", async (c) => {
+    const access = requireFrostFoxPolicyAccess(c, service);
+    if (!access.ok) return access.response;
+    try {
+      const record = await access.service.getRuntimePolicy();
+      return c.json({
+        policy: record?.policy ?? {},
+        updatedAt: record?.updatedAt ?? null,
+        canEdit:
+          access.operatorAuthorized || access.principal?.isAdmin === true,
+      });
+    } catch (error) {
+      return serviceError(c, error);
+    }
+  });
+
+  app.put("/api/frostfox/runtime-policy", async (c) => {
+    const access = requireFrostFoxPolicyAccess(c, service, true);
+    if (!access.ok) return access.response;
+    const body: unknown = await c.req.json().catch(() => null);
+    const policy =
+      body && typeof body === "object" && !Array.isArray(body)
+        ? (body as { policy?: unknown }).policy
+        : undefined;
+    try {
+      const record = await access.service.setRuntimePolicy(
+        access.principal,
+        policy,
+        { operatorAuthorized: access.operatorAuthorized },
+      );
+      return c.json({ ...record, canEdit: true });
+    } catch (error) {
+      return serviceError(c, error);
+    }
+  });
+
   app.get("/api/frostfox/progression", async (c) => {
     const access = requireFrostFoxAccount(c, service);
     if (!access.ok) return access.response;
@@ -254,6 +292,15 @@ type FrostFoxAccountAccess =
     }
   | { readonly ok: false; readonly response: Response };
 
+type FrostFoxPolicyAccess =
+  | {
+      readonly ok: true;
+      readonly service: FrostFoxService;
+      readonly principal: FrostFoxPrincipal | null;
+      readonly operatorAuthorized: boolean;
+    }
+  | { readonly ok: false; readonly response: Response };
+
 function requireFrostFoxAccount(
   c: Context,
   service: FrostFoxService | null,
@@ -293,6 +340,49 @@ function requireFrostFoxAccount(
           401,
         ),
       };
+}
+
+function requireFrostFoxPolicyAccess(
+  c: Context,
+  service: FrostFoxService | null,
+  requireOrigin = false,
+): FrostFoxPolicyAccess {
+  if (!service) {
+    return {
+      ok: false,
+      response: frostFoxError(
+        c,
+        "FrostFox account connection is not enabled",
+        "frostfox_saas_disabled",
+        404,
+      ),
+    };
+  }
+  if (requireOrigin && !hasExpectedOrigin(c, service)) {
+    return {
+      ok: false,
+      response: frostFoxError(
+        c,
+        "Request origin is not allowed",
+        "frostfox_origin_invalid",
+        403,
+      ),
+    };
+  }
+  const principal = c.get("frostFoxPrincipal");
+  const operatorAuthorized = hasOperatorToken(c);
+  if (!principal && !operatorAuthorized) {
+    return {
+      ok: false,
+      response: frostFoxError(
+        c,
+        "FrostFox account connection or operator access required",
+        "frostfox_account_required",
+        401,
+      ),
+    };
+  }
+  return { ok: true, service, principal, operatorAuthorized };
 }
 
 function frostFoxError(

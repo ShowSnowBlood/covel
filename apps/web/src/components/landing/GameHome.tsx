@@ -1,12 +1,16 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
+import {
+  frostFoxSettingsAvailable,
+  useFrostFoxAccount,
+} from "@/components/frostfox-account-context.js";
 import { FrostFoxConnectDialog } from "@/components/frostfox-connect-dialog.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { Button } from "@/components/ui/button.js";
 import { useSettingsDialog } from "@/hooks/use-settings-dialog.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
+import { isDesktopApp } from "@/lib/desktop-bridge.js";
 import {
   Particles,
   ShinyText,
@@ -25,6 +29,7 @@ export function GameHome() {
   const navigate = useNavigate();
   const { status } = useFrostFoxAccount();
   const settings = useSettingsDialog();
+  const settingsAvailable = frostFoxSettingsAvailable(status, isDesktopApp());
   const [currentLevel, setCurrentLevel] = useState(1);
   const [transitioning, setTransitioning] = useState(false);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
@@ -133,18 +138,19 @@ export function GameHome() {
                 </Button>
               </StarBorder>
             </Magnet>
-
-            <Magnet padding={60} magnetStrength={4} className="w-full">
-              <Button
-                size="lg"
-                onClick={() => settings.setOpen(true)}
-                disabled={transitioning}
-                className={HOME_SECONDARY_ACTION_CLASS}
-              >
-                <FantasySettingsIcon className="mr-2 h-5 w-5 text-current transition-transform group-hover:rotate-45" />
-                {t("home.openSettings")}
-              </Button>
-            </Magnet>
+            {settingsAvailable && (
+              <Magnet padding={60} magnetStrength={4} className="w-full">
+                <Button
+                  size="lg"
+                  onClick={() => settings.setOpen(true)}
+                  disabled={transitioning}
+                  className={HOME_SECONDARY_ACTION_CLASS}
+                >
+                  <FantasySettingsIcon className="mr-2 h-5 w-5 text-current transition-transform group-hover:rotate-45" />
+                  {t("home.openSettings")}
+                </Button>
+              </Magnet>
+            )}
           </div>
         </div>
       </div>

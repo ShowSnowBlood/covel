@@ -40,6 +40,7 @@ type AccountStatusFixture = {
     id: string;
     name: string;
     balance: number;
+    isAdmin?: boolean;
     credentialState: "active";
     lastVerifiedAt: string;
   };
@@ -139,13 +140,36 @@ describe("FrostFoxAccountSummary", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByText("ff-user-12345678")).toBeTruthy();
     expect(screen.getByText("Connected")).toBeTruthy();
-    expect(screen.getByText("Account Settings")).toBeTruthy();
+    expect(screen.queryByText("Account Settings")).toBeNull();
     expect(screen.getByText("Sign Out")).toBeTruthy();
     expect(screen.getByText("Switch Account")).toBeTruthy();
 
-    // Clicking Account Settings opens SettingsDialog
-    const settingsBtn = screen.getByText("Account Settings");
-    fireEvent.click(settingsBtn);
+  });
+
+  it("shows account settings only to an administrator", async () => {
+    api.fetchAccount.mockResolvedValue({
+      enabled: true,
+      authenticated: true,
+      account: {
+        id: "ff-admin-1",
+        name: "admin",
+        balance: 100,
+        isAdmin: true,
+        credentialState: "active",
+        lastVerifiedAt: "2026-08-26T02:00:00.000Z",
+      },
+    });
+
+    render(
+      <FrostFoxAccountProvider>
+        <FrostFoxAccountSummary />
+      </FrostFoxAccountProvider>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account and balance" }),
+    );
+    fireEvent.click(screen.getByText("Account Settings"));
     expect(screen.getByTestId("settings-dialog")).toBeTruthy();
   });
 

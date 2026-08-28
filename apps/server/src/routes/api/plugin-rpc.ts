@@ -286,6 +286,9 @@ pluginRpcRoutes.post("/:id/plugin-rpc", rateLimiter({ max: 30 }), async (c) => {
       deps: {
         loadRuntime: loadRuntimeFn,
         llm: llmAdapter,
+        ...(c.get("runtimeExecutionPolicy")
+          ? { runtimePolicy: c.get("runtimeExecutionPolicy") }
+          : {}),
         ...(pluginGateway ? { gateway: pluginGateway } : {}),
         ...(pluginUtils ? { utils: pluginUtils } : {}),
         ...(getPluginSource ? { getPluginSource } : {}),

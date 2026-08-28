@@ -25,6 +25,11 @@ import type { WorldRecord, PackageSummary } from "@/services/api.js";
 import { text } from "@/components/world/editor-helpers.js";
 import { formatSlotLabel, type ResolvedSlot } from "@/hooks/use-slot-config.js";
 import i18n from "@/i18n";
+import {
+  frostFoxSettingsAvailable,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
+import { isDesktopApp } from "@/lib/desktop-bridge.js";
 
 type ViewMode = "list" | "detail" | "edit";
 
@@ -83,6 +88,11 @@ export function WorldSelectScreen({
   onWorldDeleted,
 }: WorldSelectScreenProps) {
   const { t } = useTranslation();
+  const frostFoxAccount = useFrostFoxAccountOptional();
+  const settingsAvailable = frostFoxSettingsAvailable(
+    frostFoxAccount?.status,
+    isDesktopApp(),
+  );
   const primarySlotLabel = formatSlotLabel(resolvedSlots[0]);
   const enabledPluginCount = packages.filter((p) => p.enabled).length;
 
@@ -278,11 +288,13 @@ export function WorldSelectScreen({
           </div>
         </DialogContent>
       </Dialog>
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={onSettingsOpenChange}
-        initialKey={settingsInitialKey}
-      />
+      {settingsAvailable && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={onSettingsOpenChange}
+          initialKey={settingsInitialKey}
+        />
+      )}
       <AiWorldGenerator
         open={generatorOpen}
         onOpenChange={setGeneratorOpen}
@@ -299,8 +311,10 @@ export function WorldSelectScreen({
         progressionMode={progressionMode}
         progression={progression}
         unlockingLevel={unlockingLevel}
+        onOpenSettings={() => {
+          if (settingsAvailable) onSettingsOpenChange(true);
+        }}
 
-        onOpenSettings={() => onSettingsOpenChange(true)}
         onEnterWorld={handleEnterWorld}
         onConnectAccount={() => setConnectDialogOpen(true)}
 

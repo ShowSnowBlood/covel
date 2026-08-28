@@ -299,6 +299,9 @@ resumeRoutes.post("/:id/resume", async (c) => {
           {
             loadRuntime: loadRuntimeFn,
             llm: llmAdapter,
+            ...(c.get("runtimeExecutionPolicy")
+              ? { runtimePolicy: c.get("runtimeExecutionPolicy") }
+              : {}),
             ...(pluginGateway ? { gateway: pluginGateway } : {}),
             ...(pluginUtils ? { utils: pluginUtils } : {}),
             store,

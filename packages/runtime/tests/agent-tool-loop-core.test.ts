@@ -325,6 +325,32 @@ describe("runAgentToolLoop core", () => {
     expect(result.stoppedWithResponse).toBe(false);
   });
 
+  it("applies the server policy to retries and tool-loop steps", async () => {
+    let calls = 0;
+    const llm: LLMAdapter = {
+      generate: async () => {
+        calls += 1;
+        if (calls < 3) throw new Error("socket hang up");
+        return prose("recovered automatically");
+      },
+    };
+    const result = await run({
+      llm,
+      manifest: manifest({ maxRetries: 0, maxSteps: 6 }),
+      deps: {
+        runtimePolicy: {
+          maxRetries: 2,
+          maxSteps: 1,
+          callTimeoutMs: 1_000,
+        },
+      },
+    });
+
+    expect(calls).toBe(3);
+    expect(result.finalContent).toBe("recovered automatically");
+    expect(result.effectiveMaxSteps).toBe(1);
+  });
+
   it("synthesizes successful tool output when the final LLM round misses deadline", async () => {
     let now = 1_000_000;
     const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);

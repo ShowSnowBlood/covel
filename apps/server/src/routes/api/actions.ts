@@ -618,7 +618,9 @@ actionRoutes.post("/", rateLimiter({ max: 30 }), async (c) => {
             result = await executeTurn(turnInput, activeRuntimes, {
               loadRuntime: loadRuntimeFn,
               llm: llmAdapter,
-              // The main turn path never passed the eventBus, so every
+              ...(c.get("runtimeExecutionPolicy")
+                ? { runtimePolicy: c.get("runtimeExecutionPolicy") }
+                : {}),
               // `emitSubEvent` inside the executor — including the
               // completion barrier's `turn.completed` — silently no-opped on
               // the player-facing path (found while adding the
@@ -882,6 +884,9 @@ actionRoutes.post("/", rateLimiter({ max: 30 }), async (c) => {
           deps: {
             loadRuntime: loadRuntimeFn,
             llm: llmAdapter,
+            ...(c.get("runtimeExecutionPolicy")
+              ? { runtimePolicy: c.get("runtimeExecutionPolicy") }
+              : {}),
             ...(pluginGateway ? { gateway: pluginGateway } : {}),
             ...(pluginUtils ? { utils: pluginUtils } : {}),
             ...(getPluginSource ? { getPluginSource } : {}),

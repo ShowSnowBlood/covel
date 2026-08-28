@@ -17,6 +17,7 @@ import { Hono } from "hono";
 import type { LLMAdapter } from "@covel/runtime";
 import type { PluginRuntimeGateway } from "@covel/plugin-loader";
 import type { SlotOverridesInput } from "@covel/ai-provider";
+import type { RuntimeExecutionPolicy } from "@covel/shared";
 import type { AiStack } from "../../src/ai-setup.js";
 import {
   createPerRequestLlmMiddleware,
@@ -189,6 +190,7 @@ function buildTestApp(opts: {
       llmAdapter: LLMAdapter;
       pluginGateway?: PluginRuntimeGateway;
       frostFoxPrincipal: FrostFoxPrincipal | null;
+      runtimeExecutionPolicy?: RuntimeExecutionPolicy;
     };
   }>();
 
@@ -252,6 +254,10 @@ function buildTestApp(opts: {
     });
     return c.json({ imageCount: result.images.length });
   });
+
+  app.get("/runtime-policy", (c) =>
+    c.json({ policy: c.get("runtimeExecutionPolicy") ?? null }),
+  );
 
   return app;
 }
@@ -439,6 +445,48 @@ describe("per-request LLM middleware", () => {
       customPresets: [browserPreset],
     });
   });
+  it("injects the server-owned runtime policy into hosted requests", async () => {
+    const { ai } = createMockAi();
+    const runtimePolicy = {
+      timeoutMs: 240_000,
+      callTimeoutMs: 90_000,
+      firstTokenTimeoutMs: 20_000,
+      maxRetries: 3,
+      maxSteps: 4,
+      loopDetectionThreshold: 3,
+    } as const;
+    const frostFox = {
+      async prepareAiContext(principal: FrostFoxPrincipal | null) {
+        return principal
+          ? {
+              principal,
+              apiKeys: {},
+              managedSlotDefaults: undefined,
+              runtimePolicy,
+            }
+          : null;
+      },
+      sanitizeSlotOverrides(overrides: SlotOverridesInput | null) {
+        return overrides;
+      },
+    } as unknown as FrostFoxService;
+    const app = buildTestApp({
+      ai,
+      envApiKeys: {},
+      defaultAdapter: {
+        async generate() {
+          throw new Error("unused");
+        },
+      },
+      frostFox,
+    });
+
+    const response = await app.request("/runtime-policy");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ policy: runtimePolicy });
+  });
+
   it("ignores browser provider overrides for non-admin hosted users", async () => {
     const { ai, calls } = createMockAi();
     const managedPreset = {

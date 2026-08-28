@@ -134,12 +134,17 @@ export function buildAgentLoopPolicy({
       deps.llm.stream &&
       manifest.outputKind === "story"
     ),
-    effectiveMaxSteps: manifest.maxSteps ?? maxSteps,
+    effectiveMaxSteps:
+      deps.runtimePolicy?.maxSteps ?? manifest.maxSteps ?? maxSteps,
     retryPolicy: buildRetryPolicy({
-      maxRetries: manifest.maxRetries,
-      callTimeoutMs: manifest.callTimeoutMs,
-      firstTokenTimeoutMs: manifest.firstTokenTimeoutMs,
-      loopDetectionThreshold: manifest.loopDetectionThreshold,
+      maxRetries: deps.runtimePolicy?.maxRetries ?? manifest.maxRetries,
+      callTimeoutMs:
+        deps.runtimePolicy?.callTimeoutMs ?? manifest.callTimeoutMs,
+      firstTokenTimeoutMs:
+        deps.runtimePolicy?.firstTokenTimeoutMs ?? manifest.firstTokenTimeoutMs,
+      loopDetectionThreshold:
+        deps.runtimePolicy?.loopDetectionThreshold ??
+        manifest.loopDetectionThreshold,
       runtimeTimeoutMs: timeoutMs,
     }),
     requireToolUse: manifest.requireToolUse === true,

@@ -14,7 +14,11 @@ import { WorldSelectScreen } from "@/components/session/world-select-screen.js";
 import { SessionPrepScreen } from "@/components/session/session-prep-screen.js";
 import { OnboardingWizard } from "@/components/onboarding-wizard.js";
 import { Button } from "@/components/ui/button.js";
-import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
+import {
+  frostFoxSettingsAvailable,
+  useFrostFoxAccount,
+} from "@/components/frostfox-account-context.js";
+import { isDesktopApp } from "@/lib/desktop-bridge.js";
 
 // Lazy-load the in-game surface (chat + stage + json-render panels + plugin
 // UI) — the single heaviest component tree in the app, but only reachable once
@@ -101,6 +105,8 @@ function AccountRequiredSessionPage() {
 
 function SessionPage() {
   const { t } = useTranslation();
+  const { status } = useFrostFoxAccount();
+  const settingsAvailable = frostFoxSettingsAvailable(status, isDesktopApp());
   const {
     state,
     boot,
@@ -202,7 +208,9 @@ function SessionPage() {
 
   useEffect(() => {
     return initDesktopBridge({
-      onOpenSettings: () => settings.setOpen(true),
+      onOpenSettings: () => {
+        if (settingsAvailable) settings.setOpen(true);
+      },
       onNewWorld: () => navigateRef.current({ to: "/session", search: {} }),
       onExportChat: () => {
         const tt = tRef.current;

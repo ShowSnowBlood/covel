@@ -47,8 +47,10 @@ import {
 import { ShinyText, Magnet, StarBorder } from "@/components/reactbits/index.js";
 import {
   frostFoxModelControlsLocked,
+  frostFoxSettingsAvailable,
   useFrostFoxAccountOptional,
 } from "@/components/frostfox-account-context.js";
+import { isDesktopApp } from "@/lib/desktop-bridge.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
 import { cn } from "@/lib/utils.js";
 import { ignoreError } from "@/lib/ignore-error.js";
@@ -87,6 +89,10 @@ export function SessionPrepScreen({
   const frostFoxAccount = useFrostFoxAccountOptional();
   const modelControlsLocked = frostFoxModelControlsLocked(
     frostFoxAccount?.status,
+  );
+  const settingsAvailable = frostFoxSettingsAvailable(
+    frostFoxAccount?.status,
+    isDesktopApp(),
   );
   const { resolvedSlots, refresh: refreshSlots } = useSlotConfig(
     presets,
@@ -252,11 +258,13 @@ export function SessionPrepScreen({
 
   return (
     <div className="h-full w-full overflow-hidden bg-background text-foreground flex flex-col">
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={handleSettingsOpenChange}
-        initialKey={settingsInitialKey}
-      />
+      {settingsAvailable && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={handleSettingsOpenChange}
+          initialKey={settingsInitialKey}
+        />
+      )}
 
       {/* Main Responsive Cockpit Area */}
       <div className="flex-1 w-full max-w-[1700px] mx-auto p-2.5 sm:p-5 md:p-6 lg:p-7 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-3 sm:gap-5 ui-scroll">
@@ -542,7 +550,7 @@ export function SessionPrepScreen({
                             : t("session.slotsUnconfigured")}
                       </p>
                     </div>
-                    {!modelControlsLocked && (
+                    {settingsAvailable && !modelControlsLocked && (
                       <Button
                         variant="outline"
                         size="sm"

@@ -44,8 +44,12 @@ export async function resumeSuspendedRuntime(
   options?: ResumeSuspendedRuntimeOptions,
 ): Promise<RuntimeResult> {
   const startTime = Date.now();
-  const maxSteps = options?.maxSteps ?? 10;
-  const timeoutMs = options?.timeoutMs ?? manifest.timeoutMs ?? 60000;
+  const maxSteps = deps.runtimePolicy?.maxSteps ?? options?.maxSteps ?? 10;
+  const timeoutMs =
+    deps.runtimePolicy?.timeoutMs ??
+    options?.timeoutMs ??
+    manifest.timeoutMs ??
+    60000;
   const runId = crypto.randomUUID();
   const hookPipeline = deps.hookPipeline;
 

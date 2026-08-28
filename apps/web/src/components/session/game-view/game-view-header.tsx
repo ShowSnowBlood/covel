@@ -33,6 +33,7 @@ interface GameViewHeaderProps {
   onToggleLeftPanel: () => void;
   onToggleRightPanel: () => void;
   onOpenSettings: () => void;
+  showSettings?: boolean;
   onOpenSuspensions: () => void;
   onBackToWorldSelect: () => void;
   onResetSession: () => void;
@@ -55,6 +56,7 @@ export function GameViewHeader({
   onToggleLeftPanel,
   onToggleRightPanel,
   onOpenSettings,
+  showSettings = true,
   onOpenSuspensions,
   onBackToWorldSelect,
   onResetSession,
@@ -180,16 +182,18 @@ export function GameViewHeader({
           <ThemeToggle />
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hidden sm:inline-flex h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
-          onClick={onOpenSettings}
-          aria-label={t("nav.settings")}
-          title={t("nav.settings")}
-        >
-          <KeyRound className="w-3.5 h-3.5" />
-        </Button>
+        {showSettings && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden sm:inline-flex h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+            onClick={onOpenSettings}
+            aria-label={t("nav.settings")}
+            title={t("nav.settings")}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+          </Button>
+        )}
         {suspensionsCount > 0 && (
           <Button
             variant="ghost"
@@ -205,7 +209,6 @@ export function GameViewHeader({
             <span className="text-[11px] tabular-nums">{suspensionsCount}</span>
           </Button>
         )}
-
 
         <Button
           variant="ghost"

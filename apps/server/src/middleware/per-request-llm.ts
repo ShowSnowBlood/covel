@@ -104,6 +104,9 @@ export function createPerRequestLlmMiddleware(
         throw error;
       }
     }
+    if (frostFoxContext?.runtimePolicy) {
+      c.set("runtimeExecutionPolicy", frostFoxContext.runtimePolicy);
+    }
     if (opts.frostFox && isFrostFoxAiRequest(c.req.path) && !frostFoxContext) {
       return c.json(
         errorBody("FrostFox account connection required", {

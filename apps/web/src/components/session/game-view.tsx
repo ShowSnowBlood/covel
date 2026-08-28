@@ -1,4 +1,8 @@
 import { frostFoxLevelForWorld } from "@covel/shared";
+import {
+  frostFoxSettingsAvailable,
+  useFrostFoxAccountOptional,
+} from "@/components/frostfox-account-context.js";
 
 import { X } from "lucide-react";
 import {
@@ -57,6 +61,7 @@ import {
 import { MessageComposer } from "./game-view/message-composer.js";
 import { PendingDraftsBar } from "./game-view/pending-drafts-bar.js";
 import { useGameViewComposer } from "./game-view/use-game-view-composer.js";
+import { isDesktopApp } from "@/lib/desktop-bridge.js";
 import { worldVisual } from "@/lib/world-visuals.js";
 import { ignoreError } from "@/lib/ignore-error.js";
 import { SceneLoadingTransition } from "@/components/visual-effects/SceneLoadingTransition.js";
@@ -107,6 +112,11 @@ export function GameView({ session }: GameViewProps) {
     submittedBlockValues,
   } = state;
   const { t } = useTranslation();
+  const frostFoxAccount = useFrostFoxAccountOptional();
+  const settingsAvailable = frostFoxSettingsAvailable(
+    frostFoxAccount?.status,
+    isDesktopApp(),
+  );
   const campaignLevel = world ? frostFoxLevelForWorld(world.id) : null;
   const [levelProgression, setLevelProgression] =
     useState<FrostFoxProgressionStatus | null>(null);
@@ -517,11 +527,13 @@ export function GameView({ session }: GameViewProps) {
 
   return (
     <div className="relative flex h-full w-full overflow-hidden border-t border-border">
-      <SettingsDialog
-        open={settings.open}
-        onOpenChange={settings.onOpenChange}
-        initialKey={settings.initialKey}
-      />
+      {settingsAvailable && (
+        <SettingsDialog
+          open={settings.open}
+          onOpenChange={settings.onOpenChange}
+          initialKey={settings.initialKey}
+        />
+      )}
 
       <Dialog open={suspensionsOpen} onOpenChange={setSuspensionsOpen}>
         <DialogContent className="max-w-xl">
@@ -576,6 +588,7 @@ export function GameView({ session }: GameViewProps) {
                 onDeleteSession={onDeleteSession}
                 onCloseSessionList={() => setShowSessionList(false)}
                 onOpenSettings={() => settings.setOpen(true)}
+                showSettings={settingsAvailable}
                 onResetSession={onResetSession}
                 onTogglePlugin={onTogglePlugin}
               />
@@ -643,6 +656,7 @@ export function GameView({ session }: GameViewProps) {
                 onToggleLeftPanel={toggleLeftPanel}
                 onToggleRightPanel={toggleRightPanel}
                 onOpenSettings={() => settings.setOpen(true)}
+                showSettings={settingsAvailable}
                 onOpenSuspensions={() => setSuspensionsOpen(true)}
                 onBackToWorldSelect={handleGoWorldSelect}
                 onResetSession={handleGoPrep}
@@ -780,6 +794,7 @@ export function GameView({ session }: GameViewProps) {
               onDeleteSession={onDeleteSession}
               onCloseSessionList={() => setShowSessionList(false)}
               onOpenSettings={() => settings.setOpen(true)}
+              showSettings={settingsAvailable}
               onResetSession={onResetSession}
               onTogglePlugin={onTogglePlugin}
             />

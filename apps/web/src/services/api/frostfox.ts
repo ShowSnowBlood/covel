@@ -1,4 +1,5 @@
 import { request } from "./request.js";
+import type { RuntimeExecutionPolicy } from "@covel/shared";
 import type { ModelCapabilityInfo } from "./llm.js";
 export const FROSTFOX_RECENT_UNLOCK_STORAGE_KEY =
   "covel:frostfox:recent-unlock";
@@ -21,6 +22,8 @@ export interface FrostFoxAccountStatus {
   readonly authenticated: boolean;
   readonly clientId?: string;
   readonly routerBaseUrl?: string;
+  /** True when the stored operator credential passed the server gate. */
+  readonly operatorAuthorized?: boolean;
   readonly account?: FrostFoxAccountView;
 }
 
@@ -56,17 +59,52 @@ export interface FrostFoxModelSchedule {
   readonly canEdit?: boolean;
 }
 
+export interface FrostFoxRuntimePolicyResponse {
+  readonly policy: RuntimeExecutionPolicy;
+  readonly updatedAt: string | null;
+  readonly canEdit?: boolean;
+}
+
+export async function fetchFrostFoxRuntimePolicy(
+  silentErrors = false,
+): Promise<FrostFoxRuntimePolicyResponse> {
+  return request<FrostFoxRuntimePolicyResponse>(
+    "/api/frostfox/runtime-policy",
+    {
+      ...FROSTFOX_REQUEST_OPTIONS,
+      operatorAuth: true,
+      silentErrors,
+    },
+  );
+}
+
+export async function saveFrostFoxRuntimePolicy(
+  policy: RuntimeExecutionPolicy,
+): Promise<FrostFoxRuntimePolicyResponse> {
+  return request<FrostFoxRuntimePolicyResponse>(
+    "/api/frostfox/runtime-policy",
+    {
+      ...FROSTFOX_REQUEST_OPTIONS,
+      operatorAuth: true,
+      method: "PUT",
+      body: JSON.stringify({ policy }),
+    },
+  );
+}
+
 export interface FrostFoxProgressionStatus {
   readonly completedLevel: number;
   readonly unlockedLevel: number;
   readonly totalLevels: number;
   readonly updatedAt: string | null;
 }
+
 export async function fetchFrostFoxAccount(
   silentErrors = false,
 ): Promise<FrostFoxAccountStatus> {
   return request<FrostFoxAccountStatus>("/api/frostfox/account", {
     ...FROSTFOX_REQUEST_OPTIONS,
+    operatorAuth: true,
     silentErrors,
   });
 }

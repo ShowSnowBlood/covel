@@ -157,7 +157,8 @@ export async function executeOneRuntime(
   } = inv;
   const startTime = Date.now();
   const runId = crypto.randomUUID();
-  const timeoutMs = manifest.timeoutMs ?? defaultTimeoutMs;
+  const timeoutMs =
+    deps.runtimePolicy?.timeoutMs ?? manifest.timeoutMs ?? defaultTimeoutMs;
   const createRecursiveCall = () => {
     return async (
       rawDelta: RecursiveCallDelta,

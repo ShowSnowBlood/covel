@@ -29,6 +29,7 @@ import {
   ACCOUNT_NODE_ID,
   OPERATOR_ACCESS_NODE_ID,
   PACKAGES_NODE_ID,
+  RUNTIME_POLICY_NODE_ID,
   type NavNode,
 } from "./navigation.js";
 import { SettingWidget } from "./widgets/index.js";
@@ -40,9 +41,11 @@ import { LlmAdvancedPane } from "./panes/LlmAdvancedPane.js";
 import { PackagesPane } from "./panes/PackagesPane.js";
 import { AppearancePane } from "./panes/AppearancePane.js";
 import { OperatorAccessPane } from "./panes/OperatorAccessPane.js";
+import { RuntimePolicyPane } from "./panes/RuntimePolicyPane.js";
 import { FrostFoxAccountPane } from "./panes/FrostFoxAccountPane.js";
 import {
   frostFoxModelControlsLocked,
+  frostFoxSettingsAvailable,
   useFrostFoxAccountOptional,
 } from "@/components/frostfox-account-context.js";
 import { cn } from "@/lib/utils.js";
@@ -72,6 +75,7 @@ function getNodeIcon(id: string) {
       return Cpu;
     case "plugin":
     case "packages":
+    case "runtime-policy":
       return Layers;
     case "data":
       return Database;
@@ -96,12 +100,17 @@ export function SettingsDialog({
   const store = useSettingsStore();
   const { t, i18n } = useTranslation();
   const frostFoxAccount = useFrostFoxAccountOptional();
-  const hostedPlayerModelLocked = frostFoxModelControlsLocked(
-    frostFoxAccount?.status,
-  );
-  const adminSettingsReadOnly = hostedPlayerModelLocked;
-  const [query, setQuery] = useState("");
   const desktop = isDesktopApp();
+  const status = frostFoxAccount?.status;
+  const settingsAvailable = frostFoxSettingsAvailable(status, desktop);
+  const hostedPlayerModelLocked = frostFoxModelControlsLocked(status);
+  const hostedServiceEnabled = status?.enabled === true;
+  const hostedAdmin = Boolean(
+    hostedServiceEnabled &&
+    (status.operatorAuthorized || status.account?.isAdmin === true),
+  );
+  const adminSettingsReadOnly = false;
+  const [query, setQuery] = useState("");
   const [storeRevision, setStoreRevision] = useState(0);
 
   useEffect(
@@ -114,8 +123,21 @@ export function SettingsDialog({
 
   const tree = useMemo(
     () =>
-      buildNavTree(store, { includeDesktop: desktop, locale: i18n.language }),
-    [store, desktop, i18n.language, open, storeRevision],
+      buildNavTree(store, {
+        includeDesktop: desktop,
+        includeOperatorAccess: hostedServiceEnabled,
+        includeRuntimePolicy: hostedAdmin,
+        locale: i18n.language,
+      }),
+    [
+      store,
+      desktop,
+      hostedServiceEnabled,
+      hostedAdmin,
+      i18n.language,
+      open,
+      storeRevision,
+    ],
   );
   const visibleTree = useMemo(() => {
     const scoped = focusNode
@@ -182,6 +204,8 @@ export function SettingsDialog({
 
   const selectedNode: NavNode | null =
     filtered.find((n) => n.id === selected) ?? firstSelectable ?? null;
+
+  if (!open || !settingsAvailable) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -383,6 +407,7 @@ function renderPane(
   if (node.id === "llm.advanced") {
     return <LlmAdvancedPane readOnly={adminSettingsReadOnly} />;
   }
+  if (node.id === RUNTIME_POLICY_NODE_ID) return <RuntimePolicyPane />;
   if (node.id === "data") return <DataPane readOnly={adminSettingsReadOnly} />;
   if (node.id === "desktop") {
     return <DesktopPane readOnly={adminSettingsReadOnly} />;

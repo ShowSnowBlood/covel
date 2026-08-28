@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigate = vi.hoisted(() => vi.fn());
 const setOpen = vi.hoisted(() => vi.fn());
@@ -7,6 +7,11 @@ const accountState = vi.hoisted(() => ({
   status: {
     enabled: true,
     authenticated: false,
+    account: undefined,
+  } as {
+    enabled: boolean;
+    authenticated: boolean;
+    account?: { isAdmin?: boolean };
   },
 }));
 
@@ -23,6 +28,13 @@ vi.mock("@/components/frostfox-account-context.js", () => ({
     error: false,
     refresh: vi.fn(),
   }),
+  frostFoxSettingsAvailable: (
+    status: typeof accountState.status,
+    localAdmin = false,
+  ) =>
+    localAdmin ||
+    status?.enabled === false ||
+    status?.account?.isAdmin === true,
 }));
 vi.mock("@/hooks/use-settings-dialog.js", () => ({
   useSettingsDialog: () => ({
@@ -48,6 +60,16 @@ vi.mock("@/components/reactbits/index.js", () => ({
 const { GameHome } = await import("../GameHome.js");
 
 describe("GameHome", () => {
+  beforeEach(() => {
+    accountState.status = {
+      enabled: true,
+      authenticated: false,
+      account: undefined,
+    };
+    navigate.mockClear();
+    setOpen.mockClear();
+  });
+
   it("keeps the cinematic home and its actions visible before account login", () => {
     render(<GameHome />);
 
@@ -60,10 +82,8 @@ describe("GameHome", () => {
         .hasAttribute("disabled"),
     ).toBe(false);
     expect(
-      screen
-        .getByRole("button", { name: "home.openSettings" })
-        .hasAttribute("disabled"),
-    ).toBe(false);
+      screen.queryByRole("button", { name: "home.openSettings" }),
+    ).toBeNull();
     expect(screen.queryByText("home.mainLoginRequired")).toBeNull();
     expect(
       document.querySelector(
@@ -73,7 +93,12 @@ describe("GameHome", () => {
     expect(screen.queryByText(/^Level /)).toBeNull();
   });
 
-  it("opens settings from the restored secondary action", () => {
+  it("opens settings for an administrator", () => {
+    accountState.status = {
+      enabled: true,
+      authenticated: true,
+      account: { isAdmin: true },
+    };
     render(<GameHome />);
 
     fireEvent.click(screen.getByRole("button", { name: "home.openSettings" }));

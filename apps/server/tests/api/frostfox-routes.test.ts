@@ -53,6 +53,25 @@ function createApp(principal: FrostFoxPrincipal | null) {
         updatedAt: "2026-08-27T00:00:00.000Z",
       };
     }),
+    getRuntimePolicy: vi.fn(async () => ({
+      policy: { timeoutMs: 180_000, maxRetries: 1 },
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    })),
+    setRuntimePolicy: vi.fn(
+      async (
+        value: FrostFoxPrincipal | null,
+        policy: unknown,
+        options?: { readonly operatorAuthorized?: boolean },
+      ) => {
+        if (!options?.operatorAuthorized && !value?.isAdmin) {
+          throw new FrostFoxServiceError("frostfox_admin_required", 403);
+        }
+        return {
+          policy: policy as { timeoutMs: number; maxRetries: number },
+          updatedAt: "2026-08-27T00:00:00.000Z",
+        };
+      },
+    ),
   } as unknown as FrostFoxService;
   const app = new Hono();
   app.use("*", async (c, next) => {
@@ -159,5 +178,101 @@ describe("FrostFox model schedule routes", () => {
     expect(service.setModelSchedule).toHaveBeenCalledWith(admin, [
       { channelKey: "story", modelId: "primary" },
     ]);
+  });
+});
+
+describe("FrostFox runtime policy routes", () => {
+  it("exposes the effective policy to players without edit access", async () => {
+    const { app } = createApp(player);
+    const response = await app.request("/api/frostfox/runtime-policy");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      canEdit: false,
+      policy: { timeoutMs: 180_000, maxRetries: 1 },
+    });
+  });
+
+  it("rejects a player policy write", async () => {
+    const { app } = createApp(player);
+    const response = await app.request("/api/frostfox/runtime-policy", {
+      method: "PUT",
+      headers: {
+        origin: "https://covel.example",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ policy: { timeoutMs: 240_000 } }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "frostfox_admin_required",
+    });
+  });
+
+  it("allows an administrator to save a valid policy", async () => {
+    const { app, service } = createApp(admin);
+    const policy = {
+      timeoutMs: 240_000,
+      callTimeoutMs: 90_000,
+      firstTokenTimeoutMs: 20_000,
+      maxRetries: 2,
+      maxSteps: 4,
+      loopDetectionThreshold: 3,
+    };
+    const response = await app.request("/api/frostfox/runtime-policy", {
+      method: "PUT",
+      headers: {
+        origin: "https://covel.example",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ policy }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      canEdit: true,
+      policy,
+    });
+    expect(service.setRuntimePolicy).toHaveBeenCalledWith(admin, policy, {
+      operatorAuthorized: false,
+    });
+  });
+
+  it("allows the hosted operator to manage policy without an account", async () => {
+    const originalToken = process.env.COVEL_DESKTOP_REST_TOKEN;
+    process.env.COVEL_DESKTOP_REST_TOKEN = "operator-secret";
+    try {
+      const { app, service } = createApp(null);
+      const headers = {
+        authorization: "Bearer operator-secret",
+        origin: "https://covel.example",
+        "content-type": "application/json",
+      };
+      const readResponse = await app.request("/api/frostfox/runtime-policy", {
+        headers,
+      });
+      expect(readResponse.status).toBe(200);
+      await expect(readResponse.json()).resolves.toMatchObject({
+        canEdit: true,
+      });
+
+      const policy = { maxRetries: 3, timeoutMs: 300_000 };
+      const writeResponse = await app.request("/api/frostfox/runtime-policy", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ policy }),
+      });
+      expect(writeResponse.status).toBe(200);
+      expect(service.setRuntimePolicy).toHaveBeenCalledWith(null, policy, {
+        operatorAuthorized: true,
+      });
+    } finally {
+      if (originalToken === undefined) {
+        delete process.env.COVEL_DESKTOP_REST_TOKEN;
+      } else {
+        process.env.COVEL_DESKTOP_REST_TOKEN = originalToken;
+      }
+    }
   });
 });

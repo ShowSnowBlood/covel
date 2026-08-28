@@ -44,6 +44,7 @@ export interface LeftPanelProps {
   onDeleteSession: (sessionId: string) => Promise<void>;
   onCloseSessionList: () => void;
   onOpenSettings: () => void;
+  showSettings?: boolean;
   onResetSession: () => void;
   onTogglePlugin: (pluginId: string, enabled: boolean) => void;
 }
@@ -64,6 +65,7 @@ export function LeftPanel({
   onDeleteSession,
   onCloseSessionList,
   onOpenSettings,
+  showSettings = true,
   onResetSession,
   onTogglePlugin,
 }: LeftPanelProps): ReactElement {
@@ -121,10 +123,15 @@ export function LeftPanel({
               <div className="flex items-center gap-2 min-w-0">
                 <div
                   className={`w-2 h-2 rounded-full shrink-0 ${
-                    session ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"
+                    session
+                      ? "bg-emerald-500 animate-pulse"
+                      : "bg-muted-foreground"
                   }`}
                 />
-                <Badge variant="secondary" className="text-[10px] font-medium rounded-md px-2 py-0.5">
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] font-medium rounded-md px-2 py-0.5"
+                >
                   {session.status} · turn {session.turnCount}
                 </Badge>
               </div>
@@ -160,7 +167,9 @@ export function LeftPanel({
                         }}
                         className="flex-1 text-left px-2 py-1 text-[11px] font-mono truncate min-w-0 cursor-pointer"
                       >
-                        <span className="block truncate font-medium text-foreground">{s.id}</span>
+                        <span className="block truncate font-medium text-foreground">
+                          {s.id}
+                        </span>
                         <span className="text-[9.5px] text-muted-foreground block truncate">
                           {s.status} · turn {s.turnCount} ·{" "}
                           {new Date(s.createdAt).toLocaleDateString()}
@@ -216,14 +225,16 @@ export function LeftPanel({
 
       {/* Bottom Sticky Action Bar */}
       <div className="p-3 border-t border-border/80 bg-card/50 backdrop-blur-md shrink-0 flex flex-col gap-2">
-        <Button
-          className="w-full h-9 text-xs rounded-xl border border-border/80 bg-background/80 hover:bg-accent/40 text-foreground transition-all"
-          variant="outline"
-          onClick={onOpenSettings}
-        >
-          <KeyRound className="w-3.5 h-3.5 mr-1.5 text-primary" />
-          <span>{t("nav.settings", "Settings")}</span>
-        </Button>
+        {showSettings && (
+          <Button
+            className="w-full h-9 text-xs rounded-xl border border-border/80 bg-background/80 hover:bg-accent/40 text-foreground transition-all"
+            variant="outline"
+            onClick={onOpenSettings}
+          >
+            <KeyRound className="w-3.5 h-3.5 mr-1.5 text-primary" />
+            <span>{t("nav.settings", "Settings")}</span>
+          </Button>
+        )}
         <Button
           className="w-full h-8 text-[11px] rounded-xl text-muted-foreground hover:text-foreground transition-all"
           variant="ghost"

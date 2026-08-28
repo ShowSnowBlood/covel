@@ -53,6 +53,11 @@ const OPERATOR_ACCESS_LABEL = {
   "zh-CN": "运维访问",
   "en-US": "Operator Access",
 };
+const RUNTIME_POLICY_NODE_ID = "runtime-policy";
+const RUNTIME_POLICY_LABEL = {
+  "zh-CN": "运行策略",
+  "en-US": "Runtime Policy",
+};
 
 const GROUP_LABELS: Record<SettingGroup, { "zh-CN": string; "en-US": string }> =
   {
@@ -77,14 +82,16 @@ const LLM_SUBNODES: Array<{
   },
 ];
 
-function groupLabel(group: SettingGroup, locale: string): string {
-  const l = GROUP_LABELS[group];
-  return locale.startsWith("en") ? l["en-US"] : l["zh-CN"];
-}
-
 interface BuildNavOptions {
   readonly includeDesktop?: boolean;
+  readonly includeOperatorAccess?: boolean;
+  readonly includeRuntimePolicy?: boolean;
   readonly locale?: string;
+}
+
+function groupLabel(group: SettingGroup, locale: string): string {
+  const labels = GROUP_LABELS[group];
+  return locale.startsWith("en") ? labels["en-US"] : labels["zh-CN"];
 }
 
 /**
@@ -203,18 +210,29 @@ export function buildNavTree(
       });
     }
   }
-  // Pure-web hosted deployments need an explicit browser-local credential
-  // entry point before any operator-gated management request can succeed.
-  // Append it after the normal groups so self-tier users keep their existing
-  // default Settings pane; those servers simply ignore the optional header.
-  nodes.push({
-    id: OPERATOR_ACCESS_NODE_ID,
-    label: locale.startsWith("en")
-      ? OPERATOR_ACCESS_LABEL["en-US"]
-      : OPERATOR_ACCESS_LABEL["zh-CN"],
-    kind: "group",
-    children: [],
-  });
+  // The credential pane is meaningful only when the connected server exposes
+  // FrostFox hosted access. Desktop and self-hosted deployments keep their
+  // local settings surface free of hosted-operator controls.
+  if (opts.includeOperatorAccess) {
+    nodes.push({
+      id: OPERATOR_ACCESS_NODE_ID,
+      label: locale.startsWith("en")
+        ? OPERATOR_ACCESS_LABEL["en-US"]
+        : OPERATOR_ACCESS_LABEL["zh-CN"],
+      kind: "group",
+      children: [],
+    });
+  }
+  if (opts.includeRuntimePolicy) {
+    nodes.push({
+      id: RUNTIME_POLICY_NODE_ID,
+      label: locale.startsWith("en")
+        ? RUNTIME_POLICY_LABEL["en-US"]
+        : RUNTIME_POLICY_LABEL["zh-CN"],
+      kind: "group",
+      children: [],
+    });
+  }
   // Virtual node for package import (UI-only, no registered SettingEntry).
   nodes.push({
     id: PACKAGES_NODE_ID,
@@ -232,6 +250,7 @@ export {
   APPEARANCE_NODE_ID,
   OPERATOR_ACCESS_NODE_ID,
   PACKAGES_NODE_ID,
+  RUNTIME_POLICY_NODE_ID,
 };
 
 export function filterNav(

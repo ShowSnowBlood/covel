@@ -155,3 +155,22 @@ export function frostFoxModelControlsLocked(
     status.account.isAdmin !== true,
   );
 }
+
+/**
+ * Settings are an administrator surface on hosted deployments. Local desktop
+ * and self-hosted deployments have no remote player role, so their operator is
+ * the local administrator. A stored operator token is only a UI hint; every
+ * write is still authorized by the server.
+ */
+export function frostFoxSettingsAvailable(
+  status: FrostFoxAccountStatus | null | undefined,
+  localAdmin = false,
+): boolean {
+  if (localAdmin) return true;
+  if (!status) return false;
+  if (!status.enabled) return true;
+  return Boolean(
+    status.operatorAuthorized ||
+    (status.authenticated && status.account?.isAdmin === true),
+  );
+}

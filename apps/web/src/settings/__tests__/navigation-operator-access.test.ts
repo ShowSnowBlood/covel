@@ -4,6 +4,7 @@ import {
   buildNavTree,
   filterNav,
   OPERATOR_ACCESS_NODE_ID,
+  RUNTIME_POLICY_NODE_ID,
 } from "../navigation.js";
 
 const emptyStore = {
@@ -11,10 +12,20 @@ const emptyStore = {
 } as unknown as SettingsStoreApi;
 
 describe("operator access settings navigation", () => {
-  it("exposes the browser credential pane in every locale", () => {
-    const english = buildNavTree(emptyStore, { locale: "en-US" });
-    const chinese = buildNavTree(emptyStore, { locale: "zh-CN" });
+  it("exposes the browser credential pane only for hosted servers", () => {
+    const local = buildNavTree(emptyStore, { locale: "en-US" });
+    const english = buildNavTree(emptyStore, {
+      locale: "en-US",
+      includeOperatorAccess: true,
+    });
+    const chinese = buildNavTree(emptyStore, {
+      locale: "zh-CN",
+      includeOperatorAccess: true,
+    });
 
+    expect(local.some((node) => node.id === OPERATOR_ACCESS_NODE_ID)).toBe(
+      false,
+    );
     expect(
       english.find((node) => node.id === OPERATOR_ACCESS_NODE_ID)?.label,
     ).toBe("Operator Access");
@@ -30,11 +41,36 @@ describe("operator access settings navigation", () => {
   });
 
   it("is discoverable through settings search", () => {
-    const nodes = buildNavTree(emptyStore, { locale: "en-US" });
+    const nodes = buildNavTree(emptyStore, {
+      locale: "en-US",
+      includeOperatorAccess: true,
+    });
 
     expect(filterNav(nodes, "operator", "en-US")).toEqual([
       expect.objectContaining({ id: OPERATOR_ACCESS_NODE_ID }),
     ]);
+  });
+
+  it("shows runtime policy only when administrator access is explicit", () => {
+    expect(
+      buildNavTree(emptyStore, { locale: "en-US" }).some(
+        (node) => node.id === RUNTIME_POLICY_NODE_ID,
+      ),
+    ).toBe(false);
+
+    expect(
+      buildNavTree(emptyStore, {
+        locale: "en-US",
+        includeRuntimePolicy: true,
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: RUNTIME_POLICY_NODE_ID,
+          label: "Runtime Policy",
+        }),
+      ]),
+    );
   });
 
   it("hides onboarding bookkeeping from player settings", () => {

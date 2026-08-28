@@ -20,8 +20,12 @@ import {
   setManagedFrostFoxCatalog,
   signOutFrostFox,
 } from "@/services/api.js";
-import { useFrostFoxAccount } from "@/components/frostfox-account-context.js";
+import {
+  frostFoxSettingsAvailable,
+  useFrostFoxAccount,
+} from "@/components/frostfox-account-context.js";
 import { SettingsDialog } from "@/settings/SettingsDialog.js";
+import { isDesktopApp } from "@/lib/desktop-bridge.js";
 
 export function FrostFoxAccountSummary({
   overlay = false,
@@ -30,6 +34,7 @@ export function FrostFoxAccountSummary({
 }) {
   const { i18n, t } = useTranslation();
   const { status, refresh } = useFrostFoxAccount();
+  const settingsAvailable = frostFoxSettingsAvailable(status, isDesktopApp());
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -359,20 +364,21 @@ export function FrostFoxAccountSummary({
 
           {/* Actions Menu */}
           <div className="pt-1 space-y-1">
-            <button
-              type="button"
-              onClick={handleOpenSettings}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-zinc-900/70 transition-colors cursor-pointer"
-            >
-              <span className="flex items-center gap-2">
-                <Settings2 className="h-3.5 w-3.5 text-primary" />
-                {t("account.settings", "Account Settings")}
-              </span>
-              <span className="text-[10px] text-muted-foreground font-mono">
-                § SETTINGS
-              </span>
-            </button>
-
+            {settingsAvailable && (
+              <button
+                type="button"
+                onClick={handleOpenSettings}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-zinc-900/70 transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings2 className="h-3.5 w-3.5 text-primary" />
+                  {t("account.settings", "Account Settings")}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  § SETTINGS
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSwitchAccount}
@@ -406,12 +412,13 @@ export function FrostFoxAccountSummary({
         </div>
       )}
 
-      {/* Settings Dialog when opened via Account menu */}
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        initialKey="account"
-      />
+      {settingsAvailable && (
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          initialKey="account"
+        />
+      )}
     </div>
   );
 }

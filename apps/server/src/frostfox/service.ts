@@ -19,7 +19,9 @@ import {
   FROSTFOX_LEVEL_COUNT,
   frostFoxLevelForWorld,
   isGrok46Model,
+  normalizeRuntimeExecutionPolicy,
   type DeploymentTier,
+  type RuntimeExecutionPolicy,
 } from "@covel/shared";
 
 import type { AiStack } from "../ai-setup.js";
@@ -42,6 +44,7 @@ import {
   type FrostFoxCredentialStore,
   type FrostFoxModelSchedule,
   type FrostFoxModelScheduleEntry,
+  type FrostFoxRuntimePolicyRecord,
 } from "./credentials.js";
 
 const AUTH_TRANSACTION_TTL_MS = 5 * 60_000;
@@ -108,6 +111,8 @@ export interface FrostFoxAiContext {
   readonly managedSlotDefaults: SlotOverridesInput | undefined;
   /** Forced preset selection applied by the gateway for non-admin accounts. */
   readonly managedModelPolicy?: ManagedModelPolicy;
+  /** Administrator-owned execution limits shared by hosted sessions. */
+  readonly runtimePolicy?: RuntimeExecutionPolicy;
 }
 
 interface RouterAccountPayload {
@@ -448,6 +453,33 @@ export class FrostFoxService {
     }
     return this.store.setModelSchedule(normalized);
   }
+  async getRuntimePolicy(): Promise<FrostFoxRuntimePolicyRecord | null> {
+    return this.store.getRuntimePolicy();
+  }
+
+  async setRuntimePolicy(
+    principal: FrostFoxPrincipal | null,
+    policy: unknown,
+    options: { readonly operatorAuthorized?: boolean } = {},
+  ): Promise<FrostFoxRuntimePolicyRecord> {
+    if (!options.operatorAuthorized) {
+      if (!principal?.isAdmin) {
+        throw new FrostFoxServiceError("frostfox_admin_required", 403);
+      }
+      const binding = await this.requiredBinding(principal.localUserId);
+      if (!binding.isAdmin) {
+        throw new FrostFoxServiceError("frostfox_admin_required", 403);
+      }
+      if (binding.credentialState !== "active") {
+        throw new FrostFoxServiceError("frostfox_reconnect_required", 401);
+      }
+    }
+    const normalized = normalizeRuntimeExecutionPolicy(policy);
+    if (!normalized) {
+      throw new FrostFoxServiceError("frostfox_runtime_policy_invalid", 400);
+    }
+    return this.store.setRuntimePolicy(normalized);
+  }
 
   async handleGatewayUnauthorized(principal: FrostFoxPrincipal): Promise<void> {
     try {
@@ -511,6 +543,13 @@ export class FrostFoxService {
         .map((provider) => [provider.providerId, gatewayKey]),
     );
     let managedSlotDefaults = this.managedSlotDefaults;
+    let runtimePolicy: RuntimeExecutionPolicy | undefined;
+    try {
+      runtimePolicy = (await this.store.getRuntimePolicy())?.policy;
+    } catch {
+      // A policy read failure must not prevent ordinary account calls. The
+      // manifest/framework defaults remain the safe fallback.
+    }
     try {
       const catalog = await this.listModels(principal);
       managedSlotDefaults = withManagedStorySchedule(
@@ -531,6 +570,7 @@ export class FrostFoxService {
       principal,
       apiKeys,
       managedSlotDefaults,
+      ...(runtimePolicy ? { runtimePolicy } : {}),
       ...(!principal.isAdmin
         ? {
             managedModelPolicy:
