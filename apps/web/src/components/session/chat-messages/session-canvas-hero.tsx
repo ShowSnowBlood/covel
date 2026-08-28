@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Flame, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
-import { ShinyText } from "@/components/reactbits/index.js";
+import { ShinyText, Magnet } from "@/components/reactbits/index.js";
 import { resolveI18n } from "@/lib/catalog/helpers.js";
 import { worldVisual } from "@/lib/world-visuals.js";
 import type { WorldRecord } from "@/services/api.js";
@@ -108,15 +108,17 @@ export function SessionCanvasHero({
           )}
 
           <div>
-            <Button
-              size="lg"
-              className="mt-2 sm:mt-4 px-6 sm:px-8 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-2xl shadow-lg hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200"
-              style={{ background: "var(--world-accent)", color: "black" }}
-              onClick={onBegin}
-            >
-              <Flame className="w-4 h-4 mr-2 text-black" />
-              {beginLabel}
-            </Button>
+            <Magnet padding={45} magnetStrength={3}>
+              <Button
+                size="lg"
+                className="mt-2 sm:mt-4 px-6 sm:px-8 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-2xl shadow-lg hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200"
+                style={{ background: "var(--world-accent)", color: "black" }}
+                onClick={onBegin}
+              >
+                <Flame className="w-4 h-4 mr-2 text-black" />
+                {beginLabel}
+              </Button>
+            </Magnet>
           </div>
         </div>
       </div>

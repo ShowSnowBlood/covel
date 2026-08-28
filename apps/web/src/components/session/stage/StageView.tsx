@@ -28,6 +28,7 @@ import { usePluginNamespace } from "@/stores/plugin-data-store.js";
 import { useStreamingText } from "@/stores/streaming-text-store.js";
 import { AssetTurnSidebar } from "@/components/asset-render/index.js";
 import { RuntimeJobProgress } from "../runtime-job-progress.js";
+import { ShinyText } from "@/components/reactbits/index.js";
 import { useImageGeneration } from "../chat-messages/use-image-generation.js";
 import type { StreamMessage, ExecutionStep } from "@/stores/session-store.js";
 import type {
@@ -343,12 +344,15 @@ export function StageView(props: StageViewProps): ReactElement {
           Hidden once deltas arrive: the typewriter itself is then the feedback. */}
       {executing && !isStreaming && (
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-[8rem] z-30 flex justify-center px-4 md:bottom-40"
+          className="pointer-events-none absolute inset-x-0 bottom-[8rem] z-30 flex justify-center px-4 md:bottom-40 animate-in fade-in zoom-in-95 duration-200"
           data-testid="stage-thinking"
         >
-          <div className="ui-stage-panel flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            <span>{t("stage.thinkingLabel")}</span>
+          <div className="ui-stage-panel flex items-center gap-2.5 rounded-full border border-primary/30 bg-card/90 px-4 py-2 text-xs shadow-lg backdrop-blur-xl">
+            <div className="relative flex h-3 w-3 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-70" />
+              <Loader2 className="relative z-10 h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
+            </div>
+            <ShinyText text={t("stage.thinkingLabel")} speed={3} className="text-xs font-medium text-foreground" />
           </div>
         </div>
       )}

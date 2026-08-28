@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/stores/session-store.js";
 import type { RuntimeJobStatus } from "@/stores/session-store.js";
 import type { PackageSummary } from "@/services/api.js";
-
+import { ShinyText } from "@/components/reactbits/index.js";
 interface RuntimeJobProgressProps {
   readonly className?: string;
 }
@@ -155,7 +155,7 @@ export function RuntimeJobProgress({
                 />
               </div>
               <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                {t("session.turnDispatching", "正在推进回合")}
+                <ShinyText text={t("session.turnDispatching", "正在推进回合")} speed={3} className="font-medium" />
               </span>
             </div>
             <span className="inline-flex shrink-0 items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
