@@ -659,12 +659,21 @@ actionRoutes.post("/", rateLimiter({ max: 30 }), async (c) => {
                 });
               },
               onRuntimeComplete: async (info) => {
-                await trace.runtimeCompleted({
-                  runtimeId: info.runtimeId,
-                  pluginId: info.pluginId,
-                  status: info.status,
-                  durationMs: info.durationMs,
-                });
+                if (info.status === "failed") {
+                  await trace.runtimeFailed({
+                    runtimeId: info.runtimeId,
+                    pluginId: info.pluginId,
+                    error: info.error ?? "Runtime failed",
+                    durationMs: info.durationMs,
+                  });
+                } else {
+                  await trace.runtimeCompleted({
+                    runtimeId: info.runtimeId,
+                    pluginId: info.pluginId,
+                    status: info.status,
+                    durationMs: info.durationMs,
+                  });
+                }
                 const eventType =
                   info.status === "failed"
                     ? "runtime.failed"

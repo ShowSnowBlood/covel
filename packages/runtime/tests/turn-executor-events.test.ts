@@ -18,6 +18,7 @@ import { executeTurn } from "../src/turn-executor/turn-executor.js";
 import type { TurnExecutorDeps } from "../src/turn-executor/turn-executor.js";
 import type { LLMAdapter, LLMResponse } from "../src/llm/llm-adapter.js";
 import { createEventBus, type EventBus } from "@covel/events";
+import { createHookPipeline } from "../src/hooks/pipeline.js";
 
 // Prime a store with one prior player message so turnNumber >= 1 and
 // main-loop priority runtimes survive the Pre-Game band filter.
@@ -278,6 +279,75 @@ describe("TurnExecutor EventBus Bridge", () => {
     expect((runtimeFailed!.payload as Record<string, unknown>).error).toContain(
       "LLM exploded",
     );
+  });
+
+  it("reports returned runtime failures through the completion callback", async () => {
+    const events: SubscriptionEvent[] = [];
+    eventBus.onEmit((e) => events.push(e));
+    const completions: Array<{ status: string; error?: string }> = [];
+    const deps: TurnExecutorDeps = {
+      loadRuntime: async () => narratorLoaded,
+      llm: mockLLM,
+      eventBus,
+      store: await createMainLoopStore("sess-1"),
+      onRuntimeComplete: async (info) => {
+        completions.push(info);
+      },
+    };
+
+    const result = await executeTurn(
+      makeTurnInput(),
+      [narratorManifest],
+      deps,
+      { maxSteps: 0 },
+    );
+
+    expect(result.runtimeResults[0]?.status).toBe("failed");
+    expect(completions).toEqual([
+      expect.objectContaining({ status: "failed" }),
+    ]);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "runtime.failed" &&
+          (event.payload as Record<string, unknown>).runtimeId === "narrator",
+      ),
+    ).toBe(true);
+  });
+
+  it("reports a PreRuntime abort as a terminal skipped runtime", async () => {
+    const events: SubscriptionEvent[] = [];
+    eventBus.onEmit((e) => events.push(e));
+    const completions: Array<{ status: string }> = [];
+    const pipeline = createHookPipeline();
+    pipeline.register({
+      id: "test:PreRuntime:abort",
+      event: "PreRuntime",
+      handler: vi
+        .fn()
+        .mockResolvedValue({ action: "abort", reason: "blocked by policy" }),
+    });
+
+    const result = await executeTurn(makeTurnInput(), [narratorManifest], {
+      loadRuntime: async () => narratorLoaded,
+      llm: mockLLM,
+      eventBus,
+      store: await createMainLoopStore("sess-1"),
+      hookPipeline: pipeline,
+      onRuntimeComplete: async (info) => {
+        completions.push({ status: info.status });
+      },
+    });
+
+    expect(result.runtimeResults[0]?.status).toBe("skipped");
+    expect(completions).toEqual([{ status: "skipped" }]);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "runtime.completed" &&
+          (event.payload as Record<string, unknown>).status === "skipped",
+      ),
+    ).toBe(true);
   });
 
   it("should still work when eventBus is not provided (backward compat)", async () => {

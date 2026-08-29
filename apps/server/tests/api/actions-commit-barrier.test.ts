@@ -360,3 +360,85 @@ describe("POST /api/actions — turn accounting follows the commit outcome", () 
     );
   });
 });
+
+describe("POST /api/actions — runtime terminal trace", () => {
+  it("persists a returned runtime failure as runtime.failed", async () => {
+    const sessionId = "sess-runtime-terminal";
+    const runtimeId = "fake-runtime-terminal";
+    const store = createMemoryStore();
+    const registry = createPluginRegistry();
+    const base = makeFakeLoadedRuntime({ name: runtimeId });
+    const loaded = {
+      ...base,
+      manifest: { ...base.manifest, maxSteps: 0 },
+    };
+    registry.register(makeEntry(loaded));
+    setMemorySystem(undefined);
+
+    await store.createSession({
+      id: sessionId,
+      worldId: null,
+      status: "active",
+      presetId: null,
+      activePlugins: [runtimeId],
+      turnCount: 1,
+      preGameCompleted: [],
+      createdAt: new Date().toISOString(),
+    });
+    await store.appendTurnMessage({
+      id: "prior-runtime-terminal",
+      sessionId,
+      turnId: "prior-turn",
+      sourceType: "player",
+      role: "user",
+      content: "prior",
+      order: 0,
+      createdAt: "2024-01-01T00:00:00Z",
+    });
+
+    const eventBus = createEventBus(store);
+    const { llm } = makeFakeLLM("unused");
+    const sessionLock = createInProcessSessionLock();
+    const app = new Hono();
+    app.use("*", async (c, next) => {
+      c.set("store", store);
+      c.set("pluginRegistry", registry);
+      c.set("llmAdapter", llm);
+      c.set("loadRuntimeFn", async () => loaded);
+      // Hono's test context requires the production tool slot even though
+      // this maxSteps=0 case never reaches tool dispatch.
+      c.set(
+        "toolExecutor",
+        undefined as unknown as import("@covel/runtime").ToolExecutor,
+      );
+      c.set("resolveModel", () => undefined);
+      c.set("eventBus", eventBus);
+      c.set("sessionLock", sessionLock);
+      await next();
+    });
+    app.route("/api/actions", actionRoutes);
+
+    const response = await app.request("/api/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId: "req-runtime-terminal",
+        type: "send_message",
+        sessionId,
+        payload: { content: "hello" },
+      }),
+    });
+    expect(response.status).toBe(200);
+    await drainActionStream(response);
+    await eventBus.flush();
+
+    const rows = await store.listTraceEvents(sessionId);
+    const failed = rows.find((row) => row.type === "runtime.failed");
+    expect(failed).toBeDefined();
+    expect(failed?.payload).toMatchObject({
+      runtimeId,
+      pluginId: runtimeId,
+      durationMs: expect.any(Number),
+    });
+  });
+});

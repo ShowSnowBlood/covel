@@ -19,12 +19,12 @@ import {
 import {
   createExecutionStepFromTrace,
   createExecutionStepUpdate,
+  toRuntimeCompletedStatus,
 } from "./execution-steps.js";
 import { parseRuntimeJobStatus } from "./job-status.js";
 import { upsertGameStateCharacter } from "./game-state.js";
 import type {
   AssetProgressEvent,
-  ExecutionStep,
   SessionAction,
   SessionState,
   SnapshotCharacter,
@@ -189,13 +189,6 @@ function addBlockMessageFromSse(
       })
       .catch(ignoreError("persist block message"));
   }
-}
-
-function toRuntimeCompletedStatus(rawStatus: unknown): ExecutionStep["status"] {
-  if (rawStatus === "suspended") return "suspended";
-  if (rawStatus === "skipped") return "skipped";
-  if (rawStatus === "failed") return "failed";
-  return "completed";
 }
 
 /** Runtime failures caused by the player's Stop action are not errors. */

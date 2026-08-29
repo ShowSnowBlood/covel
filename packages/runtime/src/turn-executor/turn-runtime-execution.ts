@@ -456,12 +456,15 @@ export async function executeOneRuntime(
       input.sessionId,
     );
     if (!loaded) {
-      return makeFailedResult(
-        manifest,
-        input,
-        runId,
-        startTime,
-        "Runtime not found",
+      return emitGateTerminal(
+        makeFailedResult(
+          manifest,
+          input,
+          runId,
+          startTime,
+          "Runtime not found",
+        ),
+        "runtime-not-found",
       );
     }
 
@@ -672,13 +675,17 @@ export async function executeOneRuntime(
       startTime,
       message,
     );
-    await deps.onRuntimeComplete?.({
-      runtimeId: manifest.name,
-      pluginId: manifest.pluginId,
-      status: failedResult.status,
-      durationMs: failedResult.durationMs,
-      error: message,
-    });
+    try {
+      await deps.onRuntimeComplete?.({
+        runtimeId: manifest.name,
+        pluginId: manifest.pluginId,
+        status: failedResult.status,
+        durationMs: failedResult.durationMs,
+        error: message,
+      });
+    } catch {
+      /* callback error must not kill runtime */
+    }
 
     emitSubEvent(deps.eventBus, "runtime", "runtime.failed", input.sessionId, {
       runtimeId: manifest.name,

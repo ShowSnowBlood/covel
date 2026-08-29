@@ -30,6 +30,7 @@ export interface TraceRecorder {
     runtimeId: string;
     pluginId: string;
     error: string;
+    durationMs?: number;
   }): Promise<void>;
 }
 

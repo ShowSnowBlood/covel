@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { toRuntimeCompletedStatus } from "../session-store/execution-steps.js";
 
 // ── Local typing mirror of session-store's slice ─────────────────
 
@@ -182,19 +183,6 @@ function applyResumeResponse(
   return reduce(next, { type: "REMOVE_SUSPENSION", suspensionId });
 }
 
-/** Exact copy of the runtime.completed status-resolution branch added to
- *  handleSseEvent. Lives here so a future change to "always completed" fails
- *  these tests rather than silently regressing. */
-function resolveRuntimeCompletedStatus(
-  payload: Record<string, unknown>,
-): ExecutionStep["status"] {
-  const rawStatus = payload.status;
-  if (rawStatus === "suspended") return "suspended";
-  if (rawStatus === "skipped") return "skipped";
-  if (rawStatus === "failed") return "failed";
-  return "completed";
-}
-
 const makeSuspension = (
   overrides: Partial<SuspensionRecord> = {},
 ): SuspensionRecord => ({
@@ -269,17 +257,11 @@ describe("session-store — suspensions slice", () => {
     // Prior bug: the handler hard-coded status: "completed", so the chat
     // timeline lied about suspended runtimes and the amber clock chip never
     // showed up. Reading payload.status is what unlocks the honest state.
-    expect(resolveRuntimeCompletedStatus({ status: "suspended" })).toBe(
-      "suspended",
-    );
-    expect(resolveRuntimeCompletedStatus({ status: "completed" })).toBe(
-      "completed",
-    );
-    expect(resolveRuntimeCompletedStatus({ status: "failed" })).toBe("failed");
-    expect(resolveRuntimeCompletedStatus({ status: "skipped" })).toBe(
-      "skipped",
-    );
-    expect(resolveRuntimeCompletedStatus({})).toBe("completed"); // safe default
+    expect(toRuntimeCompletedStatus("suspended")).toBe("suspended");
+    expect(toRuntimeCompletedStatus("completed")).toBe("completed");
+    expect(toRuntimeCompletedStatus("failed")).toBe("failed");
+    expect(toRuntimeCompletedStatus("skipped")).toBe("skipped");
+    expect(toRuntimeCompletedStatus(undefined)).toBe("completed"); // safe default
   });
 
   it("runtime.completed + UPSERT: writes 'suspended' into the execution step row", () => {
@@ -294,10 +276,7 @@ describe("session-store — suspensions slice", () => {
         },
       ],
     };
-    const status = resolveRuntimeCompletedStatus({
-      status: "suspended",
-      durationMs: 42,
-    });
+    const status = toRuntimeCompletedStatus("suspended");
     const next = reduce(started, {
       type: "UPSERT_EXECUTION_STEP",
       step: {

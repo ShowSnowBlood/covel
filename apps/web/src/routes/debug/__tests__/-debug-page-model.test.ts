@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type * as api from "@/services/api.js";
 import { validateDebugSearch } from "../../debug.js";
+import { deriveRuntimesFromTurn, extractDetail } from "../-debug-helpers.js";
 import {
   getStoryTurnCount,
   getVisibleTurns,
@@ -77,6 +78,29 @@ describe("debug route model", () => {
     expect(
       traceEventMatchesCategory(traceEvent("message.completed"), "llm"),
     ).toBe(false);
+  });
+  it("treats a failed status inside runtime.completed as failed", () => {
+    const event = traceEvent("runtime.completed", {
+      runtimeId: "plugin/runtime",
+      pluginId: "plugin",
+      status: "failed",
+      error: "provider timeout",
+    });
+
+    expect(deriveRuntimesFromTurn([event])[0]?.status).toBe("failed");
+    expect(extractDetail(event)).toContain("provider timeout");
+  });
+
+  it("recognizes EventBus lifecycle rows by their _subType", () => {
+    const event = traceEvent("event", {
+      _subType: "runtime.failed",
+      runtimeId: "plugin/runtime",
+      pluginId: "plugin",
+      error: "connection reset",
+    });
+
+    expect(deriveRuntimesFromTurn([event])[0]?.status).toBe("failed");
+    expect(extractDetail(event)).toContain("connection reset");
   });
 });
 

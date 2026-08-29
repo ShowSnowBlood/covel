@@ -4,7 +4,10 @@ import { ignoreError } from "@/lib/ignore-error.js";
 import { setActiveSession as setActivePluginDataSession } from "@/stores/plugin-data-store.js";
 import { clearAllStreamingText } from "@/stores/streaming-text-store.js";
 import type { SnapshotMessage, SnapshotTraceEvent } from "@covel/shared";
-import { isDurableExecutionStep } from "./execution-steps.js";
+import {
+  isDurableExecutionStep,
+  toRuntimeCompletedStatus,
+} from "./execution-steps.js";
 import { enrichGameStateFromSnapshot } from "./game-state.js";
 import type { ExecutionStep, SessionDispatch, StreamMessage } from "./types.js";
 
@@ -37,36 +40,59 @@ export function toStreamMessages(
   }));
 }
 
-function buildSnapshotExecutionSteps(
+export function buildSnapshotExecutionSteps(
   events: readonly SnapshotTraceEvent[],
 ): ExecutionStep[] {
   const byKey = new Map<string, ExecutionStep>();
   for (const event of events) {
-    if (!event.type.startsWith("runtime.")) continue;
-    const payload = event.payload as Record<string, unknown>;
+    const payload =
+      event.payload &&
+      typeof event.payload === "object" &&
+      !Array.isArray(event.payload)
+        ? (event.payload as Record<string, unknown>)
+        : {};
+    // EventBus-backed lifecycle rows are stored as `type: "event"` with the
+    // protocol name in `_subType`. Direct TurnEmitter/TraceRecorder rows keep
+    // the protocol name in `type`; accept both so old and new failures restore.
+    const eventType = event.type.startsWith("runtime.")
+      ? event.type
+      : event.type === "event" && typeof payload._subType === "string"
+        ? payload._subType
+        : "";
+    if (!eventType.startsWith("runtime.")) continue;
+
     const runtimeId = (payload.runtimeId as string) ?? "";
     if (!runtimeId || runtimeId === "__turn__") continue;
+    const turnId =
+      event.turnId ||
+      (typeof payload.turnId === "string" ? payload.turnId : event.turnId);
 
-    const key = `${event.turnId ?? "__no_turn__"}|${runtimeId}`;
+    const key = `${turnId ?? "__no_turn__"}|${runtimeId}`;
     const prev = byKey.get(key);
     const status: ExecutionStep["status"] =
-      event.type === "runtime.completed"
-        ? "completed"
-        : event.type === "runtime.failed"
+      eventType === "runtime.completed"
+        ? toRuntimeCompletedStatus(payload.status)
+        : eventType === "runtime.failed"
           ? "failed"
-          : event.type === "runtime.skipped"
+          : eventType === "runtime.skipped"
             ? "skipped"
             : "running";
     byKey.set(key, {
       runtimeId,
       pluginId: (payload.pluginId as string) ?? prev?.pluginId ?? "",
       status,
-      turnId: event.turnId,
+      turnId,
+      detail:
+        typeof payload.error === "string"
+          ? payload.error
+          : typeof payload.reason === "string"
+            ? payload.reason
+            : prev?.detail,
       label: (payload.label as string | undefined) ?? prev?.label,
       durationMs:
         (payload.durationMs as number | undefined) ?? prev?.durationMs,
       startedAt:
-        event.type === "runtime.started" ? event.timestamp : prev?.startedAt,
+        eventType === "runtime.started" ? event.timestamp : prev?.startedAt,
     });
   }
   return [...byKey.values()].filter(isDurableExecutionStep);
@@ -170,7 +196,7 @@ function migrateExecutionStep(raw: Record<string, unknown>): ExecutionStep {
   const legacyType = raw.type as string | undefined;
   const legacyStatus: ExecutionStep["status"] =
     legacyType === "runtime.completed"
-      ? "completed"
+      ? toRuntimeCompletedStatus(raw.status)
       : legacyType === "runtime.failed"
         ? "failed"
         : legacyType === "runtime.skipped"

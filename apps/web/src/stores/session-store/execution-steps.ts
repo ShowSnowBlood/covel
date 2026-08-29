@@ -11,6 +11,22 @@ export function toExecutionStepStatus(
 }
 
 /**
+ * Resolve the status carried by a runtime.completed terminal event.
+ *
+ * Some runtime paths use the generic `runtime.completed` event for skipped,
+ * suspended, or post-hook-failed results. Treating every such event as a
+ * successful completion loses the durable terminal state during restore.
+ */
+export function toRuntimeCompletedStatus(
+  status: unknown,
+): ExecutionStep["status"] {
+  if (status === "failed") return "failed";
+  if (status === "skipped") return "skipped";
+  if (status === "suspended") return "suspended";
+  return "completed";
+}
+
+/**
  * Persist only terminal runtime rows. LLM/tool boundary projections remain
  * in-memory so high-frequency trace events do not rewrite the execution cache.
  */

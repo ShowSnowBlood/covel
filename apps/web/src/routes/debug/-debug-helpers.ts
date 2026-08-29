@@ -132,10 +132,14 @@ export function deriveRuntimesFromTurn(
     const info = map.get(runtimeId)!;
     info.events.push(event);
 
-    if (event.type === "runtime.completed") {
-      info.status = "completed";
+    const eventType =
+      event.type === "event" && typeof payload._subType === "string"
+        ? payload._subType
+        : event.type;
+    if (eventType === "runtime.completed") {
+      info.status = payload.status === "failed" ? "failed" : "completed";
       info.completedAt = event.timestamp;
-    } else if (event.type === "runtime.failed") {
+    } else if (eventType === "runtime.failed") {
       info.status = "failed";
       info.completedAt = event.timestamp;
     }
@@ -242,15 +246,21 @@ export function aggregateDeltas(events: api.TraceEvent[]): api.TraceEvent[] {
 
 export function extractDetail(event: api.TraceEvent): string {
   const payload = event.payload;
-  const innerType = (payload.type as string) || event.type;
+  const innerType =
+    (payload.type as string) ||
+    (event.type === "event" && typeof payload._subType === "string"
+      ? payload._subType
+      : event.type);
 
   switch (innerType) {
     case "runtime.started":
       return `${payload.pluginId || ""}${payload.detail && payload.detail !== "[cached]" ? ` - ${payload.detail}` : ""}${payload.detail === "[cached]" ? " (cached)" : ""}`;
     case "runtime.completed":
-      return (payload.pluginId as string) || "";
+      return payload.status === "failed"
+        ? `${payload.pluginId || ""} - ${payload.error || payload.detail || "error"}`
+        : (payload.pluginId as string) || "";
     case "runtime.failed":
-      return `${payload.pluginId || ""} - ${payload.detail || "error"}`;
+      return `${payload.pluginId || ""} - ${payload.error || payload.detail || "error"}`;
     case "llm.calling": {
       const data = payload.data as Record<string, unknown> | undefined;
       const msgCount = Array.isArray(data?.messages)

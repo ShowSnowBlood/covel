@@ -38,6 +38,7 @@ import {
   emitMessageCompleted,
   emitRuntimeCompleted,
   emitRuntimeFailed,
+  notifyRuntimeTerminal,
 } from "../trace/runtime-telemetry.js";
 import type { TurnExecutorDeps } from "../turn-executor/turn-executor-types.js";
 import { runAgentToolLoop } from "./turn-agent-tool-loop.js";
@@ -133,7 +134,7 @@ export async function executeAgentRuntime({
       emitter: deps.emitter,
     });
     if (preRtResult.action === "abort") {
-      return {
+      const skippedResult: RuntimeResult = {
         pluginId: manifest.pluginId,
         runtimeId: manifest.name,
         runId,
@@ -144,6 +145,13 @@ export async function executeAgentRuntime({
         durationMs: Date.now() - startTime,
         timestamp: new Date().toISOString(),
       };
+      await notifyRuntimeTerminal(
+        deps,
+        input.sessionId,
+        manifest,
+        skippedResult,
+      );
+      return skippedResult;
     }
   }
 
@@ -305,17 +313,17 @@ export async function executeAgentRuntime({
     eventBus: deps.eventBus,
     emitter: deps.emitter,
   };
-  const finalizeFailure = (result: RuntimeResult): Promise<RuntimeResult> => {
+  const finalizeFailure = async (
+    result: RuntimeResult,
+  ): Promise<RuntimeResult> => {
     // Single terminal-event funnel for RETURNED failures. Every returned
     // failure path (timeout without content, requireToolUse unmet,
-    // tool-failed, schema/prose short-circuits, retry exhaustion) lands here;
-    // without this emission the execution strip never learns the runtime
-    // failed and its chip spins forever (thrown failures are covered by the
-    // caller's catch in turn-runtime-execution).
-    if (result.status === "failed") {
-      emitRuntimeFailed(deps, input.sessionId, manifest, result);
-    }
-    return runPostRuntimeHook(postRuntimeOpts, result);
+    // tool-failed, schema/prose short-circuits, retry exhaustion) lands here.
+    // Report only after PostRuntime so the callback and event bus observe the
+    // same final status/output identity.
+    const finalized = await runPostRuntimeHook(postRuntimeOpts, result);
+    await notifyRuntimeTerminal(deps, input.sessionId, manifest, finalized);
+    return finalized;
   };
 
   if (!stoppedWithResponse && !finalContent) {
@@ -520,6 +528,7 @@ export async function executeAgentRuntime({
       pluginId: manifest.pluginId,
       status: result.status,
       durationMs: result.durationMs,
+      ...(result.error ? { error: result.error } : {}),
     });
   } catch {
     /* callback error must not kill runtime */
@@ -536,7 +545,11 @@ export async function executeAgentRuntime({
     );
   }
 
-  emitRuntimeCompleted(deps, input.sessionId, manifest, result);
+  if (result.status === "failed") {
+    emitRuntimeFailed(deps, input.sessionId, manifest, result);
+  } else {
+    emitRuntimeCompleted(deps, input.sessionId, manifest, result);
+  }
 
   return result;
 }
