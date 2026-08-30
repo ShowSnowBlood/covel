@@ -48,6 +48,7 @@ async function createBoundService(
     staleImageDefault?: boolean;
     imageCatalog?: boolean;
     grokCatalog?: boolean;
+    localTextConfig?: boolean;
   } = {},
 ) {
   const store = createMemoryCredentialStore();
@@ -94,6 +95,22 @@ async function createBoundService(
     return json({ error: "not_found" }, 404);
   });
   const ai = createAiStack();
+  if (options.noLocalModelConfig) {
+    ai.config.presets = [];
+  }
+  if (options.localTextConfig) {
+    ai.config.presets.push({
+      id: "slot-story",
+      name: "Configured local story",
+      provider: "story",
+      model: "configured-local",
+      tier: "medium",
+      supportedModes: ["text"],
+      enabled: true,
+      defaultSlot: "story",
+      tag: "text",
+    });
+  }
   if (options.staleImageDefault) {
     ai.config.presets.push({
       id: "slot-image",
@@ -149,7 +166,7 @@ async function createBoundService(
     credentialState: "active",
     lastVerifiedAt: now,
   };
-  return { service, principal };
+  return { service, principal, ai };
 }
 
 describe("FrostFox first-party SaaS", () => {
@@ -246,6 +263,64 @@ describe("FrostFox first-party SaaS", () => {
         expect.objectContaining({ id: primaryId, model: "grok-4.6" }),
       ]),
     );
+  });
+
+  it("provisions a managed text route when local model config is absent", async () => {
+    const { service, principal, ai } = await createBoundService(false, {
+      noLocalModelConfig: true,
+    });
+
+    const context = await service.prepareAiContext(principal);
+    const textPresetId =
+      context?.managedSlotDefaults?.slotPresetOverrides?.story;
+    const textPreset = context?.managedSlotDefaults?.customPresets?.find(
+      (preset) => preset.id === textPresetId,
+    );
+    const storyProvider = service.clientConfig
+      .providers()
+      .find((provider) => provider.channelKey === "story");
+
+    expect(textPresetId).toMatch(/^frostfox-managed-[0-9a-f]{24}$/);
+    expect(textPreset).toMatchObject({
+      provider: storyProvider?.providerId,
+      model: "story-backup",
+      tag: "text",
+    });
+    expect(context?.managedModelPolicy).toEqual({
+      presetIdsByTag: { text: textPresetId },
+    });
+    expect(context?.apiKeys[storyProvider!.providerId]).toBe(
+      deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel"),
+    );
+    const resolved = ai.gateway.resolveSlot("story", {
+      apiKeys: context!.apiKeys,
+      managedModelPolicy: context!.managedModelPolicy,
+      slotOverrides: context!.managedSlotDefaults,
+    });
+    expect(resolved).toMatchObject({
+      provider: storyProvider!.providerId,
+      model: "story-backup",
+      apiKey: deriveFrostFoxGatewayKey(ACCOUNT_KEY, "covel"),
+      headers: { "X-FrostFox-Channel-Id": CHANNEL_ID },
+    });
+  });
+
+  it("retains a configured managed text route without a preferred model", async () => {
+    const { service, principal } = await createBoundService(false, {
+      localTextConfig: true,
+    });
+
+    const context = await service.prepareAiContext(principal);
+    const textPresetId =
+      context?.managedSlotDefaults?.slotPresetOverrides?.story;
+    const textPreset = context?.managedSlotDefaults?.customPresets?.find(
+      (preset) => preset.id === textPresetId,
+    );
+
+    expect(textPreset).toMatchObject({
+      model: "configured-local",
+      tag: "text",
+    });
   });
 
   it("publishes the ordered story fallback chain for admins", async () => {

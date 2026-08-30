@@ -18,6 +18,7 @@ This release rebuilds provider and model configuration around explicit connectio
 - **Project documentation is organized by audience and lifetime.** Stable user and developer guides live under `docs/`; audits, implementation plans, temporary analysis, and handoff notes live under `devs/docs/`. Desktop packaging and world-media generation now have indexed guides, and the architecture section carries the maintained technical-debt ledger.
 
 - **FrostFox 新账号引导现在使用账号模型目录。** 登录后的叙事模型从当前账号可用的文本模型中选择，插件模型默认复用该绑定，也可以单独选择另一模型；托管绑定只保存模型引用，不要求浏览器填写 provider key。
+- **SaaS 账号现在可在无本地模型配置时直接运行。** 登录后服务端从账号目录选择健康文本模型，自动补齐默认文本用途；Router 为账号与 SaaS 客户端幂等准备托管 Gateway Key，浏览器无需填写或接收 provider API key。
 
 - **托管模型连通性探测复用正式请求的覆盖清洗边界。** `/api/ai/ping` 现在解析并清洗浏览器传入的 slot/preset 覆盖，拒绝伪造 FrostFox 渠道或让托管凭据指向外部 endpoint；provider 返回仅 reasoning 或无内容时分别给出可判定的成功/失败结果，失败探测不会污染前端重试缓存。
 

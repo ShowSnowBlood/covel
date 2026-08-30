@@ -244,7 +244,7 @@ export function ProviderForm({
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               {t(
                 "onboarding.managedModelHint",
-                "Uses your FrostFox account balance. No provider key is required.",
+                "Uses your FrostFox account balance. The server prepares the managed Gateway Key after sign-in; no provider key is required.",
               )}
             </p>
             {managedReady && (

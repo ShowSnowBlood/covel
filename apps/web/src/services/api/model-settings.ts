@@ -1,4 +1,8 @@
-import { normalizeProviderKeyMap, providerKeyToId } from "@covel/shared";
+import {
+  isGrok46Model,
+  normalizeProviderKeyMap,
+  providerKeyToId,
+} from "@covel/shared";
 import { getSettings, registerKnownProviders } from "@/settings/store";
 import {
   flattenProviderProfiles,
@@ -358,6 +362,34 @@ export function reconcileManagedFrostFoxSlots(
       continue;
     }
     next[slotId] = entry;
+  }
+
+  const isTextPreset = (preset: CustomPreset): boolean =>
+    preset.tag === "text" ||
+    preset.capability?.output.includes("text") === true;
+  const textPresets = managedPresets.filter(isTextPreset);
+  if (textPresets.length > 0) {
+    const selected =
+      textPresets.find((preset) => isGrok46Model(preset.model, preset.name)) ??
+      textPresets[0]!;
+    // Hosted accounts need a usable text route even when the deployment has
+    // no local llm.toml/slot binding. Persist references only; the matching
+    // derived Gateway Key remains server-side and never enters browser storage.
+    for (const slotId of ["story", "plugin", "utility", "default"] as const) {
+      const current = next[slotId];
+      const binding = slotBindingId(current);
+      const currentManaged = binding
+        ? managedPresets.find((preset) => preset.id === binding)
+        : undefined;
+      const playerOwnedReference =
+        typeof binding === "string" && !isManagedFrostFoxModelRef(binding);
+      if (!currentManaged || !isTextPreset(currentManaged)) {
+        if (!playerOwnedReference) {
+          next[slotId] = { modelRef: selected.id };
+          changed = true;
+        }
+      }
+    }
   }
 
   const imagePresets = managedPresets.filter((preset) =>

@@ -110,6 +110,8 @@ Covel HTTP API 参考文档。通过这些端点，你可以在没有前端 UI �
 
 账号目录中首个输出包含 `image` 的可用模型会成为托管 `image` 与 `openai-image` 用途的默认模型，浏览器显式绑定仍优先。图像调用继续使用派生 Gateway Key 与固定 `X-FrostFox-Channel-Id`，通过 Router 的 OpenAI 兼容 `POST /v1/images/generations` 执行；账号 Key 与派生 Key 均不进入浏览器。
 
+当本地没有模型配置时，连接 FrostFox 账号即可自动准备托管文本路由：服务端按账号目录选择健康模型并补齐默认用途，Router 侧的托管 Gateway Key 在 exchange 时幂等创建，派生密钥始终只在服务端使用。浏览器无需填写或接收 provider API key。
+
 启用 FrostFox 后，账号登录是进入游戏的前置条件。Web 在 `/session` 路由先检查账号状态；未登录只显示登录入口，不挂载世界选择、准备页或游戏界面。服务端同时对 `/api/sessions`、`/api/actions`、`/api/approvals`、`/api/events`、`/api/traces` 及其子路径执行账号 Cookie 校验；没有有效账号时 fail-closed，返回 `401 { "code": "frostfox_account_required" }`。运维 master token 继续用于部署探针和管理工具，未启用 FrostFox 的桌面端与 self-hosted 部署保持本地行为。`/api/ai/*`、`/api/kernel/*` 等模型执行路径仍由 per-request LLM 中间件执行同一账号要求。账户 Key 的不可区分失效只进入待恢复状态，不自动删除旧密文。
 
 固定派生算法：

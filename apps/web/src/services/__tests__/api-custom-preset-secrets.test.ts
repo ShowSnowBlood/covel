@@ -66,6 +66,29 @@ function readKeysBlob(): Record<string, string> {
   return JSON.parse(raw);
 }
 
+function setTextOnlyManagedCatalog(): void {
+  setManagedFrostFoxCatalog({
+    configurationVersion: "text-only",
+    channels: [
+      {
+        channelKey: "story",
+        providerId: "frostfox-73746f7279",
+        displayName: "Story",
+        enabled: true,
+        protocol: "openai-chat-v1",
+        baseUrl: "https://market.example/v1",
+        models: [
+          {
+            id: "story-default",
+            name: "Story Default",
+            capability: { input: ["text"], output: ["text"] },
+          },
+        ],
+      },
+    ],
+  });
+}
+
 beforeEach(async () => {
   localStorageMock.clear();
   await initSettings();
@@ -112,6 +135,36 @@ describe("custom preset secret channel", () => {
       image: {
         modelRef: "frostfox:image:gpt-image-2-2k",
       },
+    });
+  });
+
+  it("binds managed text roles when no local model configuration exists", () => {
+    setTextOnlyManagedCatalog();
+
+    reconcileManagedFrostFoxSlots();
+
+    expect(getSlotConfig()).toEqual({
+      story: { modelRef: "frostfox:story:story-default" },
+      plugin: { modelRef: "frostfox:story:story-default" },
+      utility: { modelRef: "frostfox:story:story-default" },
+      default: { modelRef: "frostfox:story:story-default" },
+    });
+    expect(JSON.stringify(readSettingsBlob())).not.toContain("apiKey");
+    expect(JSON.stringify(readSettingsBlob())).not.toContain("sk-");
+    expect(JSON.stringify(readKeysBlob())).not.toContain("sk-");
+  });
+
+  it("preserves an existing local text binding", () => {
+    setTextOnlyManagedCatalog();
+    setSlotConfig({ story: { presetId: "local-story" } });
+
+    reconcileManagedFrostFoxSlots();
+
+    expect(getSlotConfig()).toEqual({
+      story: { presetId: "local-story" },
+      plugin: { modelRef: "frostfox:story:story-default" },
+      utility: { modelRef: "frostfox:story:story-default" },
+      default: { modelRef: "frostfox:story:story-default" },
     });
   });
 
@@ -189,7 +242,7 @@ describe("custom preset secret channel", () => {
     });
   });
 
-  it("removes account-scoped slot references missing from the current catalog", async () => {
+  it("replaces stale managed text references and provisions missing roles", async () => {
     setManagedFrostFoxCatalog({
       configurationVersion: "account-a",
       channels: [
@@ -220,6 +273,10 @@ describe("custom preset secret channel", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(getSlotConfig()).toEqual({
+      story: { modelRef: "frostfox:text:model-b" },
+      plugin: { modelRef: "frostfox:text:model-b" },
+      utility: { modelRef: "frostfox:text:model-b" },
+      default: { modelRef: "frostfox:text:model-b" },
       local: { modelRef: "custom_local" },
     });
   });

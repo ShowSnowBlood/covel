@@ -1104,7 +1104,7 @@
     "localProvider": "Local provider key",
     "accountModel": "Account model",
     "managedModelAssigned": "Active model: {{model}}",
-    "managedModelHint": "Uses your FrostFox account balance. No provider key is required.",
+    "managedModelHint": "Uses your FrostFox account balance. The server prepares the managed Gateway Key after sign-in; no provider key is required.",
     "loadingManagedModels": "Loading account models…",
     "noManagedModels": "No usable account models are available yet. Refresh your FrostFox account and try again.",
     "refreshManagedModels": "Refresh models",

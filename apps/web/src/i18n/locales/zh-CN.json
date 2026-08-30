@@ -1102,7 +1102,7 @@
     "localProvider": "本地服务商密钥",
     "accountModel": "账号模型",
     "managedModelAssigned": "当前模型：{{model}}",
-    "managedModelHint": "使用 FrostFox 账号余额，无需填写服务商密钥。",
+    "managedModelHint": "使用 FrostFox 账号余额。登录后服务端会自动准备托管 Gateway Key，无需填写服务商密钥。",
     "loadingManagedModels": "正在加载账号模型…",
     "noManagedModels": "暂时没有可用的账号模型，请刷新 FrostFox 账号后重试。",
     "refreshManagedModels": "刷新模型",

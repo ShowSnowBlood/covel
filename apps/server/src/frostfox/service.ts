@@ -919,7 +919,7 @@ function normalizeScheduleEntries(
   return normalized;
 }
 
-/** Explicit administrator order wins; otherwise prefer catalog Grok 4.6. */
+/** Admin schedule wins; otherwise prefer Grok 4.6, then fill only missing routes with the first healthy text model. */
 function withManagedStorySchedule(
   defaults: SlotOverridesInput | undefined,
   schedule: FrostFoxModelSchedule | null,
@@ -927,20 +927,18 @@ function withManagedStorySchedule(
 ): SlotOverridesInput | undefined {
   let scheduledEntries = schedule?.story;
   if (!scheduledEntries || scheduledEntries.length === 0) {
-    let preferredEntry: FrostFoxModelScheduleEntry | undefined;
-    for (const channel of catalog.channels) {
-      if (!channel.enabled || channel.error) continue;
-      const model = channel.models.find(
-        (item) =>
-          item.capability.output.includes("text") &&
-          isGrok46Model(item.id, item.name),
-      );
-      if (!model) continue;
-      preferredEntry = { channelKey: channel.channelKey, modelId: model.id };
-      break;
-    }
-    if (!preferredEntry) return defaults;
-    scheduledEntries = [preferredEntry];
+    const slots = defaults?.slotPresetOverrides;
+    const hasConfiguredTextRoute = Boolean(
+      slots?.story || slots?.default || slots?.plugin,
+    );
+    const selected = selectManagedTextCandidate(
+      catalog,
+      !hasConfiguredTextRoute,
+    );
+    if (!selected) return defaults;
+    scheduledEntries = [
+      { channelKey: selected.channel.channelKey, modelId: selected.model.id },
+    ];
   }
 
   const candidates: Array<{
@@ -962,6 +960,10 @@ function withManagedStorySchedule(
     seen.add(key);
     candidates.push({ channel, model });
   }
+
+  // An explicit administrator schedule is authoritative. If every entry is
+  // unavailable in the current catalog, retain the existing defaults and let
+  // the caller surface the unavailable managed route.
   if (candidates.length === 0) return defaults;
 
   const slotPresetOverrides = { ...(defaults?.slotPresetOverrides ?? {}) };
@@ -1013,6 +1015,28 @@ function withManagedStorySchedule(
     slotPresetOverrides,
     customPresets: [...customPresets.values()],
   };
+}
+
+interface ManagedTextCandidate {
+  readonly channel: FrostFoxModelChannel;
+  readonly model: FrostFoxModelEntry;
+}
+
+function selectManagedTextCandidate(
+  catalog: FrostFoxModelCatalog,
+  allowFirstAvailableFallback: boolean,
+): ManagedTextCandidate | undefined {
+  let firstAvailable: ManagedTextCandidate | undefined;
+  for (const channel of catalog.channels) {
+    if (!channel.enabled || channel.error) continue;
+    for (const model of channel.models) {
+      if (!model.capability.output.includes("text")) continue;
+      const candidate = { channel, model };
+      if (isGrok46Model(model.id, model.name)) return candidate;
+      firstAvailable ??= candidate;
+    }
+  }
+  return allowFirstAvailableFallback ? firstAvailable : undefined;
 }
 
 function buildManagedSlotDefaults(
